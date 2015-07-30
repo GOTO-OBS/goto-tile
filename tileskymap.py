@@ -1,0 +1,93 @@
+import argparse
+import os,sys
+import datetime
+
+import glob
+import string
+import gc
+import gzip
+import cPickle
+import numpy as np
+import healpy as hp
+
+from tools import fits
+from tools import skymaptools as smt
+#from tools import galtools as gt
+from tools import plottools as pt
+from tools import grid
+
+def pretty_time_delta(seconds):
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    if days > 0:
+        return '%dd%dh%dm%ds' % (days, hours, minutes, seconds)
+    elif hours > 0:
+        return '%dh%dm%ds' % (hours, minutes, seconds)
+    elif minutes > 0:
+        return '%dm%ds' % (minutes, seconds)
+    else:
+        return '%ds' % (seconds,)
+
+def parse_command_line():
+
+	description = """This script creates pointings for selected telescopes, with given skymap files."""
+	
+	parser = argparse.ArgumentParser(description = description,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+	
+	parser.add_argument("-o", "--output", default='', help="Name of output files (without extension)")
+	parser.add_argument("-p", "--path",default='./', help="Output path [default: current directory]")
+	parser.add_argument("-t", "--maxt", type=int, default=1000,help="Number of tiles to return")
+	parser.add_argument("-f", "--maxf", type=float, default=0.9, help="Maximum fraction of skymap to tile")
+	parser.add_argument("-s", "--scopes", type=int, default=4, help="Number of telescopes for GOTO configuration, 4 or 8")
+	parser.add_argument("-g", "--goto", action="store_true", default=True, help="Use GOTO telescope design sizes")
+	parser.add_argument("-v", "--vista", action="store_true", default=False, help="Use VISTA telescope tile sizes")
+	parser.add_argument("-u", "--usegals", action="store_true", default=False, help="Use GWGC in tiling/plotting")
+	parser.add_argument("-n", "--nightsky", action="store_true", default=False, help="Use nightsky visbility in tiling/plotting")
+	parser.add_argument("--geoplot", action="store_true", default=False, help="Plot in geographic coordinates, (lat, lon)")
+	parser.add_argument("--plot", action="store_true", default=False, help="Plot in RA-Dec")
+	parser.add_argument("--makegrid", action="store_true", default=False, help="Create fixed grid of tiles on sky. WARNING: Can take some time.")
+	parser.add_argument("--tiles", default='./tiles/', help="Location of pre-made fixed grid of tiles on sky.")
+	parser.add_argument("--injgal", action="store_true", default=False,help="Inject galaxy from GWGC for first2years simulations.")
+	parser.add_argument("--simpath", default='../Skymaps/',help="Location of first2years injections")
+	parser.add_argument("infiles", help="Space separated input files", nargs='*')
+	
+	return parser.parse_args()
+
+if __name__=='__main__':
+	start = datetime.datetime.now()
+	args = parse_command_line()
+	
+	if args.makegrid: 
+		print "Creating grid for all variations of nside and nest pairs for both GOTO4 and GOTO8. Will take some time..."
+		grid.tileallsky(args)
+	
+	if len(args.infiles)==0: sys.exit("No input files detected, please provide input skymap.")
+	if len(args.infiles)>1: print "Multiple input files detected, outfile argument ignored, outfile name taken from metadata object id."
+	elif args.output=='': print "No output name detected, output taken from object id metadata."
+	
+	scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args)
+	
+	for infile in args.infiles:
+
+		skymap, metadata = fits.read_sky_map(infile)
+
+		if len(args.infiles)>1 or args.output=='':
+			objid = metadata['objid']
+			objsplit = objid.split(':')
+			args.output = objsplit[-1]
+	
+		tilefile = "allskytiles/{}_nside{}_nest{}.pgz".format(scopename,metadata['nside'],metadata['nest'])
+		alltiles,pixlist = grid.readtiles(tilefile,metadata,args)
+	
+		pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,np.array(pixlist))
+
+		if args.plot or args.geoplot: pt.plotskymapsmoll(tiledmap,pointings,metadata,args,scopename)
+
+	end = datetime.datetime.now()
+
+	td = end-start
+	ts = td.total_seconds()
+	print "Time taken to tile skymap: {}".format(pretty_time_delta(ts))
+	
