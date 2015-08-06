@@ -1,10 +1,7 @@
 import numpy as np
-import math
 import healpy as hp
 import skymaptools as smt
-import sys
 import astropy.coordinates as acoord
-import astropy.time as atime
 import astropy.units as u
 
 def visiblegals(gals, sidtimes, lat, lon, height, radius):

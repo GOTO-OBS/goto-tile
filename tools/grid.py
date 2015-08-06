@@ -8,24 +8,16 @@ import os
 
 def pixelsky(tilelist,scope):
 
-	nsides = [64,128,256,512,1024,2048]
-	nsides = [64,2048] #remake for extra maps
-	nests = [True,False]
-	allpixlists = []
-	for nside,nest in it.product(nsides,nests):	
-		pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
-		pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) for points in pointlist])
+	nside = [512]
+	nest = [True]
+	pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
+	pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) for points in pointlist])
 		
-		outfile = "{}_nside{}_nest{}.pgz".format(scope,nside,nest)
-		with gzip.GzipFile(outfile, 'w') as f: 
-			cPickle.dump([tilelist,pixlist], f) #makes gzip compressed pickles
-			f.close()
-		allpixlists.append(pixlist)
-	
-#	outfile = "{}.pgz".format(scope)
-#	with gzip.GzipFile(outfile, 'w') as f:
-#		cPickle.dump([tilelist,allpixlists], f) #makes gzip compressed pickles
-#		f.close()
+	outfile = "{}_nside{}_nest{}.pgz".format(scope,nside,nest)
+	with gzip.GzipFile(outfile, 'w') as f: 
+		cPickle.dump([tilelist,pixlist], f) #makes gzip compressed pickles
+		f.close()
+
 	return
 
 
@@ -56,20 +48,8 @@ def tileallsky(args):
 def readtiles(infile,metadata,args):
 
 	with gzip.GzipFile('{}/{}'.format(args.tiles,infile), 'r') as f: 
-		tilelist,allpixlists = cPickle.load(f)
+		tilelist,pixlist = cPickle.load(f)
 		f.close()
-
-	if len(allpixlists)==8:
-		nsides = [128,256,512,1024]
-		nests = [True,False]
-	
-		for idx,(nside,nest) in enumerate(it.product(nsides,nests)):
-			if nside==metadata['nside'] and nest==metadata['nest']: 
-				#print idx
-				pixlist = allpixlists[idx]
-				break
-	else:
-		pixlist=allpixlists
 	
 	return tilelist,pixlist
 	

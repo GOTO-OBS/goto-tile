@@ -1,6 +1,6 @@
-from . import skymaptools as smt
-from . import galtools as gt
-from . import cmap
+import skymaptools as smt
+import galtools as gt
+import cmap
 
 import numpy as np
 import healpy as hp

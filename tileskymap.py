@@ -1,18 +1,9 @@
 import argparse
-import os,sys
+import sys
 import datetime
-
-import glob
-import string
-import gc
-import gzip
-import cPickle
-import numpy as np
-import healpy as hp
 
 from tools import fits
 from tools import skymaptools as smt
-#from tools import galtools as gt
 from tools import plottools as pt
 from tools import grid
 
@@ -72,16 +63,19 @@ if __name__=='__main__':
 	for infile in args.infiles:
 
 		skymap, metadata = fits.read_sky_map(infile)
+		if metadata['nest']: orderin = 'NESTED'
+		else: orderin = 'RINGED'
+		newmap = hp.ud_grade(skymap, nside_out = 512, order_in = orderin, order_out ='NESTED',power = -2)
 
 		if len(args.infiles)>1 or args.output=='':
 			objid = metadata['objid']
 			objsplit = objid.split(':')
 			args.output = objsplit[-1]
 	
-		tilefile = "allskytiles/{}_nside{}_nest{}.pgz".format(scopename,metadata['nside'],metadata['nest'])
+		tilefile = "allskytiles/{}_nside512_nestTrue.pgz".format(scopename,metadata['nside'],metadata['nest'])
 		alltiles,pixlist = grid.readtiles(tilefile,metadata,args)
 	
-		pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,np.array(pixlist))
+		pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,pixlist)
 
 		if args.plot or args.geoplot: pt.plotskymapsmoll(tiledmap,pointings,metadata,args,scopename)
 

@@ -7,7 +7,7 @@ import astropy.units as u
 import ephem
 import sys
 import math
-
+import galtools as gt
 
 def _convc2s(r,d):
 	p = r*np.pi/180
