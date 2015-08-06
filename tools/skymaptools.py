@@ -8,6 +8,8 @@ import ephem
 import sys
 import math
 import galtools as gt
+import numpy as np
+import healpy as hp
 
 def _convc2s(r,d):
 	p = r*np.pi/180
@@ -269,7 +271,7 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 #		print len(seenpix)
 		seen.extend(list(seenpix))
 	
-	seen = list(np.unique(seen))
+		seen = list(np.unique(seen))
 #		print len(seen)
 	
 	maskedmap = skymap.copy()

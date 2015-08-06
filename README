@@ -1,0 +1,80 @@
+Tileskymap.py reads in single/multiple skymaps and attempts to provide 
+the best tiling layout using a 'greedy tile' strategy. The version
+here is designed for use during the early stages of Advanced LIGO/VIRGO
+using the GOTO prototype observatory. 
+
+The user can choose a range of options, such as tiling with galaxy 
+weighting, or selecting between the two GOTO configurations (4- and
+8-astrograph designs).
+
+Output is in the form of a list of tiles, ordered by probability,
+as well as optional plots (geocentric, or celestial).
+
+Pre-requisites:
+===============
+
+A list of modules required for the script to work can be found 
+under the tools directory. Easy installation can be completed
+using
+
+    $ pip install -r tools/requirements.txt
+    
+However, if certain modules already exists, you should
+be able to easily install modules required.
+
+
+Running skymaptile.py
+======================
+
+The basic method for calling the script with default settings is:
+
+	$ python tileskymap.py <skymap-file>
+
+A list of user-changeable options can be found using:
+
+    $ python tileskymap.py -h
+
+Output:-
+
+usage: tileskymap.py [-h] [-i ID] [-p PATH] [-t MAXT] [-f MAXF] [-s SCOPES]
+                     [-g] [-n] [--geoplot] [--plot] [--makegrid]
+                     [--tiles TILES]
+                     [infiles [infiles ...]]
+
+This script creates pointings for selected telescopes, with given skymap
+files.
+
+positional arguments:
+  infiles               Space separated input files (default: None)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i ID, --id ID        Name of output files (without extension) (default: )
+  -p PATH, --path PATH  Output path (default: ./)
+  -t MAXT, --maxt MAXT  Number of tiles to return (default: 100)
+  -f MAXF, --maxf MAXF  Maximum fraction of visible skymap to tile (default:
+                        0.95)
+  -s SCOPES, --scopes SCOPES
+                        Number of telescopes for GOTO configuration, 4 or 8
+                        (default: 4)
+  -g, --usegals         Use GWGC in tiling/plotting (default: False)
+  -n, --nightsky        Use nightsky visbility in tiling/plotting (default:
+                        False)
+  --geoplot             Plot in geographic coordinates, (lat, lon) (default:
+                        False)
+  --plot                Plot in RA-Dec (default: False)
+  --makegrid            Create fixed grid of tiles on sky. WARNING: Can take
+                        some time. (default: False)
+  --tiles TILES         Location of pre-made fixed grid of tiles on sky.
+                        (default: ./tiles/)
+    
+
+Notes
+=====
+
+    Currently the script assumes greedy tiling is required. However, this may
+    be sub-optimal given the large filed-of-view of GOTO, and poor pointing
+    from the GW detectors, particularly in the 2-detector scenario, and is
+    an avenue of future work.
+    
+    

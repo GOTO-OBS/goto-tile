@@ -8,12 +8,12 @@ import os
 
 def pixelsky(tilelist,scope):
 
-	nside = [512]
-	nest = [True]
+	nside = 512
+	nest = True
 	pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
 	pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) for points in pointlist])
 		
-	outfile = "{}_nside{}_nest{}.pgz".format(scope,nside,nest)
+	outfile = "{}/{}_nside{}_nest{}.pgz".format(args.tiles,scope,nside,nest)
 	with gzip.GzipFile(outfile, 'w') as f: 
 		cPickle.dump([tilelist,pixlist], f) #makes gzip compressed pickles
 		f.close()
