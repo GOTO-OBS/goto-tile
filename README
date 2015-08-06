@@ -27,6 +27,10 @@ in a given directory. This speeds up the time taken to tile a given skymap.
 This can be done by running:
 
 	$ python tileskymap.py --makegrid
+	
+with a user chosen directory:
+
+	$ python tileskymap.py --makegrid --tiles <path-to-tiles>
 
 
 Running skymaptile.py
