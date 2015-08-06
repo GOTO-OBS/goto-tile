@@ -29,12 +29,10 @@ def parse_command_line():
 	
 	parser.add_argument("-o", "--output", default='', help="Name of output files (without extension)")
 	parser.add_argument("-p", "--path",default='./', help="Output path [default: current directory]")
-	parser.add_argument("-t", "--maxt", type=int, default=1000,help="Number of tiles to return")
-	parser.add_argument("-f", "--maxf", type=float, default=0.9, help="Maximum fraction of skymap to tile")
+	parser.add_argument("-t", "--maxt", type=int, default=100,help="Number of tiles to return")
+	parser.add_argument("-f", "--maxf", type=float, default=0.95, help="Maximum fraction of visible skymap to tile")
 	parser.add_argument("-s", "--scopes", type=int, default=4, help="Number of telescopes for GOTO configuration, 4 or 8")
-	parser.add_argument("-g", "--goto", action="store_true", default=True, help="Use GOTO telescope design sizes")
-	parser.add_argument("-v", "--vista", action="store_true", default=False, help="Use VISTA telescope tile sizes")
-	parser.add_argument("-u", "--usegals", action="store_true", default=False, help="Use GWGC in tiling/plotting")
+	parser.add_argument("-g", "--usegals", action="store_true", default=False, help="Use GWGC in tiling/plotting")
 	parser.add_argument("-n", "--nightsky", action="store_true", default=False, help="Use nightsky visbility in tiling/plotting")
 	parser.add_argument("--geoplot", action="store_true", default=False, help="Plot in geographic coordinates, (lat, lon)")
 	parser.add_argument("--plot", action="store_true", default=False, help="Plot in RA-Dec")
@@ -51,7 +49,7 @@ if __name__=='__main__':
 	args = parse_command_line()
 	
 	if args.makegrid: 
-		print "Creating grid for all variations of nside and nest pairs for both GOTO4 and GOTO8. Will take some time..."
+		print "Creating fixed grid for both GOTO4 and GOTO8. Could take some time..."
 		grid.tileallsky(args)
 	
 	if len(args.infiles)==0: sys.exit("No input files detected, please provide input skymap.")
