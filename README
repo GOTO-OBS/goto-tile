@@ -22,6 +22,12 @@ using
 However, if certain modules already exists, you should
 be able to easily install modules required.
 
+In order to tile the sky, we must first create the list of fixed tiles,
+in a given directory. This speeds up the time taken to tile a given skymap.
+This can be done by running:
+
+	$ python tileskymap.py --makegrid
+
 
 Running skymaptile.py
 ======================

@@ -46,42 +46,41 @@ def parse_command_line():
 if __name__=='__main__':
 	start = datetime.datetime.now()
 	args = parse_command_line()
-	
-	if not os.path.exists(args.path):
-		os.makedirs(args.path)
-	
 	if args.makegrid: 
 		print "Creating fixed grid for both GOTO4 and GOTO8. Could take some time..."
 		grid.tileallsky(args)
+	else:	
+		if not os.path.exists(args.path):
+			os.makedirs(args.path)
 	
-	if len(args.infiles)==0: sys.exit("No input files detected, please provide input skymap.")
-	if len(args.infiles)>1: print "Multiple input files detected, outfile argument ignored, outfile name taken from metadata object id."
-	elif args.id=='': print "No output name detected, output taken from object id metadata."
+		if len(args.infiles)==0: sys.exit("No input files detected, please provide input skymap.")
+		if len(args.infiles)>1: print "Multiple input files detected, outfile argument ignored, outfile name taken from metadata object id."
+		elif args.id=='': print "No output name detected, output taken from object id metadata."
 	
-	scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args)
+		scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args)
 	
-	for infile in args.infiles:
+		for infile in args.infiles:
 
-		skymap, metadata = fits.read_sky_map(infile)
-		if metadata['nest']: orderin = 'NESTED'
-		else: orderin = 'RINGED'
-		newmap = hp.ud_grade(skymap, nside_out = 512, order_in = orderin, order_out ='NESTED',power = -2)
+			skymap, metadata = fits.read_sky_map(infile)
+			if metadata['nest']: orderin = 'NESTED'
+			else: orderin = 'RINGED'
+			newmap = hp.ud_grade(skymap, nside_out = 512, order_in = orderin, order_out ='NESTED',power = -2)
 
-		if len(args.infiles)>1 or args.id=='':
-			objid = metadata['objid']
-			objsplit = objid.split(':')
-			args.output = objsplit[-1]
+			if len(args.infiles)>1 or args.id=='':
+				objid = metadata['objid']
+				objsplit = objid.split(':')
+				args.output = objsplit[-1]
 	
-		tilefile = "{}_nside512_nestTrue.pgz".format(scopename,metadata['nside'],metadata['nest'])
-		alltiles,pixlist = grid.readtiles(tilefile,metadata,args)
+			tilefile = "{}_nside512_nestTrue.pgz".format(scopename,metadata['nside'],metadata['nest'])
+			alltiles,pixlist = grid.readtiles(tilefile,metadata,args)
 	
-		pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,pixlist)
+			pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,pixlist)
 
-		if args.plot or args.geoplot: pt.plotskymapsmoll(tiledmap,pointings,metadata,args,scopename)
+			if args.plot or args.geoplot: pt.plotskymapsmoll(tiledmap,pointings,metadata,args,scopename)
 
-	end = datetime.datetime.now()
+		end = datetime.datetime.now()
 
-	td = end-start
-	ts = td.total_seconds()
-	print "Time taken to tile skymap: {}".format(pretty_time_delta(ts))
+		td = end-start
+		ts = td.total_seconds()
+		print "Time taken to tile skymap: {}".format(pretty_time_delta(ts))
 	
