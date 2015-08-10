@@ -283,7 +283,7 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 	
 def getscopeinfo(args):
 
-	delns, delew = 2.1,2.1*(args.scopes/4.0) #4-scope configuration sizes
+	delns, delew = 4.2,4.2*(args.scopes/4.0) #4-scope configuration sizes
 	lat,lon,height = 28.7598742,360.0-17.8793802,2396.0
 	if args.scopes ==4: scopename = 'GOTO4'
 	if args.scopes ==8: scopename = 'GOTO8'
@@ -292,8 +292,8 @@ def getscopeinfo(args):
 
 def getdels(scope):
 
-	if scope == 'GOTO4': delns, delew = 2.81,2.1
-	if scope == 'GOTO8': delns, delew = 2.81,2.1*2.0
+	if scope == 'GOTO4': delns, delew = 4.2,4.2
+	if scope == 'GOTO8': delns, delew = 4.2,8.4
 
 	return delns,delew
 
