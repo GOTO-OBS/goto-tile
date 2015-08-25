@@ -44,4 +44,3 @@ for name in ['cylon']:
     cm.register_cmap(cmap=cmap)
 
 del name, filename, data, cmap, cm, colors, np, os
-

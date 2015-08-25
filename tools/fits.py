@@ -218,7 +218,7 @@ def read_sky_map(filename, nest=False):
     header = dict(header)
 
     metadata = {}
-    
+
     metadata['file']=filename
 
     ordering = header['ORDERING']
@@ -251,7 +251,7 @@ def read_sky_map(filename, nest=False):
         pass
     else:
         metadata['mjd'] = value
-        
+
     try:
         value = header['DATE-OBS']
     except KeyError:
@@ -279,7 +279,7 @@ def read_sky_map(filename, nest=False):
         pass
     else:
         metadata['runtime'] = value
-        
+
     try:
         value = header['NSIDE']
     except KeyError:
@@ -308,4 +308,3 @@ if __name__ == '__main__':
         runtime=21.5)
 
     print read_sky_map('test.fits.gz')
-

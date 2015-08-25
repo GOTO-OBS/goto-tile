@@ -20,7 +20,7 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
         #print np.where(altaz.alt.degree>(90-radius))
         visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
         visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
-    
+
     galradecs = {tuple(row) for row in zip(ras,decs)}
     galradecseen = {tuple(row) for row in zip(visras,visdecs)}
     galradecs = list(galradecs)
@@ -29,30 +29,30 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     visgal = []
     for row in galradecseen:
         visgal.append(gals[galradecs.index(row)])
-    
+
     return np.array(visgal)
 
-    
+
 def readgals(args,metadata):
 
     gals = np.genfromtxt('GWGCCatalog_I.txt',skiprows=1,delimiter='|',dtype=None,usecols=(0,1,2,3,7,11,20,21),missing_values='~',filling_values=99.9,names=('PGC','Name','ra','dec','B','I','dist','e_dist'))
-    
+
     return gals
-    
+
 def Blum(Bmag):
     return pow(10.,(5.48-Bmag)/2.5)
-    
+
 def Ilum(Imag):
     return pow(10.,(4.04-Imag)/2.5)
 
 def getmass(gal):
     return Ilum(gal['I'])*pow(10.,-0.88+0.6*(gal['B']-gal['I']))
-    
+
 def map2gals(skymap,gals,metadata):
     masses = np.zeros(len(skymap))
     ras = gals['ra']*15.
     decs = gals['dec']
-    
+
     ts,ps = smt.cel2sph(ras,decs)
     galpix = hp.ang2pix(metadata['nside'],ts,ps,nest=metadata['nest'])
 
@@ -62,7 +62,5 @@ def map2gals(skymap,gals,metadata):
             masses[galpix[i]]+=galmass#
 
     galmap = masses*skymap
-    
+
     return galmap #normalised?
-    
-    

@@ -15,37 +15,37 @@ from astropy.time import Time
 def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
     fig = plt.figure()#
     fig.clf()
-    
+
     if args.geoplot:
         # longitude correction
         t = Time(metadata['mjd'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
     else: dlon = 0
-        
+
     nside = metadata['nside']
     npix = hp.nside2npix(nside)
     ipix = np.arange(npix)
     thetas,phis = hp.pix2ang(nside,ipix,nest=metadata['nest'])
-    
+
     p1 = pointings[0]
     lonmax,latmax = p1[0]-(dlon/np.pi*180.0),p1[1]
-    
+
     h = 3000.
     m = Basemap(projection='nsper',lon_0=lonmax,lat_0=latmax, satellite_height=h*10000.,resolution='l')#
-    
+
     m.drawmeridians(np.arange(0,360,30),linewidth=0.25)
     m.drawparallels(np.arange(-90,90,30),linewidth=0.25)
     m.drawmapboundary(color='k', linewidth=0.5)
 
     if args.geoplot:
-        
+
         m.drawcoastlines(linewidth=0.25)
         #m.drawcountries(linewidth=0.25)
         #m.fillcontinents(color='coral',lake_color='aqua')
         #m.drawmapboundary(fill_color='aqua')
-    
-        
+
+
     ####################
     # Plot Skymap
     ###################
@@ -56,14 +56,14 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
     #################
     # Plot FoVs
     #################
-    for tileinfo in pointings:    
-        
-        plotFoV = tileinfo[2] 
+    for tileinfo in pointings:
+
+        plotFoV = tileinfo[2]
 
         FoVlon,FoVlat = smt.getshape(plotFoV)
         FoVx,FoVy = m(FoVlon-(dlon/np.pi*180.0),FoVlat)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
-        
+
     if args.usegals:
         gals = gt.readgals(args,metadata)
         galras = gals['ra']*15.
@@ -73,22 +73,22 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
         #ts,ps = cel2sph(ras,decs)
         xgal,ygal=m(galras,galdecs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, linewidths=0)
-    
+
         plt.title("Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(args.output,scopename))
     else:
         plt.title("Skymap and {0} tiling for trigger {1}".format(scopename,args.output))
-        
+
     plt.savefig('{0}/{1}nsper{2}.png'.format(args.path,args.output,scopename), dpi=300)
     plt.close()
     return
 
-    
+
 def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
     fig = plt.figure()#
     fig.clf()
 
     m = Basemap(projection='moll',resolution='c',lon_0=0.0)
-    
+
     m.drawmeridians(np.arange(0,360,30),linewidth=0.25)
     m.drawparallels(np.arange(-90,90,30),linewidth=0.25,labels=[1,0,0,0])
     m.drawmapboundary(color='k', linewidth=0.5)
@@ -97,15 +97,15 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
         t = Time(metadata['mjd'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
-        
+
         m.drawcoastlines(linewidth=0.25)
         #m.drawcountries(linewidth=0.25)
         #m.fillcontinents(color='coral',lake_color='aqua')
         #m.drawmapboundary(fill_color='aqua')
-    
+
 
         # longitude correction
-        
+
     else: dlon = 0
 
     ####################
@@ -123,14 +123,14 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
     #################
     # Plot FoVs
     #################
-    for tileinfo in pointings:    
-        
-        plotFoV = tileinfo[2] 
-        
+    for tileinfo in pointings:
+
+        plotFoV = tileinfo[2]
+
         FoVlon,FoVlat = smt.getshape(plotFoV)
         FoVx,FoVy = m(FoVlon-(dlon/np.pi*180.0),FoVlat)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
-    
+
     if args.usegals:
         gals = gt.readgals(args,metadata)
         galras = gals['ra']*15.
@@ -140,12 +140,11 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
         #ts,ps = celi2sph(ras,decs)
         xgal,ygal=m(galras,galdecs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, linewidths=0)
-    
+
         plt.title("Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(args.output,scopename))
     else:
         plt.title("Skymap and {0} tiling for trigger {1}".format(scopename,args.output))
-        
+
     plt.savefig('{0}/{1}moll{2}.png'.format(args.path,args.output,scopename), dpi=300)
     plt.close()
     return
-
