@@ -1,3 +1,4 @@
+from __future__ import absolute_import, print_function, division
 import spherical_geometry as sg
 import spherical_geometry.great_circle_arc as sggc
 import spherical_geometry.polygon as sgp
@@ -7,7 +8,7 @@ import astropy.units as u
 import ephem
 import sys
 import math
-import galtools as gt
+from . import galtools as gt
 import numpy as np
 import healpy as hp
 
@@ -87,7 +88,7 @@ def sph2cel(ts,ps):
 
 def findedge(GC,delta):
     for i,step in enumerate(GC):
-        #print sggc.length(plusGC[0],step,degrees=True)
+        #print(sggc.length(plusGC[0],step,degrees=True))
         if sggc.length(GC[0],step,degrees=True)>delta:
 
             edge=step
@@ -233,8 +234,8 @@ def outputtile(tileinfo,outfile,writecode):
 def siderealtimes(lat, lon, height, mjd):
     #lat=-30.0
     #s = ephem.Sun()
-#    print mjd
-#    print lat,lon
+#    print(mjd)
+#    print(lat,lon)
     t = atime.Time(mjd, format='mjd', scale='utc')
 
 
@@ -243,7 +244,7 @@ def siderealtimes(lat, lon, height, mjd):
     obs.horizon='-18:00'
     obs.lat,obs.lon = str(lat),str(lon)
     obs.date = ephem.Date(t.iso)
-    #print t.datetime
+    #print(t.datetime)
     sun = ephem.Sun(obs)
     # daytime so want to know time of next setting and rising of sun
     if sun.alt>ephem.degrees(str(-18.)):
@@ -260,13 +261,12 @@ def siderealtimes(lat, lon, height, mjd):
     delt = atime.TimeDelta(300., format='sec')
 
     diff = ATend-ATstart
-
     steps = diff/delt
-#    print steps
+#    print(steps)
     times = np.linspace(ATstart.mjd,ATend.mjd,steps+1)
-#    print len(times)
+#    print(len(times))
     timeobjs = atime.Time(times,format ='mjd')
-#    print timeobjs.datetime
+#    print(timeobjs.datetime)
     return timeobjs
 
 
@@ -284,12 +284,12 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
         radecs = acoord.SkyCoord(ra=phi*u.rad, dec=(0.5*np.pi - theta)*u.rad)
         altaz = radecs.transform_to(frame)
         seenpix = ipix[np.where(altaz.alt.degree>(90-radius))]
-#        print np.where(altaz.alt.degree>(90-radius))
-#        print len(seenpix)
+#        print(np.where(altaz.alt.degree>(90-radius)))
+#        print(len(seenpix))
         seen.extend(list(seenpix))
 
         seen = list(np.unique(seen))
-#        print len(seen)
+#        print(len(seen))
 
     maskedmap = skymap.copy()
     maskedmap[:] = 0.0
@@ -333,12 +333,12 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon,
         if args.nightsky:
             gals = gt.visiblegals(allgals, sidtimes, lat, lon, height, 75.)
             skymap = gt.map2gals(allskymap,gals,metadata)
-            #print skymap.sum()
+            #print(skymap.sum())
         allskymap = gt.map2gals(allskymap,allgals,metadata)
 
         if not args.nightsky:
             skymap = allskymap.copy()
-            #print skymap.sum()
+            #print(skymap.sum())
 
         skymap = skymap/allskymap.sum() #gets fractional percentage
                                         #covered, normalised
@@ -350,12 +350,12 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon,
 
     GWtot = skymap.sum()
 
-    print GWtot
-    print allskymap.sum()
-    print ("The total probability visible during the next "
-           "observing period is {}".format(GWtot))
-    print "This is {}% of the original skymap".format(
-        (GWtot/allskymap.sum())*100.)
+    print(GWtot)
+    print(allskymap.sum())
+    print("The total probability visible during the next "
+          "observing period is {}".format(GWtot))
+    print("This is {}% of the original skymap".format(
+        (GWtot/allskymap.sum())*100.))
     if GWtot<0.05:
         sys.exit("Less than 5% of the skymap probability is visible, "
                  "ignoring...")
@@ -386,7 +386,7 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon,
         sphpoints = hp.vec2ang(center)
         clon,clat = sph2cel(sphpoints[0],sphpoints[1])
 
-        print "{0},{1},{2},{3}".format(clon[0],clat[0],oprobs[0],GWtot)
+        print("{0},{1},{2},{3}".format(clon[0],clat[0],oprobs[0],GWtot))
         pointings.append([clon,clat,otiles[0],oprobs[0],GWobs])
         outfile.write("{0},{1},{2},{3}\n".format(
             clon[0],clat[0],oprobs[0],GWtot))

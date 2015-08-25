@@ -1,6 +1,7 @@
-import skymaptools as smt
-import galtools as gt
-import cmap
+from __future__ import absolute_import, print_function, division
+from . import skymaptools as smt
+from . import galtools as gt
+from . import cmap
 
 import numpy as np
 import healpy as hp

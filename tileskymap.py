@@ -1,12 +1,14 @@
+from __future__ import absolute_import, print_function, division
+
 import argparse
 import os,sys
 import datetime
 import healpy as hp
 
-from tools import fits
-from tools import skymaptools as smt
-from tools import plottools as pt
-from tools import grid
+from gototile import fits
+from gototile import skymaptools as smt
+from gototile import plottools as pt
+from gototile import grid
 
 def pretty_time_delta(seconds):
     seconds = int(seconds)
@@ -64,8 +66,8 @@ if __name__=='__main__':
     start = datetime.datetime.now()
     args = parse_command_line()
     if args.makegrid:
-        print ("Creating fixed grid for both GOTO4 and GOTO8. "
-               "Could take some time...")
+        print("Creating fixed grid for both GOTO4 and GOTO8. "
+              "Could take some time...")
         grid.tileallsky(args)
     else:
         if not os.path.exists(args.path):
@@ -74,11 +76,11 @@ if __name__=='__main__':
         if len(args.infiles)==0: 
             sys.exit("No input files detected, please provide input skymap.")
         if len(args.infiles)>1: 
-            print ("Multiple input files detected, outfile argument ignored, "
-                   "outfile name taken from metadata object id.")
+            print("Multiple input files detected, outfile argument ignored, "
+                  "outfile name taken from metadata object id.")
         elif args.id=='': 
-            print ("No output name detected, output taken from "
-                   "object id metadata.")
+            print("No output name detected, output taken from "
+                  "object id metadata.")
 
         scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args)
 
@@ -110,4 +112,4 @@ if __name__=='__main__':
 
         td = end-start
         ts = td.total_seconds()
-        print "Time taken to tile skymap: {}".format(pretty_time_delta(ts))
+        print("Time taken to tile skymap: {}".format(pretty_time_delta(ts)))

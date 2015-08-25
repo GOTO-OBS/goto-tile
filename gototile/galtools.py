@@ -1,6 +1,7 @@
+from __future__ import absolute_import, print_function, division
+
 import numpy as np
 import healpy as hp
-import skymaptools as smt
 import astropy.coordinates as acoord
 import astropy.units as u
 
@@ -18,7 +19,7 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
         frame = acoord.AltAz(obstime=st, location=observatory)
         radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
         altaz = radecs.transform_to(frame)
-        #print np.where(altaz.alt.degree>(90-radius))
+        #print(np.where(altaz.alt.degree>(90-radius)))
         visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
         visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
 
@@ -54,6 +55,7 @@ def getmass(gal):
     return Ilum(gal['I'])*pow(10.,-0.88+0.6*(gal['B']-gal['I']))
 
 def map2gals(skymap,gals,metadata):
+    from . import skymaptools as smt
     masses = np.zeros(len(skymap))
     ras = gals['ra']*15.
     decs = gals['dec']

@@ -20,7 +20,7 @@
 #
 # Modified by Darren J. White for GOTO project, using non-LIGO systems.
 #
-
+from __future__ import absolute_import, print_function, division
 
 
 """
@@ -64,7 +64,6 @@ END
 """
 __author__ = "Leo Singer <leo.singer@ligo.org>"
 __all__ = ("read_sky_map", "write_sky_map")
-
 
 import gzip
 import math
@@ -287,7 +286,7 @@ def read_sky_map(filename, nest=False):
     try:
         value = header['NSIDE']
     except KeyError:
-        print "Getting nside parameter from length of skymap, header missing"
+        print("Getting nside parameter from length of skymap, header missing")
         metadata['nside'] = hp.npix2nside(len(prob))
     else:
         metadata['nside'] = value
@@ -311,4 +310,4 @@ if __name__ == '__main__':
         origin='LIGO Scientific Collaboration',
         runtime=21.5)
 
-    print read_sky_map('test.fits.gz')
+    print(read_sky_map('test.fits.gz'))

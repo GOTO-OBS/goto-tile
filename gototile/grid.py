@@ -1,8 +1,13 @@
+from __future__ import print_function
+from __future__ import absolute_import
 import healpy as hp
 import numpy as np
 import itertools as it
-import cPickle
-import skymaptools as smt
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+from . import skymaptools as smt
 import gzip
 import os
 
@@ -16,7 +21,7 @@ def pixelsky(tilesdir,tilelist,scope):
 
     outfile = "{}/{}_nside{}_nest{}.pgz".format(tilesdir,scope,nside,nest)
     with gzip.GzipFile(outfile, 'w') as f:
-        cPickle.dump([tilelist,pixlist], f) #makes gzip compressed pickles
+        pickle.dump([tilelist,pixlist], f) #makes gzip compressed pickles
         f.close()
 
     return
@@ -30,7 +35,7 @@ def tileallsky(args):
     scopes = ['GOTO4','GOTO8']
 
     for scope in scopes:
-        print scope
+        print(scope)
         delns,delew = smt.getdels(scope)
 
         tilelist = []
@@ -50,7 +55,7 @@ def tileallsky(args):
 def readtiles(infile,metadata,args):
 
     with gzip.GzipFile('{}/{}'.format(args.tiles,infile), 'r') as f:
-        tilelist,pixlist = cPickle.load(f)
+        tilelist,pixlist = pickle.load(f)
         f.close()
 
     return tilelist,pixlist
