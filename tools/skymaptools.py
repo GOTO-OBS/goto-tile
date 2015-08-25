@@ -32,7 +32,8 @@ def _convc2s(r,d):
 
 def _convs2c(t,p):
     r = (p*(180/np.pi))
-    d = (t-np.pi/2.0)*-1*(180/np.pi) #spherical coords theta=0 at dec=90, and theta=180 at dec=-90
+    d = (t-np.pi/2.0)*-1*(180/np.pi) #spherical coords theta=0 at
+                                     #dec=90, and theta=180 at dec=-90
 
     rachange=False
 
@@ -51,7 +52,8 @@ def _convs2c(t,p):
 
 def cel2sph(rs,ds):
     if isinstance(rs,list) or isinstance(rs,np.ndarray):
-        if len(rs)!=len(ds): sys.exit("RA and Dec arrays must be same lengths")
+        if len(rs)!=len(ds):
+            sys.exit("RA and Dec arrays must be same lengths")
         elif len(rs)>1:
             ts,ps=[],[]
             for r,d in zip(rs,ds):
@@ -67,7 +69,8 @@ def cel2sph(rs,ds):
 
 def sph2cel(ts,ps):
     if isinstance(ts,list) or isinstance(ts,np.ndarray):
-        if len(ts)!=len(ps): sys.exit("Theta and phi arrays must be same lengths")
+        if len(ts)!=len(ps):
+            sys.exit("Theta and phi arrays must be same lengths")
         elif len(ts)>1:
             rs,ds=[],[]
             for t,p in zip(ts,ps):
@@ -94,13 +97,15 @@ def findedge(GC,delta):
 def findFoV(RA,dec, delns, delew):
 
     tc,pc = cel2sph(RA,dec)
-    te,pe = cel2sph(RA+90.0,0.0) #find vertices needed for drawing along great circles.
+    te,pe = cel2sph(RA+90.0,0.0) #find vertices needed for drawing
+                                 #along great circles.
     tw,pw = cel2sph(RA-90.0,0.0)
     tn,pn = cel2sph(RA,dec+90.0)
     ts,ps = cel2sph(RA,dec-90.0)
 
     center = hp.ang2vec(tc,pc)
-    npole = hp.ang2vec(tn,pn) #"poles" of GC from center (ie +/- 90 degrees at right angles)
+    npole = hp.ang2vec(tn,pn) #"poles" of GC from center (ie +/- 90
+                              #degrees at right angles)
     spole = hp.ang2vec(ts,ps)
     epole = hp.ang2vec(te,pe)
     wpole = hp.ang2vec(tw,pw)
@@ -111,7 +116,8 @@ def findFoV(RA,dec, delns, delew):
     e = findedge(eastGC,delew)
     w = findedge(westGC,delew)
 
-    # don't need to interpolate for stepping along RA great circle, so just do +/- step
+    # don't need to interpolate for stepping along RA great circle, so
+    # just do +/- step
     dmin = dec-delns
     dmax = dec+delns
 
@@ -140,7 +146,8 @@ def getpoints(FoV): #Get long/lat vertices for shape on sky
 
     return np.array(lon),np.array(lat)
 
-def getshape(FoV): #Get points that allow shape to be drawn on sky using plot/scatter points
+def getshape(FoV): #Get points that allow shape to be drawn on sky
+                   #using plot/scatter points
 
     points = vars(vars(FoV)['_polygons'][0])['_points']
     lons, lats = [],[]
@@ -158,7 +165,8 @@ def getshape(FoV): #Get points that allow shape to be drawn on sky using plot/sc
 
     return np.array(lons),np.array(lats)
 
-def getgrid(FoV,steps = 100): #Get regular grid of points for field to find pixels using hp.ang2pix
+def getgrid(FoV,steps = 100): #Get regular grid of points for field to
+                              #find pixels using hp.ang2pix
 
     points = vars(vars(FoV)['_polygons'][0])['_points']
     edgelons, edgelats = [],[]
@@ -200,13 +208,17 @@ def getvectors(FoV):
 
     return points,center
 
-def orderedpixels(skymap): #return the pixel list in order of loudest to quietest, with corresponding original indices
+# return the pixel list in order of loudest to quietest, with
+# corresponding original indices
+def orderedpixels(skymap):
     pixels = np.sort(skymap)
     indices = np.argsort(skymap)
     return np.array(pixels[::-1]),np.array(indices[::-1])
 
 
-def ordertiles(tiles,pixlist,tileprobs): #return the pixel list in order of loudest to quietest, with corresponding original indices
+# return the pixel list in order of loudest to quietest, with
+# corresponding original indices
+def ordertiles(tiles,pixlist,tileprobs):
     oprobs = np.sort(tileprobs)
     otiles = tiles[np.argsort(tileprobs)]
     opixs = pixlist[np.argsort(tileprobs)]
@@ -233,12 +245,16 @@ def siderealtimes(lat, lon, height, mjd):
     obs.date = ephem.Date(t.iso)
     #print t.datetime
     sun = ephem.Sun(obs)
-    if sun.alt>ephem.degrees(str(-18.)): #daytime so want to know time of next setting and rising of sun
-        ATstart = atime.Time(obs.next_setting(ephem.Sun()).datetime(),format='datetime')
-        ATend = atime.Time(obs.next_rising(ephem.Sun()).datetime(),format='datetime')
+    # daytime so want to know time of next setting and rising of sun
+    if sun.alt>ephem.degrees(str(-18.)):
+        ATstart = atime.Time(
+            obs.next_setting(ephem.Sun()).datetime(),format='datetime')
+        ATend = atime.Time(
+            obs.next_rising(ephem.Sun()).datetime(),format='datetime')
     else: #night time so need to know current  when it will rise again
         ATstart = t
-        ATend = atime.Time(obs.next_rising(ephem.Sun()).datetime(),format='datetime')
+        ATend = atime.Time(
+            obs.next_rising(ephem.Sun()).datetime(),format='datetime')
 
 
     delt = atime.TimeDelta(300., format='sec')
@@ -257,7 +273,8 @@ def siderealtimes(lat, lon, height, mjd):
 def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 
 
-    observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, height=height*u.m)
+    observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg,
+                                       height=height*u.m)
     seen = []
     for st in sidtimes:
         frame = acoord.AltAz(obstime=st, location=observatory)
@@ -303,7 +320,9 @@ def filltiles(skymap, tiles, pixlist):
 
     return tileprobs
 
-def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,tiles,pixlist): #return pixel to center on for next tile
+# return pixel to center on for next tile
+def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon,
+              height,tiles,pixlist):
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
 
@@ -321,7 +340,8 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,tiles,p
             skymap = allskymap.copy()
             #print skymap.sum()
 
-        skymap = skymap/allskymap.sum() #gets fractional percentage covered, normalised
+        skymap = skymap/allskymap.sum() #gets fractional percentage
+                                        #covered, normalised
         allskymap = allskymap/allskymap.sum() #normalised
     elif args.nightsky:
         skymap = visiblemap(skymap, sidtimes, lat, lon, height, 75., metadata)
@@ -332,9 +352,13 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,tiles,p
 
     print GWtot
     print allskymap.sum()
-    print "The total probability visible during the next observing period is {}".format(GWtot)
-    print "This is {}% of the original skymap".format((GWtot/allskymap.sum())*100.)
-    if GWtot<0.05: sys.exit("Less than 5% of the skymap probability is visible, ignoring...")
+    print ("The total probability visible during the next "
+           "observing period is {}".format(GWtot))
+    print "This is {}% of the original skymap".format(
+        (GWtot/allskymap.sum())*100.)
+    if GWtot<0.05:
+        sys.exit("Less than 5% of the skymap probability is visible, "
+                 "ignoring...")
     tileprobs = filltiles(skymap, tiles, pixlist)
 
     nside = hp.get_nside(skymap)
@@ -348,12 +372,13 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,tiles,p
     GWobs = 0.0
 
     otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
-    outfile = open("{0}/{1}_{2}.txt".format(args.path,args.output,scopename), 'w')
+    outfile = open("{0}/{1}_{2}.txt".format(
+        args.path,args.output,scopename), 'w')
 
     while GWobs<=args.maxf*GWtot and len(pointings)<=args.maxt:
 
-
-        usedmap[opixs[0]]=0.0 # first tile will be brightest, so blank out pixels of usedmap
+        # first tile will be brightest, so blank out pixels of usedmap
+        usedmap[opixs[0]]=0.0
         seenpix.extend(opixs[0])
         GWobs+=oprobs[0]
 
@@ -363,13 +388,16 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,tiles,p
 
         print "{0},{1},{2},{3}".format(clon[0],clat[0],oprobs[0],GWtot)
         pointings.append([clon,clat,otiles[0],oprobs[0],GWobs])
-        outfile.write("{0},{1},{2},{3}\n".format(clon[0],clat[0],oprobs[0],GWtot))
+        outfile.write("{0},{1},{2},{3}\n".format(
+            clon[0],clat[0],oprobs[0],GWtot))
 
         oprobs[0] = 0.0 #seen so set tile prob to zero
 
 
 
-        for idx,[tile,tpix,tprob] in enumerate(zip(otiles[1:],opixs[1:],oprobs[1:])):
+        for idx,[tile,tpix,tprob] in enumerate(zip(otiles[1:],
+                                                   opixs[1:],
+                                                   oprobs[1:])):
             if len(list(set(tpix).intersection(seenpix)))>0:
                 oprobs[idx+1] = usedmap[tpix].sum()
             else: break

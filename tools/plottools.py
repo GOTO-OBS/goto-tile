@@ -32,7 +32,8 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
     lonmax,latmax = p1[0]-(dlon/np.pi*180.0),p1[1]
 
     h = 3000.
-    m = Basemap(projection='nsper',lon_0=lonmax,lat_0=latmax, satellite_height=h*10000.,resolution='l')#
+    m = Basemap(projection='nsper',lon_0=lonmax,lat_0=latmax, 
+                satellite_height=h*10000.,resolution='l')#
 
     m.drawmeridians(np.arange(0,360,30),linewidth=0.25)
     m.drawparallels(np.arange(-90,90,30),linewidth=0.25)
@@ -72,13 +73,18 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
         galmassnorm = np.array(masslist)/max(masslist)
         #ts,ps = cel2sph(ras,decs)
         xgal,ygal=m(galras,galdecs)
-        m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, linewidths=0)
+        m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
+                  linewidths=0)
 
-        plt.title("Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(args.output,scopename))
+        plt.title(
+                "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
+                        args.output,scopename))
     else:
-        plt.title("Skymap and {0} tiling for trigger {1}".format(scopename,args.output))
+        plt.title("Skymap and {0} tiling for trigger {1}".format(
+                scopename,args.output))
 
-    plt.savefig('{0}/{1}nsper{2}.png'.format(args.path,args.output,scopename), dpi=300)
+    plt.savefig('{0}/{1}nsper{2}.png'.format(args.path,args.output,scopename), 
+                dpi=300)
     plt.close()
     return
 
@@ -139,12 +145,17 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
         galmassnorm = np.array(masslist)/max(masslist)
         #ts,ps = celi2sph(ras,decs)
         xgal,ygal=m(galras,galdecs)
-        m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, linewidths=0)
+        m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
+                  linewidths=0)
 
-        plt.title("Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(args.output,scopename))
+        plt.title(
+                "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
+                        args.output,scopename))
     else:
-        plt.title("Skymap and {0} tiling for trigger {1}".format(scopename,args.output))
+        plt.title("Skymap and {0} tiling for trigger {1}".format(
+                scopename,args.output))
 
-    plt.savefig('{0}/{1}moll{2}.png'.format(args.path,args.output,scopename), dpi=300)
+    plt.savefig('{0}/{1}moll{2}.png'.format(args.path,args.output,scopename), 
+                dpi=300)
     plt.close()
     return

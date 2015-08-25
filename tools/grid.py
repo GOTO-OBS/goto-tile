@@ -11,7 +11,8 @@ def pixelsky(tilesdir,tilelist,scope):
     nside = 512
     nest = True
     pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
-    pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) for points in pointlist])
+    pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) 
+                        for points in pointlist])
 
     outfile = "{}/{}_nside{}_nest{}.pgz".format(tilesdir,scope,nside,nest)
     with gzip.GzipFile(outfile, 'w') as f:
@@ -39,7 +40,8 @@ def tileallsky(args):
         n2s = np.append(south[::-2],north)
         e2w = np.arange(0.0,360.,delew)
 
-        tilelist = np.array([smt.findFoV(lon,lat,delns,delew) for lat,lon in it.product(n2s,e2w)])
+        tilelist = np.array([smt.findFoV(lon,lat,delns,delew) 
+                             for lat,lon in it.product(n2s,e2w)])
 
         pixelsky(args.tiles,tilelist,scope)
 

@@ -27,21 +27,21 @@
 Reading and writing HEALPix FITS files. An example FITS header looks like this:
 
 $ funhead -a test.fits.gz
-SIMPLE  =					T / conforms to FITS standard
-BITPIX  =					8 / array data type
-NAXIS   =					0 / number of array dimensions
-EXTEND  =					T
+SIMPLE  =                        T / conforms to FITS standard
+BITPIX  =                        8 / array data type
+NAXIS   =                        0 / number of array dimensions
+EXTEND  =                        T
 END
 	  Extension: xtension
 
 XTENSION= 'BINTABLE'		   / binary table extension
-BITPIX  =					8 / array data type
-NAXIS   =					2 / number of array dimensions
-NAXIS1  =				 4096 / length of dimension 1
-NAXIS2  =				  192 / length of dimension 2
-PCOUNT  =					0 / number of group parameters
-GCOUNT  =					1 / number of groups
-TFIELDS =					1 / number of table fields
+BITPIX  =                        8 / array data type
+NAXIS   =                        2 / number of array dimensions
+NAXIS1  =                     4096 / length of dimension 1
+NAXIS2  =                      192 / length of dimension 2
+PCOUNT  =                        0 / number of group parameters
+GCOUNT  =                        1 / number of groups
+TFIELDS =                        1 / number of table fields
 TTYPE1  = 'PROB	'
 TFORM1  = '1024E   '
 TUNIT1  = 'pix-1   '
@@ -49,17 +49,17 @@ PIXTYPE = 'HEALPIX '		   / HEALPIX pixelisation
 ORDERING= 'RING	'		   / Pixel ordering scheme, either RING or NESTED
 COORDSYS= 'C	   '		   / Ecliptic, Galactic or Celestial (equatorial)
 EXTNAME = 'xtension'		   / name of this binary table extension
-NSIDE   =				  128 / Resolution parameter of HEALPIX
-FIRSTPIX=					0 / First pixel # (0 based)
-LASTPIX =			   196607 / Last pixel # (0 based)
+NSIDE   =                      128 / Resolution parameter of HEALPIX
+FIRSTPIX=                        0 / First pixel # (0 based)
+LASTPIX =                   196607 / Last pixel # (0 based)
 INDXSCHM= 'IMPLICIT'		   / Indexing: IMPLICIT or EXPLICIT
 OBJECT  = 'FOOBAR 12345'	   / Unique identifier for this event
 REFERENC= 'http://www.youtube.com/watch?v=0ccKPSVQcFk' / URL of this event
 DATE-OBS= '2013-04-08T21:37:32.25' / UTC date of the observation
-MJD-OBS =	  56391.151064815 / modified Julian date of the observation
-DATE	= '2013-04-08T21:50:32' / UTC date of file creation
+MJD-OBS =	  56391.151064815  / modified Julian date of the observation
+DATE	= '2013-04-08T21:50:32'    / UTC date of file creation
 CREATOR = 'fits.py '		   / Program that created this file
-RUNTIME =				 21.5 / Runtime in seconds of the CREATOR program
+RUNTIME =                     21.5 / Runtime in seconds of the CREATOR program
 END
 """
 __author__ = "Leo Singer <leo.singer@ligo.org>"
@@ -86,7 +86,8 @@ from healpy.fitsfunc import getformat, pixelfunc, standard_column_names, pf, np
 #
 # FIXME: Instead of pyfits, use astropy.io.fits; it supports gzip compression.
 #
-def write_map(filename,m,nest=False,dtype=np.float32,fits_IDL=True,coord=None,column_names=None,unit=None,extra_metadata=()):
+def write_map(filename,m,nest=False,dtype=np.float32,fits_IDL=True,
+              coord=None,column_names=None,unit=None,extra_metadata=()):
     """Writes an healpix map into an healpix file.
 
     Parameters
@@ -98,13 +99,14 @@ def write_map(filename,m,nest=False,dtype=np.float32,fits_IDL=True,coord=None,co
       They will be considered as I, Q, U maps.
       Supports masked maps, see the `ma` function.
     nest : bool, optional
-      If False, ordering scheme is NESTED, otherwise, it is RING. Default: RING.
+      If False, ordering scheme is NESTED, otherwise, it is RING. 
+      Default: RING.
     fits_IDL : bool, optional
       If True, reshapes columns in rows of 1024, otherwise all the data will
       go in one column. Default: True
     coord : str
-      The coordinate system, typically 'E' for Ecliptic, 'G' for Galactic or 'C' for
-      Celestial (equatorial)
+      The coordinate system, typically 'E' for Ecliptic, 
+      'G' for Galactic or 'C' for Celestial (equatorial)
     column_names : str or list
       Column name or list of column names, if None we use:
       I_STOKES for 1 component,
@@ -122,9 +124,11 @@ def write_map(filename,m,nest=False,dtype=np.float32,fits_IDL=True,coord=None,co
         m = [m]
 
     if column_names is None:
-        column_names = standard_column_names.get(len(m), ["COLUMN_%d" % n for n in range(len(m))])
+        column_names = standard_column_names.get(
+            len(m), ["COLUMN_%d" % n for n in range(len(m))])
     else:
-        assert len(column_names) == len(m), "Length column_names != number of maps"
+        assert len(column_names) == len(m), \
+                "Length column_names != number of maps"
 
     # maps must have same length
     assert len(set(map(len, m))) == 1, "Maps must have same length"

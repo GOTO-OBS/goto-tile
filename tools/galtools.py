@@ -5,7 +5,8 @@ import astropy.coordinates as acoord
 import astropy.units as u
 
 def visiblegals(gals, sidtimes, lat, lon, height, radius):
-    observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, height=height*u.m)
+    observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
+                                       height=height*u.m)
 
     visras,visdecs = [],[]
     ras, decs = [],[]
@@ -35,7 +36,11 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
 
 def readgals(args,metadata):
 
-    gals = np.genfromtxt('GWGCCatalog_I.txt',skiprows=1,delimiter='|',dtype=None,usecols=(0,1,2,3,7,11,20,21),missing_values='~',filling_values=99.9,names=('PGC','Name','ra','dec','B','I','dist','e_dist'))
+    gals = np.genfromtxt('GWGCCatalog_I.txt',skiprows=1,delimiter='|',
+                         dtype=None,usecols=(0,1,2,3,7,11,20,21),
+                         missing_values='~',filling_values=99.9,
+                         names=('PGC','Name','ra','dec','B','I','dist',
+                                'e_dist'))
 
     return gals
 
@@ -58,7 +63,8 @@ def map2gals(skymap,gals,metadata):
 
     for i,gal in enumerate(gals):
         if gal['B']<0.0:
-            galmass = Blum(gal['B']) ###figure out the "getmass" problem with I bands
+            galmass = Blum(gal['B']) #figure out the "getmass" problem
+                                     #with I bands
             masses[galpix[i]]+=galmass#
 
     galmap = masses*skymap
