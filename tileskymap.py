@@ -24,63 +24,63 @@ def pretty_time_delta(seconds):
 
 def parse_command_line():
 
-	description = """This script creates pointings for selected telescopes, with given skymap files."""
-	
-	parser = argparse.ArgumentParser(description = description,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-	
-	parser.add_argument("-i", "--id", default='', help="Name of output files (without extension)")
-	parser.add_argument("-p", "--path",default='./', help="Output path")
-	parser.add_argument("-t", "--maxt", type=int, default=100,help="Number of tiles to return")
-	parser.add_argument("-f", "--maxf", type=float, default=0.95, help="Maximum fraction of visible skymap to tile")
-	parser.add_argument("-s", "--scopes", type=int, default=4, help="Number of telescopes for GOTO configuration, 4 or 8")
-	parser.add_argument("-g", "--usegals", action="store_true", default=False, help="Use GWGC in tiling/plotting")
-	parser.add_argument("-n", "--nightsky", action="store_true", default=False, help="Use nightsky visbility in tiling/plotting")
-	parser.add_argument("--geoplot", action="store_true", default=False, help="Plot in geographic coordinates, (lat, lon)")
-	parser.add_argument("--plot", action="store_true", default=False, help="Plot in RA-Dec")
-	parser.add_argument("--makegrid", action="store_true", default=False, help="Create fixed grid of tiles on sky. WARNING: Can take some time.")
-	parser.add_argument("--tiles", default='./tiles/', help="Location of pre-made fixed grid of tiles on sky.")
-	parser.add_argument("infiles", help="Space separated input files", nargs='*')
-	
-	return parser.parse_args()
+    description = """This script creates pointings for selected telescopes, with given skymap files."""
+    
+    parser = argparse.ArgumentParser(description = description,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    
+    parser.add_argument("-i", "--id", default='', help="Name of output files (without extension)")
+    parser.add_argument("-p", "--path",default='./', help="Output path")
+    parser.add_argument("-t", "--maxt", type=int, default=100,help="Number of tiles to return")
+    parser.add_argument("-f", "--maxf", type=float, default=0.95, help="Maximum fraction of visible skymap to tile")
+    parser.add_argument("-s", "--scopes", type=int, default=4, help="Number of telescopes for GOTO configuration, 4 or 8")
+    parser.add_argument("-g", "--usegals", action="store_true", default=False, help="Use GWGC in tiling/plotting")
+    parser.add_argument("-n", "--nightsky", action="store_true", default=False, help="Use nightsky visbility in tiling/plotting")
+    parser.add_argument("--geoplot", action="store_true", default=False, help="Plot in geographic coordinates, (lat, lon)")
+    parser.add_argument("--plot", action="store_true", default=False, help="Plot in RA-Dec")
+    parser.add_argument("--makegrid", action="store_true", default=False, help="Create fixed grid of tiles on sky. WARNING: Can take some time.")
+    parser.add_argument("--tiles", default='./tiles/', help="Location of pre-made fixed grid of tiles on sky.")
+    parser.add_argument("infiles", help="Space separated input files", nargs='*')
+    
+    return parser.parse_args()
 
 if __name__=='__main__':
-	start = datetime.datetime.now()
-	args = parse_command_line()
-	if args.makegrid: 
-		print "Creating fixed grid for both GOTO4 and GOTO8. Could take some time..."
-		grid.tileallsky(args)
-	else:	
-		if not os.path.exists(args.path):
-			os.makedirs(args.path)
-	
-		if len(args.infiles)==0: sys.exit("No input files detected, please provide input skymap.")
-		if len(args.infiles)>1: print "Multiple input files detected, outfile argument ignored, outfile name taken from metadata object id."
-		elif args.id=='': print "No output name detected, output taken from object id metadata."
-	
-		scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args)
-	
-		for infile in args.infiles:
+    start = datetime.datetime.now()
+    args = parse_command_line()
+    if args.makegrid: 
+        print "Creating fixed grid for both GOTO4 and GOTO8. Could take some time..."
+        grid.tileallsky(args)
+    else:    
+        if not os.path.exists(args.path):
+            os.makedirs(args.path)
+    
+        if len(args.infiles)==0: sys.exit("No input files detected, please provide input skymap.")
+        if len(args.infiles)>1: print "Multiple input files detected, outfile argument ignored, outfile name taken from metadata object id."
+        elif args.id=='': print "No output name detected, output taken from object id metadata."
+    
+        scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args)
+    
+        for infile in args.infiles:
 
-			skymap, metadata = fits.read_sky_map(infile)
-			if metadata['nest']: orderin = 'NESTED'
-			else: orderin = 'RINGED'
-			newmap = hp.ud_grade(skymap, nside_out = 512, order_in = orderin, order_out ='NESTED',power = -2)
+            skymap, metadata = fits.read_sky_map(infile)
+            if metadata['nest']: orderin = 'NESTED'
+            else: orderin = 'RINGED'
+            newmap = hp.ud_grade(skymap, nside_out = 512, order_in = orderin, order_out ='NESTED',power = -2)
 
-			if len(args.infiles)>1 or args.id=='':
-				objid = metadata['objid']
-				objsplit = objid.split(':')
-				args.output = objsplit[-1]
-	
-			tilefile = "{}_nside512_nestTrue.pgz".format(scopename,metadata['nside'],metadata['nest'])
-			alltiles,pixlist = grid.readtiles(tilefile,metadata,args)
-	
-			pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,pixlist)
+            if len(args.infiles)>1 or args.id=='':
+                objid = metadata['objid']
+                objsplit = objid.split(':')
+                args.output = objsplit[-1]
+    
+            tilefile = "{}_nside512_nestTrue.pgz".format(scopename,metadata['nside'],metadata['nest'])
+            alltiles,pixlist = grid.readtiles(tilefile,metadata,args)
+    
+            pointings,tiledmap = smt.findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon, height,alltiles,pixlist)
 
-			if args.plot or args.geoplot: pt.plotskymapsmoll(tiledmap,pointings,metadata,args,scopename)
+            if args.plot or args.geoplot: pt.plotskymapsmoll(tiledmap,pointings,metadata,args,scopename)
 
-		end = datetime.datetime.now()
+        end = datetime.datetime.now()
 
-		td = end-start
-		ts = td.total_seconds()
-		print "Time taken to tile skymap: {}".format(pretty_time_delta(ts))
-	
+        td = end-start
+        ts = td.total_seconds()
+        print "Time taken to tile skymap: {}".format(pretty_time_delta(ts))
+    
