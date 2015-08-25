@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 """Register some extra Matplotlib color maps"""
-
+from __future__ import absolute_import, print_function, division
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
@@ -44,4 +44,3 @@ for name in ['cylon']:
     cm.register_cmap(cmap=cmap)
 
 del name, filename, data, cmap, cm, colors, np, os
-
