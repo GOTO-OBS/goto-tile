@@ -6,14 +6,14 @@ import skymaptools as smt
 import gzip
 import os
 
-def pixelsky(tilelist,scope):
+def pixelsky(tilesdir,tilelist,scope):
 
 	nside = 512
 	nest = True
 	pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
 	pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) for points in pointlist])
 		
-	outfile = "{}/{}_nside{}_nest{}.pgz".format(args.tiles,scope,nside,nest)
+	outfile = "{}/{}_nside{}_nest{}.pgz".format(tilesdir,scope,nside,nest)
 	with gzip.GzipFile(outfile, 'w') as f: 
 		cPickle.dump([tilelist,pixlist], f) #makes gzip compressed pickles
 		f.close()
@@ -41,7 +41,7 @@ def tileallsky(args):
 			
 		tilelist = np.array([smt.findFoV(lon,lat,delns,delew) for lat,lon in it.product(n2s,e2w)])
 	
-		pixelsky(tilelist,scope)
+		pixelsky(args.tiles,tilelist,scope)
 	
 	return
 	
