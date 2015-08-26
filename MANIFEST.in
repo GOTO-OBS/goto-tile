@@ -1,0 +1,7 @@
+recursive-include gototile *.py
+include gototile/GWGCCatalog_I.txt
+include gototile/cylon.csv
+include scripts/tileskymap
+include README
+include MANIFEST.in
+include setup.py
