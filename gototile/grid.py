@@ -27,10 +27,10 @@ def pixelsky(tilesdir,tilelist,scope):
     return
 
 
-def tileallsky(args):
+def tileallsky(tilesdir):
 
-    if not os.path.exists(args.tiles):
-        os.makedirs(args.tiles)
+    if not os.path.exists(tilesdir):
+        os.makedirs(tilesdir)
 
     scopes = ['GOTO4','GOTO8']
 
@@ -48,13 +48,13 @@ def tileallsky(args):
         tilelist = np.array([smt.findFoV(lon,lat,delns,delew) 
                              for lat,lon in it.product(n2s,e2w)])
 
-        pixelsky(args.tiles,tilelist,scope)
+        pixelsky(tilesdir,tilelist,scope)
 
     return
 
-def readtiles(infile,metadata,args):
+def readtiles(infile,metadata,tilesdir):
 
-    with gzip.GzipFile('{}/{}'.format(args.tiles,infile), 'r') as f:
+    with gzip.GzipFile('{}/{}'.format(tilesdir,infile), 'r') as f:
         tilelist,pixlist = pickle.load(f)
         f.close()
 

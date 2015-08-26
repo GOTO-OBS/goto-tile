@@ -13,11 +13,12 @@ from math import sin,cos,atan2,sqrt,pi
 from mpl_toolkits.basemap import Basemap
 from astropy.time import Time
 
-def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
-    fig = plt.figure()#
+def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, 
+                     output, path, scopename):
+    fig = plt.figure()
     fig.clf()
 
-    if args.geoplot:
+    if geoplot:
         # longitude correction
         t = Time(metadata['mjd'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
@@ -40,7 +41,7 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
     m.drawparallels(np.arange(-90,90,30),linewidth=0.25)
     m.drawmapboundary(color='k', linewidth=0.5)
 
-    if args.geoplot:
+    if geoplot:
 
         m.drawcoastlines(linewidth=0.25)
         #m.drawcountries(linewidth=0.25)
@@ -66,8 +67,8 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
         FoVx,FoVy = m(FoVlon-(dlon/np.pi*180.0),FoVlat)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
-    if args.usegals:
-        gals = gt.readgals(args,metadata)
+    if usegals:
+        gals = gt.readgals(metadata)
         galras = gals['ra']*15.
         galdecs = gals['dec']
         masslist = [getmass(gal) for gal in gals]
@@ -79,18 +80,19 @@ def plotskymapsnsper(skymap,pointings,metadata,args,scopename):
 
         plt.title(
                 "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
-                        args.output,scopename))
+                        output, scopename))
     else:
         plt.title("Skymap and {0} tiling for trigger {1}".format(
-                scopename,args.output))
+                scopename, output))
 
-    plt.savefig('{0}/{1}nsper{2}.png'.format(args.path,args.output,scopename), 
+    plt.savefig('{0}/{1}nsper{2}.png'.format(path, output, scopename), 
                 dpi=300)
     plt.close()
     return
 
 
-def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
+def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, 
+                    output, path, scopename):
     fig = plt.figure()#
     fig.clf()
 
@@ -100,7 +102,7 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
     m.drawparallels(np.arange(-90,90,30),linewidth=0.25,labels=[1,0,0,0])
     m.drawmapboundary(color='k', linewidth=0.5)
 
-    if args.geoplot:
+    if geoplot:
         t = Time(metadata['mjd'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
@@ -138,8 +140,8 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
         FoVx,FoVy = m(FoVlon-(dlon/np.pi*180.0),FoVlat)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
-    if args.usegals:
-        gals = gt.readgals(args,metadata)
+    if usegals:
+        gals = gt.readgals(metadata)
         galras = gals['ra']*15.
         galdecs = gals['dec']
         masslist = [getmass(gal) for gal in gals]
@@ -151,12 +153,12 @@ def plotskymapsmoll(skymap,pointings,metadata,args,scopename):
 
         plt.title(
                 "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
-                        args.output,scopename))
+                        output, scopename))
     else:
         plt.title("Skymap and {0} tiling for trigger {1}".format(
-                scopename,args.output))
+                scopename, output))
 
-    plt.savefig('{0}/{1}moll{2}.png'.format(args.path,args.output,scopename), 
+    plt.savefig('{0}/{1}moll{2}.png'.format(path, output, scopename), 
                 dpi=300)
     plt.close()
     return

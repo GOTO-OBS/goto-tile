@@ -298,12 +298,12 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
     return maskedmap
 
 
-def getscopeinfo(args):
+def getscopeinfo(scopes):
 
-    delns, delew = 4.2,4.2*(args.scopes/4.0) #4-scope configuration sizes
+    delns, delew = 4.2,4.2*(scopes/4.0) #4-scope configuration sizes
     lat,lon,height = 28.7598742,360.0-17.8793802,2396.0
-    if args.scopes ==4: scopename = 'GOTO4'
-    if args.scopes ==8: scopename = 'GOTO8'
+    if scopes ==4: scopename = 'GOTO4'
+    if scopes ==8: scopename = 'GOTO8'
 
     return scopename,delns,delew,lat,lon,height
 
@@ -321,29 +321,29 @@ def filltiles(skymap, tiles, pixlist):
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon,
-              height,tiles,pixlist):
+def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
+              maxf, maxt, scopename, lat, lon, height, tiles, pixlist):
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
 
 
-    if args.usegals:
-        allgals = gt.readgals(args,metadata)
+    if usegals:
+        allgals = gt.readgals(metadata)
 
-        if args.nightsky:
+        if nightsky:
             gals = gt.visiblegals(allgals, sidtimes, lat, lon, height, 75.)
             skymap = gt.map2gals(allskymap,gals,metadata)
             #print(skymap.sum())
         allskymap = gt.map2gals(allskymap,allgals,metadata)
 
-        if not args.nightsky:
+        if not nightsky:
             skymap = allskymap.copy()
             #print(skymap.sum())
 
         skymap = skymap/allskymap.sum() #gets fractional percentage
                                         #covered, normalised
         allskymap = allskymap/allskymap.sum() #normalised
-    elif args.nightsky:
+    elif nightsky:
         skymap = visiblemap(skymap, sidtimes, lat, lon, height, 75., metadata)
 
 
@@ -373,9 +373,9 @@ def findtiles(skymap,delns,delew,metadata,args,scopename,lat,lon,
 
     otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
     outfile = open("{0}/{1}_{2}.txt".format(
-        args.path,args.output,scopename), 'w')
+        path,output,scopename), 'w')
 
-    while GWobs<=args.maxf*GWtot and len(pointings)<=args.maxt:
+    while GWobs <= maxf*GWtot and len(pointings) <= maxt:
 
         # first tile will be brightest, so blank out pixels of usedmap
         usedmap[opixs[0]]=0.0

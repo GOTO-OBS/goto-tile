@@ -35,8 +35,7 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     return np.array(visgal)
 
 
-def readgals(args,metadata):
-
+def readgals(metadata):
     gals = np.genfromtxt('GWGCCatalog_I.txt',skiprows=1,delimiter='|',
                          dtype=None,usecols=(0,1,2,3,7,11,20,21),
                          missing_values='~',filling_values=99.9,
