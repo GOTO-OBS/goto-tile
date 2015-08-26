@@ -3,5 +3,6 @@ include gototile/GWGCCatalog_I.txt
 include gototile/cylon.csv
 include scripts/tileskymap
 include README
+include requirements.txt
 include MANIFEST.in
 include setup.py

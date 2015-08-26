@@ -17,7 +17,7 @@ for scheme in INSTALL_SCHEMES.values():
 
 setup(
     name='GOTO-tile',
-    version='0.1-alpha',
+    version='0.1',
     description=('Create a set of tiled observation pointings '
                  'for GOTO for GW follow-up'),
     author='Darren White',
