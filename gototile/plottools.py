@@ -71,7 +71,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
         gals = gt.readgals(metadata)
         galras = gals['ra']*15.
         galdecs = gals['dec']
-        masslist = [getmass(gal) for gal in gals]
+        masslist = [gt.getmass(gal) for gal in gals]
         galmassnorm = np.array(masslist)/max(masslist)
         #ts,ps = cel2sph(ras,decs)
         xgal,ygal=m(galras,galdecs)
@@ -144,7 +144,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
         gals = gt.readgals(metadata)
         galras = gals['ra']*15.
         galdecs = gals['dec']
-        masslist = [getmass(gal) for gal in gals]
+        masslist = [gt.getmass(gal) for gal in gals]
         galmassnorm = np.array(masslist)/max(masslist)
         #ts,ps = celi2sph(ras,decs)
         xgal,ygal=m(galras,galdecs)
