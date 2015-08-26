@@ -4,11 +4,11 @@ import argparse
 import os,sys
 import datetime
 import healpy as hp
-
 from gototile import fits
 from gototile import skymaptools as smt
 from gototile import plottools as pt
 from gototile import grid
+
 
 def pretty_time_delta(seconds):
     seconds = int(seconds)
@@ -23,6 +23,7 @@ def pretty_time_delta(seconds):
         return '%dm%ds' % (minutes, seconds)
     else:
         return '%ds' % (seconds,)
+
 
 def parse_command_line():
 
@@ -62,57 +63,59 @@ def parse_command_line():
 
     return parser.parse_args()
 
-if __name__=='__main__':
-    start = datetime.datetime.now()
-    args = parse_command_line()
+
+def main(args):
     if args.makegrid:
         print("Creating fixed grid for both GOTO4 and GOTO8. "
               "Could take some time...")
         grid.tileallsky(args.tiles)
-    else:
-        if not os.path.exists(args.path):
-            os.makedirs(args.path)
+        return
 
-        if len(args.infiles)==0:
-            sys.exit("No input files detected, please provide input skymap.")
-        if len(args.infiles)>1:
-            print("Multiple input files detected, outfile argument ignored, "
-                  "outfile name taken from metadata object id.")
-        elif args.id=='':
-            print("No output name detected, output taken from "
-                  "object id metadata.")
+    if not os.path.exists(args.path):
+        os.makedirs(args.path)
 
-        scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args.scopes)
+    if not args.infiles:
+        sys.exit("No input files detected, please provide input skymap.")
+    if len(args.infiles) > 1:
+        print("Multiple input files detected, outfile argument ignored, "
+              "outfile name taken from metadata object id.")
+    elif args.id == '':
+        print("No output name detected, output taken from "
+              "object id metadata.")
 
-        for infile in args.infiles:
+    scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args.scopes)
 
-            skymap, metadata = fits.read_sky_map(infile)
-            if metadata['nest']: orderin = 'NESTED'
-            else: orderin = 'RINGED'
-            newmap = hp.ud_grade(skymap, nside_out = 512, order_in = orderin,
-                                 order_out ='NESTED',power = -2)
+    for infile in args.infiles:
+        skymap, metadata = fits.read_sky_map(infile)
+        orderin = 'NESTED' if metadata['nest'] else 'RINGED'
+        newmap = hp.ud_grade(skymap, nside_out=512, order_in=orderin,
+                             order_out='NESTED', power=-2)
 
-            if len(args.infiles)>1 or args.id=='':
-                objid = metadata['objid']
-                objsplit = objid.split(':')
-                args.output = objsplit[-1]
+        if len(args.infiles) > 1 or args.id == '':
+            objid = metadata['objid']
+            objsplit = objid.split(':')
+            args.output = objsplit[-1]
 
-            tilefile = "{}_nside512_nestTrue.pgz".format(
-                scopename,metadata['nside'],metadata['nest'])
-            alltiles,pixlist = grid.readtiles(tilefile,metadata,args.tiles)
+        tilefile = "{}_nside512_nestTrue.pgz".format(
+            scopename, metadata['nside'], metadata['nest'])
+        alltiles, pixlist = grid.readtiles(tilefile, metadata, args.tiles)
 
-            pointings,tiledmap = smt.findtiles(
-                skymap, delns, delew, metadata, args.usegals,
-                args.nightsky, args.path, args.output,  args.maxf, args.maxt,
-                scopename, lat, lon, height, alltiles, pixlist)
+        pointings, tiledmap = smt.findtiles(
+            skymap, delns, delew, metadata, args.usegals,
+            args.nightsky, args.path, args.output,  args.maxf, args.maxt,
+            scopename, lat, lon, height, alltiles, pixlist)
 
-            if args.plot or args.geoplot:
-                pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
-                                   args.usegals, args.output, args.path,
-                                   scopename)
+        if args.plot or args.geoplot:
+            pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
+                               args.usegals, args.output, args.path,
+                               scopename)
 
-        end = datetime.datetime.now()
 
-        td = end-start
-        ts = td.total_seconds()
-        print("Time taken to tile skymap: {}".format(pretty_time_delta(ts)))
+if __name__ == '__main__':
+    start = datetime.datetime.now()
+    args = parse_command_line()
+    main(args)
+    end = datetime.datetime.now()
+    td = end-start
+    ts = td.total_seconds()
+    print("Time taken to tile skymap: {}".format(pretty_time_delta(ts)))
