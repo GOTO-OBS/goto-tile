@@ -361,8 +361,8 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
                  "ignoring...")
     tileprobs = filltiles(skymap, tiles, pixlist)
 
-    nside = hp.get_nside(skymap)
-    npix = hp.nside2npix(metadata['nside'])
+    nside = metadata['nside']
+    npix = len(skymap)
     ipix = np.arange(npix)
 
 

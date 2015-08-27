@@ -1,7 +1,4 @@
 healpy
-numpy
 git+https://github.com/spacetelescope/sphere.git
 astropy
 pyephem
-matplotlib
-mpl_toolkits

@@ -13,7 +13,7 @@ import os
 
 def pixelsky(tilesdir,tilelist,scope):
 
-    nside = 512
+    nside = 256
     nest = True
     pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
     pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=nest) 

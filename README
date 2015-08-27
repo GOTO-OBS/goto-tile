@@ -13,24 +13,56 @@ as well as optional plots (geocentric, or celestial).
 Pre-requisites:
 ===============
 
-A list of modules required for the script to work can be found 
-under the tools directory. Easy installation can be completed
+Before installing additional pre-requisite modules, please ensure that the 
+following packages (and their pre-requisites) are installed: 
+    numpy
+    matplotlib
+    mpl_toolkits
+    
+Both numpy and matplotlib need to be installed before installing the remaining
+pakages. Numpy and matplotlib can be installed via 'pip install' (assuming the 
+correct development libraries, eg: python-dev, are installed) or using your 
+local package manager.
+
+The mpl-toolkits can either be installed via your local package manager or from
+source (see http://matplotlib.org/basemap/users/download.html and
+mahttp://matplotlib.org/basemap/users/installing.html).
+
+The remaining modules required for the script to work can be found listed 
+under the main directory. Easy installation can be completed
 using
 
-    $ pip install -r tools/requirements.txt
+    $ pip install -r requirements.txt
     
 However, if certain modules already exists, you should
-be able to easily install modules required.
+be able to easily install modules required by hand.
+
+Known issues: 
+
+For python3 installations, pip install healpy does not seem to build/install
+the internal healpix libraries (but seems to work fine for python 2.7). This
+can be fixed by manually installing the healpix_cxx libraries 
+(http://sourceforge.net/projects/healpix/files/Healpix_3.11/autotools_packages)
+
+Installation:
+=============
+
+Installation can be done using the standard python setup.py install command.
+This will place the tileskymap executable in your path, and allow import
+of gototile modules in other python scripts.
+
+Post-install:
+=============
 
 In order to tile the sky, we must first create the list of fixed tiles,
 in a given directory. This speeds up the time taken to tile a given skymap.
 This can be done by running:
 
-	$ python tileskymap.py --makegrid
+	$ tileskymap --makegrid
 	
 with a user chosen directory:
 
-	$ python tileskymap.py --makegrid --tiles <path-to-tiles>
+	$ tileskymap --makegrid --tiles <path-to-tiles>
 
 
 Running skymaptile.py
@@ -38,15 +70,15 @@ Running skymaptile.py
 
 The basic method for calling the script with default settings is:
 
-	$ python tileskymap.py <skymap-file>
+	$ tileskymap <skymap-file>
 
 A list of user-changeable options can be found using:
 
-    $ python tileskymap.py -h
+    $ tileskymap -h
 
 Output:-
 
-usage: tileskymap.py [-h] [-i ID] [-p PATH] [-t MAXT] [-f MAXF] [-s SCOPES]
+usage: tileskymap [-h] [-i ID] [-p PATH] [-t MAXT] [-f MAXF] [-s SCOPES]
                      [-g] [-n] [--geoplot] [--plot] [--makegrid]
                      [--tiles TILES]
                      [infiles [infiles ...]]
