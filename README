@@ -26,7 +26,7 @@ local package manager.
 
 The mpl-toolkits can either be installed via your local package manager or from
 source (see http://matplotlib.org/basemap/users/download.html and
-mahttp://matplotlib.org/basemap/users/installing.html).
+http://matplotlib.org/basemap/users/installing.html).
 
 The remaining modules required for the script to work can be found listed 
 under the main directory. Easy installation can be completed
