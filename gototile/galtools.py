@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, division
 
+import os.path
 import numpy as np
 import healpy as hp
 import astropy.coordinates as acoord
@@ -35,12 +36,12 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     return np.array(visgal)
 
 
-def readgals(args,metadata):
-
-    gals = np.genfromtxt('GWGCCatalog_I.txt',skiprows=1,delimiter='|',
-                         dtype=None,usecols=(0,1,2,3,7,11,20,21),
-                         missing_values='~',filling_values=99.9,
-                         names=('PGC','Name','ra','dec','B','I','dist',
+def readgals(metadata):
+    path = os.path.join(os.path.dirname(__file__), 'GWGCCatalog_I.txt')
+    gals = np.genfromtxt(path, skiprows=1, delimiter='|',
+                         dtype=None, usecols=(0, 1, 2, 3, 7, 11, 20, 21),
+                         missing_values='~', filling_values=99.9,
+                         names=('PGC', 'Name', 'ra', 'dec', 'B', 'I', 'dist',
                                 'e_dist'))
 
     return gals
