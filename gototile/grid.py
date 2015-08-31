@@ -52,9 +52,9 @@ def tileallsky(tilesdir):
 
     return
 
-def readtiles(infile,metadata,tilesdir):
+def readtiles(infile,metadata):
 
-    with gzip.GzipFile('{}/{}'.format(tilesdir,infile), 'r') as f:
+    with gzip.GzipFile(infile, 'r') as f:
         tilelist,pixlist = pickle.load(f)
         f.close()
 
