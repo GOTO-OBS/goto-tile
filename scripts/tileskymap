@@ -100,10 +100,11 @@ def main(args):
             args.id = objsplit[-1]
 
         tilefile = "{}_nside256_nestTrue.pgz".format(scopename)
+        tilefile = os.path.join(args.tiles, tilefile)
         if not os.path.isfile(tilefile): 
             sys.exit("No existing pre-made tiles found. Please run tileskymap "
                      "with the --makegrid option.")
-        alltiles, pixlist = grid.readtiles(tilefile, metadata, args.tiles)
+        alltiles, pixlist = grid.readtiles(tilefile, metadata)
 
         pointings, tiledmap = smt.findtiles(
             newmap, delns, delew, metadata, args.usegals,
