@@ -286,7 +286,7 @@ def read_sky_map(filename, nest=False):
     try:
         value = header['NSIDE']
     except KeyError:
-        print("Getting nside parameter from length of skymap, header missing")
+        #print("Getting nside parameter from length of skymap, header missing")
         metadata['nside'] = hp.npix2nside(len(prob))
     else:
         metadata['nside'] = value

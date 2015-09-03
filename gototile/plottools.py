@@ -121,15 +121,12 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
     # Plot Skymap
     ###################
     nside = metadata['nside']
-    print(nside)
     npix = hp.nside2npix(nside)
     ipix = np.arange(npix)
     thetas,phis = hp.pix2ang(nside,ipix,nest=metadata['nest'])
 
     longs, lats = smt.sph2cel(thetas,phis-dlon)
     xmap,ymap=m(longs,lats)
-    print(len(xmap))
-    print(len(skymap))
     m.scatter(xmap, ymap, s=1, c=skymap, cmap='cylon', alpha=0.5, linewidths=0)
 
     #################

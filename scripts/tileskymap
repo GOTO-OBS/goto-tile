@@ -85,7 +85,7 @@ def main(args):
         print("No output name detected, output taken from "
               "object id metadata.")
 
-    scopename,delns,delew,lat,lon,height=smt.getscopeinfo(args.scopes)
+    scopename, delns, delew, lat, lon, height = smt.getscopeinfo(args.scopes)
 
     for infile in args.infiles:
         skymap, metadata = fits.read_sky_map(infile)
@@ -106,10 +106,27 @@ def main(args):
                      "with the --makegrid option.")
         alltiles, pixlist = grid.readtiles(tilefile, metadata)
 
-        pointings, tiledmap = smt.findtiles(
+        pointings, tiledmap, allskymap = smt.findtiles(
             newmap, delns, delew, metadata, args.usegals,
-            args.nightsky, args.path, args.id,  args.maxf, args.maxt,
-            scopename, lat, lon, height, alltiles, pixlist)
+            args.nightsky, args.maxf, args.maxt,
+            lat, lon, height, alltiles, pixlist)
+        
+        gwtot = skymap.sum()
+        allsky = allskymap.sum()
+        print("The total probability visible during the next "
+              "observing period is {}".format(gwtot))
+        print("This is {}% of the original skymap".format(
+            (gwtot/allskymap.sum())*100.))
+
+        outfilename = "{}_{}.txt".format(args.id, scopename)
+        outfilename = os.path.join(args.path, outfilename)
+        with open(outfilename, 'w') as outfile:
+            for pointing in pointings:
+                clon, clat, _, prob, gwtot = pointing
+                outfile.write("{},{},{},{}\n".format(
+                    clon[0], clat[0], prob, gwtot))
+                print("{:9.5f}, {:+9.5f}, {:8.6f}, {:8.6f}".format(
+                    clon[0], clat[0], prob, gwtot))
 
         if args.plot or args.geoplot:
             pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,

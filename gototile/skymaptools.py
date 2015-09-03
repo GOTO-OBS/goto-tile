@@ -321,8 +321,8 @@ def filltiles(skymap, tiles, pixlist):
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
-              maxf, maxt, scopename, lat, lon, height, tiles, pixlist):
+def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
+              maxf, maxt, lat, lon, height, tiles, pixlist):
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
 
@@ -349,13 +349,6 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
 
 
     GWtot = skymap.sum()
-
-    print(GWtot)
-    print(allskymap.sum())
-    print("The total probability visible during the next "
-          "observing period is {}".format(GWtot))
-    print("This is {}% of the original skymap".format(
-        (GWtot/allskymap.sum())*100.))
     if GWtot<0.05:
         sys.exit("Less than 5% of the skymap probability is visible, "
                  "ignoring...")
@@ -372,8 +365,6 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
     GWobs = 0.0
 
     otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
-    outfile = open("{0}/{1}_{2}.txt".format(
-        path,output,scopename), 'w')
 
     while GWobs <= maxf*GWtot and len(pointings) <= maxt:
 
@@ -386,14 +377,8 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
         sphpoints = hp.vec2ang(center)
         clon,clat = sph2cel(sphpoints[0],sphpoints[1])
 
-        print("{0},{1},{2},{3}".format(clon[0],clat[0],oprobs[0],GWtot))
         pointings.append([clon,clat,otiles[0],oprobs[0],GWobs])
-        outfile.write("{0},{1},{2},{3}\n".format(
-            clon[0],clat[0],oprobs[0],GWtot))
-
         oprobs[0] = 0.0 #seen so set tile prob to zero
-
-
 
         for idx,[tile,tpix,tprob] in enumerate(zip(otiles[1:],
                                                    opixs[1:],
@@ -404,5 +389,4 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
 
         otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs)
 
-    outfile.close()
-    return pointings,skymap
+    return pointings, skymap, allskymap

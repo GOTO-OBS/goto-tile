@@ -35,7 +35,6 @@ def tileallsky(tilesdir):
     scopes = ['GOTO4','GOTO8']
 
     for scope in scopes:
-        print(scope)
         delns,delew = smt.getdels(scope)
 
         tilelist = []
