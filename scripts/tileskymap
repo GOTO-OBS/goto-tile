@@ -129,9 +129,10 @@ def main(args):
                     clon[0], clat[0], prob, gwtot))
 
         if args.plot or args.geoplot:
+            plotfilename = os.path.join(args.path, "{}moll{}.png".format(
+                args.id, scopename))
             pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
-                               args.usegals, args.id, args.path,
-                               scopename)
+                               args.usegals, scopename, args.id, plotfilename)
 
 
 if __name__ == '__main__':

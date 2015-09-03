@@ -92,8 +92,8 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
 
 
 def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, 
-                    output, path, scopename):
-    fig = plt.figure()#
+                    scopename, trigger, plotfilename, dpi=300):
+    fig = plt.figure()
     fig.clf()
 
     m = Basemap(projection='moll',resolution='c',lon_0=0.0)
@@ -152,13 +152,12 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
                   linewidths=0)
 
         plt.title(
-                "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
-                        output, scopename))
+            "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
+                scopename, trigger))
     else:
         plt.title("Skymap and {0} tiling for trigger {1}".format(
-                scopename, output))
+                scopename, trigger))
 
-    plt.savefig('{0}/{1}moll{2}.png'.format(path, output, scopename), 
-                dpi=300)
+    plt.savefig(plotfilename, dpi=dpi)
     plt.close()
     return
