@@ -6,6 +6,8 @@ import argparse
 import os,sys
 import datetime
 import healpy as hp
+import matplotlib
+matplotlib.use('Agg')
 from gototile import fits
 from gototile import skymaptools as smt
 from gototile import plottools as pt

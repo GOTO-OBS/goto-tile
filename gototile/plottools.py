@@ -6,7 +6,6 @@ from . import cmap
 import numpy as np
 import healpy as hp
 import matplotlib
-matplotlib.use('Agg') # Force matplotlib to not use any Xwindows backend.
 import matplotlib.pyplot as plt
 
 from math import sin,cos,atan2,sqrt,pi
