@@ -99,14 +99,14 @@ def main(args):
             objsplit = objid.split(':')
             args.id = objsplit[-1]
 
-        tilefile = "{}_nside512_nestTrue.pgz".format(scopename)
+        tilefile = "{}_nside256_nestTrue.pgz".format(scopename)
         if not os.path.isfile(tilefile): 
             sys.exit("No existing pre-made tiles found. Please run tileskymap"
                      "with --maketiles option.")
         alltiles, pixlist = grid.readtiles(tilefile, metadata, args.tiles)
 
         pointings, tiledmap = smt.findtiles(
-            skymap, delns, delew, metadata, args.usegals,
+            newmap, delns, delew, metadata, args.usegals,
             args.nightsky, args.path, args.id,  args.maxf, args.maxt,
             scopename, lat, lon, height, alltiles, pixlist)
 
