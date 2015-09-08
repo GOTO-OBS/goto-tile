@@ -14,6 +14,9 @@ from gototile import plottools as pt
 from gototile import grid
 
 
+NSIDE = 256
+
+
 def pretty_time_delta(seconds):
     seconds = int(seconds)
     days, seconds = divmod(seconds, 86400)
@@ -70,9 +73,16 @@ def parse_command_line():
 
 def main(args):
     if args.makegrid:
+        tilesdir = args.tiles
+        if not os.path.exists(tilesdir):
+            os.makedirs(tilesdir)
         print("Creating fixed grid for both GOTO4 and GOTO8. "
               "Could take some time...")
-        grid.tileallsky(args.tiles)
+        for scope in (4, 8):
+            scopename = "GOTO{}".format(scope)
+            filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+            filename = os.path.join(tilesdir, filename)
+            grid.tileallsky(filename, scopename, NSIDE)
         return
 
     if not os.path.exists(args.path):
@@ -92,16 +102,16 @@ def main(args):
     for infile in args.infiles:
         skymap, metadata = fits.read_sky_map(infile)
         orderin = 'NESTED' if metadata['nest'] else 'RINGED'
-        newmap = hp.ud_grade(skymap, nside_out=256, order_in=orderin,
+        newmap = hp.ud_grade(skymap, nside_out=NSIDE, order_in=orderin,
                              order_out='NESTED', power=-2)
         metadata['nest'] = True
-        metadata['nside'] = 256
+        metadata['nside'] = NSIDE
         if len(args.infiles) > 1 or args.id == '':
             objid = metadata['objid']
             objsplit = objid.split(':')
             args.id = objsplit[-1]
 
-        tilefile = "{}_nside256_nestTrue.pgz".format(scopename)
+        tilefile = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
         tilefile = os.path.join(args.tiles, tilefile)
         if not os.path.isfile(tilefile): 
             sys.exit("No existing pre-made tiles found. Please run tileskymap "
