@@ -298,21 +298,28 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
     return maskedmap
 
 
-def getscopeinfo(scopes):
+def getscopeinfo(name):
+    if name.startswith('SuperWASP'):
+        delns, delew = 7.8, 7.8
+        if name.endswith('N'):
+            lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
+        elif name.endswith('S'):
+            lat, lon, height = -32.37601, 47.83983, 1798
+        else:
+            raise ValueError("unknown SuperWASP configuration")
+    elif name.startswith('GOTO'):
+        if name.endswith('4'):
+            delns, delew = 4.2, 4.2
+        elif name.endswith('8'):
+            delns, delew = 4.2, 8.4
+        else:
+            raise ValueError("unknown GOTO configuration")
+        lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
+    else:
+        raise ValueError("unknown telescope")
 
-    delns, delew = 4.2,4.2*(scopes/4.0) #4-scope configuration sizes
-    lat,lon,height = 28.7598742,360.0-17.8793802,2396.0
-    if scopes ==4: scopename = 'GOTO4'
-    if scopes ==8: scopename = 'GOTO8'
+    return delns, delew, lat, lon, height
 
-    return scopename,delns,delew,lat,lon,height
-
-def getdels(scope):
-
-    if scope == 'GOTO4': delns, delew = 4.2,4.2
-    if scope == 'GOTO8': delns, delew = 4.2,8.4
-
-    return delns,delew
 
 def filltiles(skymap, tiles, pixlist):
 
@@ -321,8 +328,8 @@ def filltiles(skymap, tiles, pixlist):
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
-              maxf, maxt, scopename, lat, lon, height, tiles, pixlist):
+def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
+              maxf, maxt, lat, lon, height, tiles, pixlist):
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
 
@@ -349,13 +356,6 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
 
 
     GWtot = skymap.sum()
-
-    print(GWtot)
-    print(allskymap.sum())
-    print("The total probability visible during the next "
-          "observing period is {}".format(GWtot))
-    print("This is {}% of the original skymap".format(
-        (GWtot/allskymap.sum())*100.))
     if GWtot<0.05:
         sys.exit("Less than 5% of the skymap probability is visible, "
                  "ignoring...")
@@ -372,8 +372,6 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
     GWobs = 0.0
 
     otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
-    outfile = open("{0}/{1}_{2}.txt".format(
-        path,output,scopename), 'w')
 
     while GWobs <= maxf*GWtot and len(pointings) <= maxt:
 
@@ -386,14 +384,8 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
         sphpoints = hp.vec2ang(center)
         clon,clat = sph2cel(sphpoints[0],sphpoints[1])
 
-        print("{0},{1},{2},{3}".format(clon[0],clat[0],oprobs[0],GWtot))
         pointings.append([clon,clat,otiles[0],oprobs[0],GWobs])
-        outfile.write("{0},{1},{2},{3}\n".format(
-            clon[0],clat[0],oprobs[0],GWtot))
-
         oprobs[0] = 0.0 #seen so set tile prob to zero
-
-
 
         for idx,[tile,tpix,tprob] in enumerate(zip(otiles[1:],
                                                    opixs[1:],
@@ -404,5 +396,4 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky, path, output,
 
         otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs)
 
-    outfile.close()
-    return pointings,skymap
+    return pointings, skymap, allskymap

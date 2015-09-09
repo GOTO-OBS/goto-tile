@@ -72,7 +72,7 @@ import shutil
 import tempfile
 import healpy as hp
 from healpy.fitsfunc import getformat, pixelfunc, standard_column_names, pf, np
-
+import astropy.time
 
 #
 # Based on https://github.com/healpy/healpy/blob/1.6.1/healpy/fitsfunc.py.
@@ -98,13 +98,13 @@ def write_map(filename,m,nest=False,dtype=np.float32,fits_IDL=True,
       They will be considered as I, Q, U maps.
       Supports masked maps, see the `ma` function.
     nest : bool, optional
-      If False, ordering scheme is NESTED, otherwise, it is RING. 
+      If False, ordering scheme is NESTED, otherwise, it is RING.
       Default: RING.
     fits_IDL : bool, optional
       If True, reshapes columns in rows of 1024, otherwise all the data will
       go in one column. Default: True
     coord : str
-      The coordinate system, typically 'E' for Ecliptic, 
+      The coordinate system, typically 'E' for Ecliptic,
       'G' for Galactic or 'C' for Celestial (equatorial)
     column_names : str or list
       Column name or list of column names, if None we use:
@@ -234,11 +234,14 @@ def read_sky_map(filename, nest=False):
             'ORDERING card in header has unknown value: {0}'.format(ordering))
 
     try:
-        value = header['OBJECT']
+        metadata['objid'] = header['OBJECT']
     except KeyError:
-        pass
-    else:
-        metadata['objid'] = value
+        # Grab an object id from the filename
+        objid = os.path.basename(filename)
+        # Twice, in case we use a .fits.gz file
+        objid = os.path.splitext(objid)[0]
+        objid = os.path.splitext(objid)[0]
+        metadata['objid'] = objid
 
     try:
         value = header['REFERENC']
@@ -248,12 +251,7 @@ def read_sky_map(filename, nest=False):
         metadata['url'] = value
 
 
-    try:
-        value = header['MJD-OBS']
-    except KeyError:
-        pass
-    else:
-        metadata['mjd'] = value
+    metadata['mjd'] = header.get('MJD-OBS', astropy.time.Time.now().mjd)
 
     try:
         value = header['DATE-OBS']
@@ -286,7 +284,7 @@ def read_sky_map(filename, nest=False):
     try:
         value = header['NSIDE']
     except KeyError:
-        print("Getting nside parameter from length of skymap, header missing")
+        #print("Getting nside parameter from length of skymap, header missing")
         metadata['nside'] = hp.npix2nside(len(prob))
     else:
         metadata['nside'] = value
