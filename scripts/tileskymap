@@ -86,7 +86,7 @@ def main(args):
         for scopename in ('SuperWASP-S', 'SuperWASP-N'):
             filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
             path = os.path.join(tilesdir, filename)
-            grid.tileallsky(path, scopename, NSIDE)            
+            grid.tileallsky(path, scopename, NSIDE)
         return
 
     if not os.path.exists(args.path):
@@ -122,7 +122,7 @@ def main(args):
 
         tilefile = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
         tilefile = os.path.join(args.tiles, tilefile)
-        if not os.path.isfile(tilefile): 
+        if not os.path.isfile(tilefile):
             sys.exit("No existing pre-made tiles found. Please run tileskymap "
                      "with the --makegrid option.")
         alltiles, pixlist = grid.readtiles(tilefile, metadata)
@@ -131,7 +131,7 @@ def main(args):
             newmap, delns, delew, metadata, args.usegals,
             args.nightsky, args.maxf, args.maxt,
             lat, lon, height, alltiles, pixlist)
-        
+
         gwtot = skymap.sum()
         allsky = allskymap.sum()
         print("The total probability visible during the next "
