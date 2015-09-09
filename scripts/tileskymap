@@ -16,7 +16,6 @@ from gototile import grid
 
 NSIDE = 256
 
-
 def pretty_time_delta(seconds):
     seconds = int(seconds)
     days, seconds = divmod(seconds, 86400)
@@ -48,9 +47,10 @@ def parse_command_line():
                         help="Number of tiles to return")
     parser.add_argument("-f", "--maxf", type=float, default=0.95,
                         help="Maximum fraction of visible skymap to tile")
-    parser.add_argument("-s", "--scopes", type=int, default=4,
-                        help=("Number of telescopes for GOTO configuration, "
-                              "4 or 8"))
+    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'sws', 'swn'],
+                        default='g4',
+                        help=("Telescope to use. GOTO-4, GOTO-8, "
+                              "SuperWASP-South, SuperWASP-North."))
     parser.add_argument("-g", "--usegals", action="store_true", default=False,
                         help="Use GWGC in tiling/plotting")
     parser.add_argument("-n", "--nightsky", action="store_true", default=False,
@@ -76,13 +76,17 @@ def main(args):
         tilesdir = args.tiles
         if not os.path.exists(tilesdir):
             os.makedirs(tilesdir)
-        print("Creating fixed grid for both GOTO4 and GOTO8. "
-              "Could take some time...")
+        print("Creating the fixed grid GOTO-4, GOTO-8, SuperWASP-N and "
+              "SuperWASP-S. This could take some time.")
         for scope in (4, 8):
             scopename = "GOTO{}".format(scope)
             filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
-            filename = os.path.join(tilesdir, filename)
-            grid.tileallsky(filename, scopename, NSIDE)
+            path = os.path.join(tilesdir, filename)
+            grid.tileallsky(path, scopename, NSIDE)
+        for scopename in ('SuperWASP-S', 'SuperWASP-N'):
+            filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+            path = os.path.join(tilesdir, filename)
+            grid.tileallsky(path, scopename, NSIDE)            
         return
 
     if not os.path.exists(args.path):
@@ -97,7 +101,12 @@ def main(args):
         print("No output name detected, output taken from "
               "object id metadata.")
 
-    scopename, delns, delew, lat, lon, height = smt.getscopeinfo(args.scopes)
+    names = {'g4': 'GOTO4',
+             'g8': 'GOTO8',
+             'sws': 'SuperWASP-S',
+             'swn': 'SuperWASP-N'}
+    scopename = names[args.scope]
+    delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
 
     for infile in args.infiles:
         skymap, metadata = fits.read_sky_map(infile)

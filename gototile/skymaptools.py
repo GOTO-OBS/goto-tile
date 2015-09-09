@@ -298,21 +298,28 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
     return maskedmap
 
 
-def getscopeinfo(scopes):
+def getscopeinfo(name):
+    if name.startswith('SuperWASP'):
+        delns, delew = 7.8, 7.8
+        if name.endswith('N'):
+            lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
+        elif name.endswith('S'):
+            lat, lon, height = -32.37601, 47.83983, 1798
+        else:
+            raise ValueError("unknown SuperWASP configuration")
+    elif name.startswith('GOTO'):
+        if name.endswith('4'):
+            delns, delew = 4.2, 4.2
+        elif name.endswith('8'):
+            delns, delew = 4.2, 8.4
+        else:
+            raise ValueError("unknown GOTO configuration")
+        lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
+    else:
+        raise ValueError("unknown telescope")
 
-    delns, delew = 4.2,4.2*(scopes/4.0) #4-scope configuration sizes
-    lat,lon,height = 28.7598742,360.0-17.8793802,2396.0
-    if scopes ==4: scopename = 'GOTO4'
-    if scopes ==8: scopename = 'GOTO8'
+    return delns, delew, lat, lon, height
 
-    return scopename,delns,delew,lat,lon,height
-
-def getdels(scope):
-
-    if scope == 'GOTO4': delns, delew = 4.2,4.2
-    if scope == 'GOTO8': delns, delew = 4.2,8.4
-
-    return delns,delew
 
 def filltiles(skymap, tiles, pixlist):
 

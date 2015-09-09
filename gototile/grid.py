@@ -14,7 +14,7 @@ import os
 
 def tileallsky(filename, scopename, nside):
 
-    delns, delew = smt.getdels(scopename)
+    delns, delew = smt.getscopeinfo(scopename)[:2]
 
     north = np.arange(0.0, 90.0, delns)
     south = -1*north
