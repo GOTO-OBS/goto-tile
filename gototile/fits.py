@@ -251,7 +251,8 @@ def read_sky_map(filename, nest=False):
         metadata['url'] = value
 
 
-    metadata['mjd'] = header.get('MJD-OBS', astropy.time.Time.now().mjd)
+    metadata['mjddet'] = header.get('MJD-OBS', astropy.time.Time(header['DATE']).mjd)
+    metadata['mjd'] = astropy.time.Time.now().mjd
 
     try:
         value = header['DATE-OBS']

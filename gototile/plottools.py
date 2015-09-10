@@ -19,7 +19,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
 
     if geoplot:
         # longitude correction
-        t = Time(metadata['mjd'], format='mjd',location=('0d', '0d'))
+        t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
     else: dlon = 0
@@ -102,7 +102,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
     m.drawmapboundary(color='k', linewidth=0.5)
 
     if geoplot:
-        t = Time(metadata['mjd'], format='mjd',location=('0d', '0d'))
+        t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
 
