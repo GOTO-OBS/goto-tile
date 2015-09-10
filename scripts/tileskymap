@@ -132,22 +132,22 @@ def main(args):
             args.nightsky, args.maxf, args.maxt,
             lat, lon, height, alltiles, pixlist)
 
-        gwtot = skymap.sum()
+        gwtot = tiledmap.sum()
         allsky = allskymap.sum()
         print("The total probability visible during the next "
               "observing period is {}".format(gwtot))
-        print("This is {}% of the original skymap".format(
+        print("This is {:5.2f}% of the original skymap".format(
             (gwtot/allskymap.sum())*100.))
 
         outfilename = "{}_{}.txt".format(args.id, scopename)
         outfilename = os.path.join(args.path, outfilename)
         with open(outfilename, 'w') as outfile:
             for pointing in pointings:
-                clon, clat, _, prob, gwtot = pointing
+                clon, clat, _, prob, gwobs = pointing
                 outfile.write("{},{},{},{}\n".format(
-                    clon[0], clat[0], prob, gwtot))
+                    clon[0], clat[0], prob, gwobs))
                 print("{:9.5f}, {:+9.5f}, {:8.6f}, {:8.6f}".format(
-                    clon[0], clat[0], prob, gwtot))
+                    clon[0], clat[0], prob, gwobs))
 
         if args.plot or args.geoplot:
             plotfilename = os.path.join(args.path, "{}moll{}.png".format(
