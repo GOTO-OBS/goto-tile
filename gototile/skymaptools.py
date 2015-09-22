@@ -333,17 +333,18 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
 
-
     if usegals:
         allgals = gt.readgals(metadata)
-
+        #print(skymap.sum())
         if nightsky:
             gals = gt.visiblegals(allgals, sidtimes, lat, lon, height, 75.)
             skymap = gt.map2gals(allskymap,gals,metadata)
             #print(skymap.sum())
+            #print("Hello2?")
         allskymap = gt.map2gals(allskymap,allgals,metadata)
 
         if not nightsky:
+            print("I should not pop up")
             skymap = allskymap.copy()
             #print(skymap.sum())
 
