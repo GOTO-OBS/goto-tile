@@ -43,7 +43,8 @@ def readgals(metadata):
                          missing_values='~', filling_values=99.9,
                          names=('PGC', 'Name', 'ra', 'dec', 'B', 'I', 'dist',
                                 'e_dist'))
-
+    #blank
+    
     return gals
 
 def Blum(Bmag):
