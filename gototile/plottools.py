@@ -12,7 +12,7 @@ from math import sin,cos,atan2,sqrt,pi
 from mpl_toolkits.basemap import Basemap
 from astropy.time import Time
 
-def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, 
+def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky, 
                      output, path, scopename):
     fig = plt.figure()
     fig.clf()
@@ -65,30 +65,40 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
     if usegals:
+        
         gals = gt.readgals(metadata)
-        visras,visdecs = [],[]
-        ras, decs = [],[]
 
         ras = gals['ra']
         decs = gals['dec']
+        
+        if nightsky:
+            visras,visdecs = [],[]
+            import astropy.coordinates as acoord
+            import astropy.units as u
+            delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
+            sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
 
-        for st in sidtimes:
-            frame = acoord.AltAz(obstime=st, location=observatory)
-            radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
-            altaz = radecs.transform_to(frame)
-
-            visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
-            visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
-        xgal,ygal=m(visras,visdecs)
+            observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
+                                           height=height*u.m)
+            radius = 75.
+            for st in sidtimes:
+                frame = acoord.AltAz(obstime=st, location=observatory)
+                radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
+                altaz = radecs.transform_to(frame)
+                visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
+                visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
+            xgal,ygal=m(np.array(visras)-(dlon/np.pi*180.0),visdecs)
+            
+        else: xgal,ygal=m(np.array(ras)-(dlon/np.pi*180.0),decs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
                       linewidths=0)
 
         plt.title(
-                "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
-                        output, scopename))
+            "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
+                scopename, trigger))
     else:
         plt.title("Skymap and {0} tiling for trigger {1}".format(
-                scopename, output))
+                scopename, trigger))
 
     plt.savefig('{0}/{1}nsper{2}.png'.format(path, output, scopename), 
                 dpi=300)
@@ -96,7 +106,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
     return
 
 
-def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, 
+def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky, 
                     scopename, trigger, plotfilename, dpi=300):
     fig = plt.figure()
     fig.clf()
@@ -140,26 +150,31 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
     if usegals:
-        import astropy.coordinates as acoord
-        import astropy.units as u
-        delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
-        sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
+        
         gals = gt.readgals(metadata)
-        visras,visdecs = [],[]
-        ras, decs = [],[]
 
         ras = gals['ra']
         decs = gals['dec']
-        observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
-                                       height=height*u.m)
-        radius = 75.
-        for st in sidtimes:
-            frame = acoord.AltAz(obstime=st, location=observatory)
-            radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
-            altaz = radecs.transform_to(frame)
-            visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
-            visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
-        xgal,ygal=m(np.array(visras)-(dlon/np.pi*180.0),visdecs)
+        
+        if nightsky:
+            visras,visdecs = [],[]
+            import astropy.coordinates as acoord
+            import astropy.units as u
+            delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
+            sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
+
+            observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
+                                           height=height*u.m)
+            radius = 75.
+            for st in sidtimes:
+                frame = acoord.AltAz(obstime=st, location=observatory)
+                radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
+                altaz = radecs.transform_to(frame)
+                visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
+                visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
+            xgal,ygal=m(np.array(visras)-(dlon/np.pi*180.0),visdecs)
+            
+        else: xgal,ygal=m(np.array(ras)-(dlon/np.pi*180.0),decs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
                       linewidths=0)
 
