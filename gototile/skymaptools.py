@@ -232,10 +232,6 @@ def outputtile(tileinfo,outfile,writecode):
     return
 
 def siderealtimes(lat, lon, height, mjd):
-    #lat=-30.0
-    #s = ephem.Sun()
-#    print(mjd)
-#    print(lat,lon)
     t = atime.Time(mjd, format='mjd', scale='utc')
 
 
@@ -262,11 +258,11 @@ def siderealtimes(lat, lon, height, mjd):
 
     diff = ATend-ATstart
     steps = diff/delt
-#    print(steps)
+
     times = np.linspace(ATstart.mjd,ATend.mjd,steps+1)
-#    print(len(times))
+
     timeobjs = atime.Time(times,format ='mjd')
-#    print(timeobjs.datetime)
+
     return timeobjs
 
 
@@ -284,12 +280,8 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
         radecs = acoord.SkyCoord(ra=phi*u.rad, dec=(0.5*np.pi - theta)*u.rad)
         altaz = radecs.transform_to(frame)
         seenpix = ipix[np.where(altaz.alt.degree>(90-radius))]
-#        print(np.where(altaz.alt.degree>(90-radius)))
-#        print(len(seenpix))
         seen.extend(list(seenpix))
-
         seen = list(np.unique(seen))
-#        print(len(seen))
 
     maskedmap = skymap.copy()
     maskedmap[:] = 0.0
@@ -333,19 +325,18 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
 
-
     if usegals:
         allgals = gt.readgals(metadata)
-
+        
         if nightsky:
             gals = gt.visiblegals(allgals, sidtimes, lat, lon, height, 75.)
             skymap = gt.map2gals(allskymap,gals,metadata)
-            #print(skymap.sum())
+            
         allskymap = gt.map2gals(allskymap,allgals,metadata)
 
         if not nightsky:
             skymap = allskymap.copy()
-            #print(skymap.sum())
+
 
         skymap = skymap/allskymap.sum() #gets fractional percentage
                                         #covered, normalised

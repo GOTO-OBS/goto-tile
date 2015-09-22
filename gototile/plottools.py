@@ -18,7 +18,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
     fig.clf()
 
     if geoplot:
-        # longitude correction
+
         t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
@@ -43,9 +43,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
     if geoplot:
 
         m.drawcoastlines(linewidth=0.25)
-        #m.drawcountries(linewidth=0.25)
-        #m.fillcontinents(color='coral',lake_color='aqua')
-        #m.drawmapboundary(fill_color='aqua')
+
 
 
     ####################
@@ -68,14 +66,22 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals,
 
     if usegals:
         gals = gt.readgals(metadata)
-        galras = gals['ra']*15.
-        galdecs = gals['dec']
-        masslist = [gt.getmass(gal) for gal in gals]
-        galmassnorm = np.array(masslist)/max(masslist)
-        #ts,ps = cel2sph(ras,decs)
-        xgal,ygal=m(galras,galdecs)
+        visras,visdecs = [],[]
+        ras, decs = [],[]
+
+        ras = gals['ra']
+        decs = gals['dec']
+
+        for st in sidtimes:
+            frame = acoord.AltAz(obstime=st, location=observatory)
+            radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
+            altaz = radecs.transform_to(frame)
+
+            visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
+            visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
+        xgal,ygal=m(visras,visdecs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
-                  linewidths=0)
+                      linewidths=0)
 
         plt.title(
                 "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
@@ -107,14 +113,8 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
         dlon = st.radian
 
         m.drawcoastlines(linewidth=0.25)
-        #m.drawcountries(linewidth=0.25)
-        #m.fillcontinents(color='coral',lake_color='aqua')
-        #m.drawmapboundary(fill_color='aqua')
-
-
-        # longitude correction
-
-    else: dlon = 0
+        
+    else: dlon = 0 # longitude correction
 
     ####################
     # Plot Skymap
@@ -140,15 +140,28 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals,
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
     if usegals:
+        import astropy.coordinates as acoord
+        import astropy.units as u
+        delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
+        sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
         gals = gt.readgals(metadata)
-        galras = gals['ra']*15.
-        galdecs = gals['dec']
-        masslist = [gt.getmass(gal) for gal in gals]
-        galmassnorm = np.array(masslist)/max(masslist)
-        #ts,ps = celi2sph(ras,decs)
-        xgal,ygal=m(galras,galdecs)
+        visras,visdecs = [],[]
+        ras, decs = [],[]
+
+        ras = gals['ra']
+        decs = gals['dec']
+        observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
+                                       height=height*u.m)
+        radius = 75.
+        for st in sidtimes:
+            frame = acoord.AltAz(obstime=st, location=observatory)
+            radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
+            altaz = radecs.transform_to(frame)
+            visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
+            visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
+        xgal,ygal=m(np.array(visras)-(dlon/np.pi*180.0),visdecs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
-                  linewidths=0)
+                      linewidths=0)
 
         plt.title(
             "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(

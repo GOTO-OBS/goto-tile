@@ -13,25 +13,24 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     visras,visdecs = [],[]
     ras, decs = [],[]
 
-    ras = gals['ra']*15.
+    ras = gals['ra']
     decs = gals['dec']
 
     for st in sidtimes:
         frame = acoord.AltAz(obstime=st, location=observatory)
         radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
         altaz = radecs.transform_to(frame)
-        #print(np.where(altaz.alt.degree>(90-radius)))
-        visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
-        visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
-
-    galradecs = {tuple(row) for row in zip(ras,decs)}
+        visras.extend(ras[np.where(altaz.alt.degree>(90.-radius))])
+        visdecs.extend(decs[np.where(altaz.alt.degree>(90.-radius))])
+    
+    galradecs = {tuple(row):gals[i] for i,row in enumerate(zip(ras,decs))}
     galradecseen = {tuple(row) for row in zip(visras,visdecs)}
-    galradecs = list(galradecs)
-    galradecseen = list(galradecseen)
-
+    
     visgal = []
     for row in galradecseen:
-        visgal.append(gals[galradecs.index(row)])
+        print(row)
+        print(galradecs[row])
+        visgal.append(galradecs[row])
 
     return np.array(visgal)
 
@@ -42,8 +41,9 @@ def readgals(metadata):
                          dtype=None, usecols=(0, 1, 2, 3, 7, 11, 20, 21),
                          missing_values='~', filling_values=99.9,
                          names=('PGC', 'Name', 'ra', 'dec', 'B', 'I', 'dist',
-                                'e_dist'))
-    #blank
+                                 'e_dist'))
+    
+    gals['ra'] = gals['ra']*15.
     
     return gals
 
@@ -59,7 +59,7 @@ def getmass(gal):
 def map2gals(skymap,gals,metadata):
     from . import skymaptools as smt
     masses = np.zeros(len(skymap))
-    ras = gals['ra']*15.
+    ras = gals['ra']
     decs = gals['dec']
 
     ts,ps = smt.cel2sph(ras,decs)
