@@ -28,8 +28,6 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     
     visgal = []
     for row in galradecseen:
-        print(row)
-        print(galradecs[row])
         visgal.append(galradecs[row])
 
     return np.array(visgal)
