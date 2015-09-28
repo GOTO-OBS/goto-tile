@@ -292,7 +292,7 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 
 def getscopeinfo(name):
     if name.startswith('SuperWASP'):
-        delns, delew = 7.8, 7.8
+        delns, delew = 30, 15
         if name.endswith('N'):
             lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
         elif name.endswith('S'):
