@@ -295,8 +295,6 @@ def getscopeinfo(name):
         delns, delew = 30, 15
         if name.endswith('N'):
             lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
-        elif name.endswith('S'):
-            lat, lon, height = -32.37601, 47.83983, 1798
         else:
             raise ValueError("unknown SuperWASP configuration")
     elif name.startswith('GOTO'):
