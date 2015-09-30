@@ -8,9 +8,11 @@ import astropy.units as u
 import ephem
 import sys
 import math
-from . import galtools as gt
 import numpy as np
 import healpy as hp
+from . import galtools as gt
+from .constants import GOTO4, GOTO8, SWASPN
+
 
 def _convc2s(r,d):
     p = r*np.pi/180
@@ -292,19 +294,19 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 
 def getscopeinfo(name):
     if name.startswith('SuperWASP'):
-        delns, delew = 30, 15
+        delns, delew = SWASPN['fov-dec']/2, SWASPN['fov-ra']/2
         if name.endswith('N'):
-            lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
+            lat, lon, height = SWASPN['lat'], SWASPN['lon'], SWASPN['height']
         else:
             raise ValueError("unknown SuperWASP configuration")
     elif name.startswith('GOTO'):
         if name.endswith('4'):
-            delns, delew = 4.2, 4.2
+            delns, delew = GOTO4['fov-dec']/2, GOTO4['fov-ra']/2
         elif name.endswith('8'):
-            delns, delew = 4.2, 8.4
+            delns, delew = GOTO8['fov-dec']/2, GOTO8['fov-ra']/2
         else:
             raise ValueError("unknown GOTO configuration")
-        lat, lon, height = 28.7598742, 360.0-17.8793802, 2396.0
+        lat, lon, height = GOTO4['lat'], GOTO4['lon'], GOTO4['height']
     else:
         raise ValueError("unknown telescope")
 
@@ -325,11 +327,11 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
 
     if usegals:
         allgals = gt.readgals(metadata)
-        
+
         if nightsky:
             gals = gt.visiblegals(allgals, sidtimes, lat, lon, height, 75.)
             skymap = gt.map2gals(allskymap,gals,metadata)
-            
+
         allskymap = gt.map2gals(allskymap,allgals,metadata)
 
         if not nightsky:
