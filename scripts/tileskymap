@@ -47,10 +47,10 @@ def parse_command_line():
                         help="Number of tiles to return")
     parser.add_argument("-f", "--maxf", type=float, default=0.95,
                         help="Maximum fraction of visible skymap to tile")
-    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'sws', 'swn'],
+    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn'],
                         default='g4',
                         help=("Telescope to use. GOTO-4, GOTO-8, "
-                              "SuperWASP-South, SuperWASP-North."))
+                              "SuperWASP-North."))
     parser.add_argument("-g", "--usegals", action="store_true", default=False,
                         help="Use GWGC in tiling/plotting")
     parser.add_argument("-n", "--nightsky", action="store_true", default=False,
@@ -76,17 +76,17 @@ def main(args):
         tilesdir = args.tiles
         if not os.path.exists(tilesdir):
             os.makedirs(tilesdir)
-        print("Creating the fixed grid GOTO-4, GOTO-8, SuperWASP-N and "
-              "SuperWASP-S. This could take some time.")
+        print("Creating the fixed grid GOTO-4, GOTO-8 and SuperWASP-N "
+              "This could take some time.")
         for scope in (4, 8):
             scopename = "GOTO{}".format(scope)
             filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
             path = os.path.join(tilesdir, filename)
             grid.tileallsky(path, scopename, NSIDE)
-        for scopename in ('SuperWASP-S', 'SuperWASP-N'):
-            filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
-            path = os.path.join(tilesdir, filename)
-            grid.tileallsky(path, scopename, NSIDE)
+        scopename = "SuperWASP-N"
+        filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+        path = os.path.join(tilesdir, filename)
+        grid.tileallsky(path, scopename, NSIDE)
         return
 
     if not os.path.exists(args.path):
@@ -103,7 +103,6 @@ def main(args):
 
     names = {'g4': 'GOTO4',
              'g8': 'GOTO8',
-             'sws': 'SuperWASP-S',
              'swn': 'SuperWASP-N'}
     scopename = names[args.scope]
     delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
