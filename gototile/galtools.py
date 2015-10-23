@@ -35,7 +35,7 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
 
 def readgals(metadata):
     path = os.path.join(os.path.dirname(__file__), 'GWGCCatalog_I.txt')
-    gals = np.genfromtxt(path, skiprows=1, delimiter='|',
+    gals = np.genfromtxt(path, skip_header=1, delimiter='|',
                          dtype=None, usecols=(0, 1, 2, 3, 7, 11, 20, 21),
                          missing_values='~', filling_values=99.9,
                          names=('PGC', 'Name', 'ra', 'dec', 'B', 'I', 'dist',
