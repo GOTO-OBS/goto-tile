@@ -364,7 +364,7 @@ def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
 
     otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
 
-    while GWobs <= maxf*GWtot and len(pointings) <= maxt:
+    while GWobs <= maxf*GWtot and len(pointings) < maxt:
 
         # first tile will be brightest, so blank out pixels of usedmap
         usedmap[opixs[0]]=0.0
