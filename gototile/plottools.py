@@ -119,7 +119,11 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
     if geoplot:
         t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
-        st = t.sidereal_time('mean')
+        try:
+            st = t.sidereal_time('mean')
+        except IndexError:
+            t.delta_ut1_utc = 0
+            st = t.sidereal_time('mean')
         dlon = st.radian
 
         m.drawcoastlines(linewidth=0.25)
