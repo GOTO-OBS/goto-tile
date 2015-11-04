@@ -8,6 +8,7 @@ import datetime
 import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
+from astropy.time import Time
 from gototile import fits
 from gototile import skymaptools as smt
 from gototile import plottools as pt
@@ -55,6 +56,16 @@ def parse_command_line():
                         help="Use GWGC in tiling/plotting")
     parser.add_argument("-n", "--nightsky", action="store_true", default=False,
                         help="Use nightsky visbility in tiling/plotting")
+    parser.add_argument("-d", "--date", nargs='?', default='now',
+                        help="Set observation date. If not used, defaults to "
+                        "the current date.  If given without argument, "
+                        "defaults to the trigger date in the input file(s). "
+                        "The optional "
+                        "argument can be a date-time string that can be parsed "
+                        "by astropy.time.Time, such as '2012-12-12T12:12:12'. "
+                        "A single number is interpreted as Julian days; use a "
+                        "number with 'mjd' appended to specify Modified Julian "
+                        "Days.")
     parser.add_argument("--geoplot", action="store_true", default=False,
                         help="Plot in geographic coordinates, (lat, lon)")
     parser.add_argument("--plot", action="store_true", default=False,
@@ -69,6 +80,20 @@ def parse_command_line():
                         nargs='*')
 
     return parser.parse_args()
+
+
+def parse_date(string):
+    """Turn a string into an astropy.time.Time date"""
+
+    if string is None:
+        return None
+    if string is 'now':
+        return Time.now().mjd
+    if string.lower().endswith('jd'):
+        if string.lower().endswith('mjd'):
+            return Time(float(string[:-3]), format='mjd', scale='utc').mjd
+        return Time(float(string[:-2]), format='jd', scale='utc').mjd
+    return Time(string).mjd
 
 
 def main(args):
@@ -91,6 +116,8 @@ def main(args):
 
     if not os.path.exists(args.path):
         os.makedirs(args.path)
+
+    args.date = parse_date(args.date)
 
     if not args.infiles:
         sys.exit("No input files detected, please provide input skymap.")
@@ -126,8 +153,9 @@ def main(args):
                      "with the --makegrid option.")
         alltiles, pixlist = grid.readtiles(tilefile, metadata)
 
+        date = metadata['mjddet'] if args.date is None else args.date
         pointings, tiledmap, allskymap = smt.findtiles(
-            newmap, delns, delew, metadata, args.usegals,
+            newmap, date, delns, delew, metadata, args.usegals,
             args.nightsky, args.maxf, args.maxt,
             lat, lon, height, alltiles, pixlist)
 
@@ -153,7 +181,7 @@ def main(args):
                 args.id, scopename))
             pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
                                args.usegals, args.nightsky,
-                               scopename, args.id, plotfilename)
+                               scopename, args.id, date, plotfilename)
 
 
 if __name__ == '__main__':

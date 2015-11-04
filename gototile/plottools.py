@@ -107,7 +107,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
 
 def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky, 
-                    scopename, trigger, plotfilename, dpi=300):
+                    scopename, trigger, date, plotfilename, dpi=300):
     fig = plt.figure()
     fig.clf()
 
@@ -118,12 +118,9 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     m.drawmapboundary(color='k', linewidth=0.5)
 
     if geoplot:
-        t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
-        try:
-            st = t.sidereal_time('mean')
-        except IndexError:
-            t.delta_ut1_utc = 0
-            st = t.sidereal_time('mean')
+        t = Time(date, format='mjd',location=('0d', '0d'))
+        t.delta_ut1_utc = 0
+        st = t.sidereal_time('mean')
         dlon = st.radian
 
         m.drawcoastlines(linewidth=0.25)
@@ -165,7 +162,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
             import astropy.coordinates as acoord
             import astropy.units as u
             delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
-            sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
+            sidtimes = smt.siderealtimes(lat, lon, height, date)
 
             observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
                                            height=height*u.m)

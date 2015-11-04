@@ -236,7 +236,6 @@ def outputtile(tileinfo,outfile,writecode):
 def siderealtimes(lat, lon, height, mjd):
     t = atime.Time(mjd, format='mjd', scale='utc')
 
-
     obs = ephem.Observer()
     obs.pressure=0
     obs.horizon='-18:00'
@@ -320,10 +319,10 @@ def filltiles(skymap, tiles, pixlist):
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
+def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky,
               maxf, maxt, lat, lon, height, tiles, pixlist):
     allskymap = skymap.copy()
-    sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
+    sidtimes = siderealtimes(lat, lon, height, date)
 
     if usegals:
         allgals = gt.readgals(metadata)
