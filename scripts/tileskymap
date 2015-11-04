@@ -44,8 +44,10 @@ def parse_command_line():
     parser.add_argument("-i", "--id", default='',
                         help="Name of output files (without extension)")
     parser.add_argument("-p", "--path",default='./', help="Output path")
-    parser.add_argument("-t", "--maxt", type=int, default=100,
+    parser.add_argument("-t", "--maxtiles", type=int, default=100,
                         help="Number of tiles to return")
+    parser.add_argument("--maxt", type=int, default=100, dest='maxtiles',
+                        help=argparse.SUPPRESS)
     parser.add_argument("-f", "--maxf", type=float, default=0.95,
                         help="Maximum fraction of visible skymap to tile")
     parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn'],
@@ -157,7 +159,7 @@ def main(args):
         date = metadata['date-det'] if args.date is None else args.date
         pointings, tiledmap, allskymap = smt.findtiles(
             newmap, date, delns, delew, metadata, args.usegals,
-            args.nightsky, args.maxf, args.maxt,
+            args.nightsky, args.maxf, args.maxtiles,
             lat, lon, height, alltiles, pixlist)
 
         gwtot = tiledmap.sum()
