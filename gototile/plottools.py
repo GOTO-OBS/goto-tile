@@ -13,13 +13,12 @@ from mpl_toolkits.basemap import Basemap
 from astropy.time import Time
 
 def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky, 
-                     output, path, scopename):
+                     date, output, path, scopename):
     fig = plt.figure()
     fig.clf()
 
     if geoplot:
-
-        t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
+        t = Time(date, location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
     else: dlon = 0
@@ -76,7 +75,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
             import astropy.coordinates as acoord
             import astropy.units as u
             delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
-            sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
+            sidtimes = smt.siderealtimes(lat, lon, height, date)
 
             observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
                                            height=height*u.m)
@@ -108,6 +107,9 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
 def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky, 
                     scopename, trigger, date, plotfilename, dpi=300):
+    formatted_date = Time(date).datetime.strftime(
+        "%Y-%m-%d %H:%M:%S")
+
     fig = plt.figure()
     fig.clf()
 
@@ -118,7 +120,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     m.drawmapboundary(color='k', linewidth=0.5)
 
     if geoplot:
-        t = Time(date, format='mjd',location=('0d', '0d'))
+        t = Time(date, location=('0d', '0d'))
         t.delta_ut1_utc = 0
         st = t.sidereal_time('mean')
         dlon = st.radian
@@ -180,11 +182,11 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
                       linewidths=0)
 
         plt.title(
-            "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
-                scopename, trigger))
+            "Skymap, GWGC galaxies and {0} tiling for trigger {1}\n{2}".format(
+                scopename, trigger, formatted_date))
     else:
-        plt.title("Skymap and {0} tiling for trigger {1}".format(
-                scopename, trigger))
+        plt.title("Skymap and {0} tiling for trigger {1}\n{2}".format(
+                scopename, trigger, formatted_date))
 
     plt.savefig(plotfilename, dpi=dpi)
     plt.close()

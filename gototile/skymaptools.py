@@ -233,14 +233,14 @@ def outputtile(tileinfo,outfile,writecode):
     f.close()
     return
 
-def siderealtimes(lat, lon, height, mjd):
-    t = atime.Time(mjd, format='mjd', scale='utc')
+def siderealtimes(lat, lon, height, date):
+    #t = atime.Time(mjd, format='mjd', scale='utc')
 
     obs = ephem.Observer()
     obs.pressure=0
     obs.horizon='-18:00'
     obs.lat,obs.lon = str(lat),str(lon)
-    obs.date = ephem.Date(t.iso)
+    obs.date = ephem.Date(date.iso)
     #print(t.datetime)
     sun = ephem.Sun(obs)
     # daytime so want to know time of next setting and rising of sun
@@ -250,7 +250,7 @@ def siderealtimes(lat, lon, height, mjd):
         ATend = atime.Time(
             obs.next_rising(ephem.Sun()).datetime(),format='datetime')
     else: #night time so need to know current  when it will rise again
-        ATstart = t
+        ATstart = date
         ATend = atime.Time(
             obs.next_rising(ephem.Sun()).datetime(),format='datetime')
 
@@ -262,7 +262,7 @@ def siderealtimes(lat, lon, height, mjd):
 
     times = np.linspace(ATstart.mjd,ATend.mjd,steps+1)
 
-    timeobjs = atime.Time(times,format ='mjd')
+    timeobjs = atime.Time(times, format='mjd')
 
     return timeobjs
 

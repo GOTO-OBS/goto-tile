@@ -253,6 +253,8 @@ def read_sky_map(filename, nest=False):
 
     metadata['mjddet'] = header.get('MJD-OBS', astropy.time.Time(header['DATE']).mjd)
     metadata['mjd'] = astropy.time.Time.now().mjd
+    metadata['date-det'] = astropy.time.Time(metadata['mjddet'], format='mjd')
+    metadata['date'] = astropy.time.Time(metadata['mjd'], format='mjd')
 
     try:
         value = header['DATE-OBS']
