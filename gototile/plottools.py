@@ -105,10 +105,17 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
     return
 
 
-def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky, 
-                    scopename, trigger, date, plotfilename, dpi=300):
-    formatted_date = Time(date).datetime.strftime(
-        "%Y-%m-%d %H:%M:%S")
+def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
+                    scopename, trigger, date, plotfilename, title=None,
+                    dpi=300):
+    if title is None:
+        formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
+        if usegals:
+            title = ("Skymap, GWGC galaxies and {0} tiling for trigger {1}\n"
+                     "{2}".format(scopename, trigger, formatted_date))
+        else:
+            title = "Skymap and {0} tiling for trigger {1}\n{2}".format(
+                scopename, trigger, formatted_date)
 
     fig = plt.figure()
     fig.clf()
@@ -181,12 +188,9 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
                       linewidths=0)
 
-        plt.title(
-            "Skymap, GWGC galaxies and {0} tiling for trigger {1}\n{2}".format(
-                scopename, trigger, formatted_date))
+        plt.title(title)
     else:
-        plt.title("Skymap and {0} tiling for trigger {1}\n{2}".format(
-                scopename, trigger, formatted_date))
+        plt.title(title)
 
     plt.savefig(plotfilename, dpi=dpi)
     plt.close()

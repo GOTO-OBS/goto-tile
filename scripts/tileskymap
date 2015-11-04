@@ -70,6 +70,7 @@ def parse_command_line():
                         help="Plot in geographic coordinates, (lat, lon)")
     parser.add_argument("--plot", action="store_true", default=False,
                         help="Plot in RA-Dec")
+    parser.add_argument("--title", help="Use suppied title in skymap plot.")
     parser.add_argument("--makegrid", action="store_true", default=False,
                         help=("Create fixed grid of tiles on sky. "
                               "WARNING: Can take some time."))
@@ -181,7 +182,8 @@ def main(args):
                 args.id, scopename))
             pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
                                args.usegals, args.nightsky,
-                               scopename, args.id, date, plotfilename)
+                               scopename, args.id, date, plotfilename,
+                               title=args.title)
 
 
 if __name__ == '__main__':
