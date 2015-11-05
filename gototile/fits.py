@@ -257,13 +257,6 @@ def read_sky_map(filename, nest=False):
     metadata['date'] = astropy.time.Time(metadata['mjd'], format='mjd')
 
     try:
-        value = header['DATE-OBS']
-    except KeyError:
-        pass
-    else:
-        metadata['date'] = value
-
-    try:
         value = header['CREATOR']
     except KeyError:
         pass
