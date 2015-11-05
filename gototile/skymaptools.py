@@ -11,7 +11,7 @@ import math
 import numpy as np
 import healpy as hp
 from . import galtools as gt
-from .constants import GOTO4, GOTO8, SWASPN
+from .constants import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
 
 
 def _convc2s(r,d):
@@ -292,7 +292,11 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 
 
 def getscopeinfo(name):
-    if name.startswith('SuperWASP'):
+    if name.startswith('temp__'):
+        delns, delew, lat, lon, height = (
+            TEMP__SCOPE['fov-dec']/2, TEMP__SCOPE['fov-ra']/2,
+            TEMP__SCOPE['lat'], TEMP__SCOPE['lon'], TEMP__SCOPE['height'])
+    elif name.startswith('SuperWASP'):
         delns, delew = SWASPN['fov-dec']/2, SWASPN['fov-ra']/2
         if name.endswith('N'):
             lat, lon, height = SWASPN['lat'], SWASPN['lon'], SWASPN['height']
@@ -307,7 +311,7 @@ def getscopeinfo(name):
             raise ValueError("unknown GOTO configuration")
         lat, lon, height = GOTO4['lat'], GOTO4['lon'], GOTO4['height']
     else:
-        raise ValueError("unknown telescope")
+        raise ValueError("Unknown telescope")
 
     return delns, delew, lat, lon, height
 

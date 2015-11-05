@@ -4,17 +4,19 @@ from __future__ import absolute_import, print_function, division
 
 import argparse
 import os,sys
+import tempfile
 import datetime
 import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
 from astropy.time import Time
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, EarthLocation, Angle
 from astropy import units
 from gototile import fits
 from gototile import skymaptools as smt
 from gototile import plottools as pt
 from gototile import grid
+from gototile import constants
 
 
 NSIDE = 256
@@ -56,6 +58,13 @@ def parse_command_line():
                         default='g4',
                         help=("Telescope to use. GOTO-4, GOTO-8, "
                               "SuperWASP-North."))
+    parser.add_argument('--site', nargs=3,
+                        help="Set the longitude, latitude and elevation. "
+                        "Overrides the defaults from the 'scope' setting.")
+    parser.add_argument('--fov', nargs=2, type=float,
+                        help="Set the width (RA) and height (dec) of the "
+                        "field of view, in degrees. Overrides the default "
+                        "from the 'scope' setting.")
     parser.add_argument("-g", "--usegals", action="store_true", default=False,
                         help="Use GWGC in tiling/plotting")
     parser.add_argument("-n", "--nightsky", action="store_true", default=False,
@@ -109,7 +118,7 @@ def parse_date(string):
 
 def parse_object(args):
     if ':' in args[0] and ':' in args[1]:
-        coords = SkyCoord(args[0], args[1], unit=units.degree)
+        coords = SkyCoord(args[0], args[1], unit=(units.hour, units.degree))
     else:
         try:
             float(args[0]), float(args[1])
@@ -121,29 +130,53 @@ def parse_object(args):
     return coords
 
 
-def main(args):
-    if args.makegrid:
-        tilesdir = args.tiles
-        if not os.path.exists(tilesdir):
-            os.makedirs(tilesdir)
-        print("Creating the fixed grid GOTO-4, GOTO-8 and SuperWASP-N "
-              "This could take some time.")
-        for scope in (4, 8):
-            scopename = "GOTO{}".format(scope)
-            filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
-            path = os.path.join(tilesdir, filename)
-            grid.tileallsky(path, scopename, NSIDE)
-        scopename = "SuperWASP-N"
+def parse_site(site):
+    if site is None:
+        return site
+    try:
+        lon = Angle(site[0])
+    except units.UnitsError:
+        lon = Angle(site[0], unit=units.hour)
+    lat = Angle(site[1], unit=units.degree)
+    height = float(site[2])
+    return EarthLocation.from_geodetic(lon, lat, height)
+
+
+def makegrid(tilesdir, name=None):
+    if not os.path.exists(tilesdir):
+        os.makedirs(tilesdir)
+    if name:
+        fp = tempfile.NamedTemporaryFile(prefix='temp__', dir='.', delete=False)
+        path = fp.name
+        fp.close()
+        print("Creating temporary grid in file {}".format(path))
+        grid.tileallsky(path, name, NSIDE)
+        return path
+    print("Creating the fixed grid GOTO-4, GOTO-8 and SuperWASP-N "
+          "This could take some time.")
+    for scope in (4, 8):
+        scopename = "GOTO{}".format(scope)
         filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
         path = os.path.join(tilesdir, filename)
         grid.tileallsky(path, scopename, NSIDE)
-        return
+    scopename = "SuperWASP-N"
+    filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+    path = os.path.join(tilesdir, filename)
+    grid.tileallsky(path, scopename, NSIDE)
+    return path
+
+
+def main(args):
+    temptilespath = None
+    if args.makegrid:
+        makegrid(args.tiles)
 
     if not os.path.exists(args.path):
         os.makedirs(args.path)
 
     args.date = parse_date(args.date)
     objects = [parse_object(obj) for obj in args.object]
+    args.site = parse_site(args.site)
 
     if not args.infiles:
         sys.exit("No input files detected, please provide input skymap.")
@@ -159,6 +192,12 @@ def main(args):
              'swn': 'SuperWASP-N'}
     scopename = names[args.scope]
     delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
+    if args.site or args.fov:
+        defaults = (delns, delew, lat, lon, height)
+        constants.set_temp_scope(defaults, args.site, args.fov)
+        scopename = 'temp__scope'
+        temptilespath = makegrid('.', name=scopename)
+        delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
 
     for infile in args.infiles:
         skymap, metadata = fits.read_sky_map(infile)
@@ -174,6 +213,8 @@ def main(args):
 
         tilefile = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
         tilefile = os.path.join(args.tiles, tilefile)
+        if temptilespath:
+            tilefile = temptilespath
         if not os.path.isfile(tilefile):
             sys.exit("No existing pre-made tiles found. Please run tileskymap "
                      "with the --makegrid option.")
@@ -210,6 +251,8 @@ def main(args):
                                scopename, args.id, date, plotfilename,
                                title=args.title, objects=objects,
                                sun=args.sun, moon=args.moon)
+    if temptilespath:
+        os.unlink(temptilespath)
 
 
 if __name__ == '__main__':
