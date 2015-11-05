@@ -11,7 +11,7 @@ import math
 import numpy as np
 import healpy as hp
 from . import galtools as gt
-from .constants import GOTO4, GOTO8, SWASPN
+from .constants import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
 
 
 def _convc2s(r,d):
@@ -233,15 +233,14 @@ def outputtile(tileinfo,outfile,writecode):
     f.close()
     return
 
-def siderealtimes(lat, lon, height, mjd):
-    t = atime.Time(mjd, format='mjd', scale='utc')
-
+def siderealtimes(lat, lon, height, date):
+    #t = atime.Time(mjd, format='mjd', scale='utc')
 
     obs = ephem.Observer()
     obs.pressure=0
     obs.horizon='-18:00'
     obs.lat,obs.lon = str(lat),str(lon)
-    obs.date = ephem.Date(t.iso)
+    obs.date = ephem.Date(date.iso)
     #print(t.datetime)
     sun = ephem.Sun(obs)
     # daytime so want to know time of next setting and rising of sun
@@ -251,7 +250,7 @@ def siderealtimes(lat, lon, height, mjd):
         ATend = atime.Time(
             obs.next_rising(ephem.Sun()).datetime(),format='datetime')
     else: #night time so need to know current  when it will rise again
-        ATstart = t
+        ATstart = date
         ATend = atime.Time(
             obs.next_rising(ephem.Sun()).datetime(),format='datetime')
 
@@ -263,7 +262,7 @@ def siderealtimes(lat, lon, height, mjd):
 
     times = np.linspace(ATstart.mjd,ATend.mjd,steps+1)
 
-    timeobjs = atime.Time(times,format ='mjd')
+    timeobjs = atime.Time(times, format='mjd')
 
     return timeobjs
 
@@ -293,7 +292,11 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 
 
 def getscopeinfo(name):
-    if name.startswith('SuperWASP'):
+    if name.startswith('temp__'):
+        delns, delew, lat, lon, height = (
+            TEMP__SCOPE['fov-dec']/2, TEMP__SCOPE['fov-ra']/2,
+            TEMP__SCOPE['lat'], TEMP__SCOPE['lon'], TEMP__SCOPE['height'])
+    elif name.startswith('SuperWASP'):
         delns, delew = SWASPN['fov-dec']/2, SWASPN['fov-ra']/2
         if name.endswith('N'):
             lat, lon, height = SWASPN['lat'], SWASPN['lon'], SWASPN['height']
@@ -308,7 +311,7 @@ def getscopeinfo(name):
             raise ValueError("unknown GOTO configuration")
         lat, lon, height = GOTO4['lat'], GOTO4['lon'], GOTO4['height']
     else:
-        raise ValueError("unknown telescope")
+        raise ValueError("Unknown telescope")
 
     return delns, delew, lat, lon, height
 
@@ -320,10 +323,10 @@ def filltiles(skymap, tiles, pixlist):
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap, delns, delew, metadata, usegals, nightsky,
+def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky,
               maxf, maxt, lat, lon, height, tiles, pixlist):
     allskymap = skymap.copy()
-    sidtimes = siderealtimes(lat, lon, height, metadata['mjd'])
+    sidtimes = siderealtimes(lat, lon, height, date)
 
     if usegals:
         allgals = gt.readgals(metadata)

@@ -11,15 +11,18 @@ import matplotlib.pyplot as plt
 from math import sin,cos,atan2,sqrt,pi
 from mpl_toolkits.basemap import Basemap
 from astropy.time import Time
+from astropy.coordinates import get_sun, SkyCoord
+from astropy import units
+import ephem
+
 
 def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky, 
-                     output, path, scopename):
+                     date, output, path, scopename):
     fig = plt.figure()
     fig.clf()
 
     if geoplot:
-
-        t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
+        t = Time(date, location=('0d', '0d'))
         st = t.sidereal_time('mean')
         dlon = st.radian
     else: dlon = 0
@@ -76,7 +79,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
             import astropy.coordinates as acoord
             import astropy.units as u
             delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
-            sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
+            sidtimes = smt.siderealtimes(lat, lon, height, date)
 
             observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
                                            height=height*u.m)
@@ -106,8 +109,24 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
     return
 
 
-def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky, 
-                    scopename, trigger, plotfilename, dpi=300):
+def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
+                    scopename, trigger, date, plotfilename, title=None,
+                    sun=False, moon=False, objects=None, dpi=300):
+    if title is None:
+        formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
+        if usegals:
+            title = ("Skymap, GWGC galaxies and {0} tiling for trigger {1}\n"
+                     "{2}".format(scopename, trigger, formatted_date))
+        else:
+            title = "Skymap and {0} tiling for trigger {1}\n{2}".format(
+                scopename, trigger, formatted_date)
+    if sun:
+        sun = get_sun(date)
+    if moon:
+        moon = ephem.Moon(date.iso)
+        phase = moon.phase
+        moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, unit=units.degree)
+        moon.phase = phase/100
     fig = plt.figure()
     fig.clf()
 
@@ -118,12 +137,9 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     m.drawmapboundary(color='k', linewidth=0.5)
 
     if geoplot:
-        t = Time(metadata['mjddet'], format='mjd',location=('0d', '0d'))
-        try:
-            st = t.sidereal_time('mean')
-        except IndexError:
-            t.delta_ut1_utc = 0
-            st = t.sidereal_time('mean')
+        t = Time(date, location=('0d', '0d'))
+        t.delta_ut1_utc = 0
+        st = t.sidereal_time('mean')
         dlon = st.radian
 
         m.drawcoastlines(linewidth=0.25)
@@ -165,7 +181,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
             import astropy.coordinates as acoord
             import astropy.units as u
             delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
-            sidtimes = smt.siderealtimes(lat, lon, height, metadata['mjd'])          
+            sidtimes = smt.siderealtimes(lat, lon, height, date)
 
             observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
                                            height=height*u.m)
@@ -182,12 +198,27 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
                       linewidths=0)
 
-        plt.title(
-            "Skymap, GWGC galaxies and {0} tiling for trigger {1}".format(
-                scopename, trigger))
+        plt.title(title)
     else:
-        plt.title("Skymap and {0} tiling for trigger {1}".format(
-                scopename, trigger))
+        plt.title(title)
+    if objects:
+        ra = [obj.ra.value for obj in objects]
+        dec = [obj.dec.value for obj in objects]
+        x, y = m(np.array(ra) - (dlon / np.pi*180), dec)
+        m.plot(x, y, linestyle='None', marker='p', color=(0, 1, 1, 0.5))
+        for obj, xpos, ypos in zip(objects, x, y):
+            plt.annotate(obj.name, xy=(xpos, ypos), xytext=(xpos, ypos),
+                         ha='center', va='top', size='xx-small')
+    if sun:
+        x, y = m(np.array(sun.ra.value) - (dlon / np.pi*180), sun.dec.value)
+        m.plot(x, y, color=(1, 1, 0, 0.5), marker='o', markerfacecolor=(1, 1, 0, 0.5),
+               markersize=12)
+    if moon:
+        phase = moon.phase
+        print('Phase', phase)
+        x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180), moon.dec.value)
+        m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
+               markerfacecolor=(phase, phase, phase, 0.5))
 
     plt.savefig(plotfilename, dpi=dpi)
     plt.close()
