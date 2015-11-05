@@ -9,6 +9,8 @@ import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
 from astropy.time import Time
+from astropy.coordinates import SkyCoord
+from astropy import units
 from gototile import fits
 from gototile import skymaptools as smt
 from gototile import plottools as pt
@@ -81,7 +83,13 @@ def parse_command_line():
                               "on sky."))
     parser.add_argument("infiles", help="Space separated input files",
                         nargs='*')
-
+    parser.add_argument("--object", nargs=3, action='append',
+                        default=[], help="Overplot an object. "
+                        "Requires three values: RA, Dec and an object name.")
+    parser.add_argument('--sun', action='store_true',
+                        help="Plot the Sun position")
+    parser.add_argument('--moon', action='store_true',
+                        help="Plot the Moon position")
     return parser.parse_args()
 
 
@@ -97,6 +105,20 @@ def parse_date(string):
             return Time(float(string[:-3]), format='mjd', scale='utc')
         return Time(float(string[:-2]), format='jd', scale='utc')
     return Time(string)
+
+
+def parse_object(args):
+    if ':' in args[0] and ':' in args[1]:
+        coords = SkyCoord(args[0], args[1], unit=units.degree)
+    else:
+        try:
+            float(args[0]), float(args[1])
+        except ValueError:
+            coords = SkyCoord(args[0], args[1])
+        else:
+            coords = SkyCoord(args[0], args[1], unit=units.degree)
+    coords.name = args[2]
+    return coords
 
 
 def main(args):
@@ -121,6 +143,7 @@ def main(args):
         os.makedirs(args.path)
 
     args.date = parse_date(args.date)
+    objects = [parse_object(obj) for obj in args.object]
 
     if not args.infiles:
         sys.exit("No input files detected, please provide input skymap.")
@@ -185,7 +208,8 @@ def main(args):
             pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
                                args.usegals, args.nightsky,
                                scopename, args.id, date, plotfilename,
-                               title=args.title)
+                               title=args.title, objects=objects,
+                               sun=args.sun, moon=args.moon)
 
 
 if __name__ == '__main__':

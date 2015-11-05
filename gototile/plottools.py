@@ -11,6 +11,10 @@ import matplotlib.pyplot as plt
 from math import sin,cos,atan2,sqrt,pi
 from mpl_toolkits.basemap import Basemap
 from astropy.time import Time
+from astropy.coordinates import get_sun, SkyCoord
+from astropy import units
+import ephem
+
 
 def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky, 
                      date, output, path, scopename):
@@ -107,7 +111,7 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
 def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
                     scopename, trigger, date, plotfilename, title=None,
-                    dpi=300):
+                    sun=False, moon=False, objects=None, dpi=300):
     if title is None:
         formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
         if usegals:
@@ -116,7 +120,13 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
         else:
             title = "Skymap and {0} tiling for trigger {1}\n{2}".format(
                 scopename, trigger, formatted_date)
-
+    if sun:
+        sun = get_sun(date)
+    if moon:
+        moon = ephem.Moon(date.iso)
+        phase = moon.phase
+        moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, unit=units.degree)
+        moon.phase = phase/100
     fig = plt.figure()
     fig.clf()
 
@@ -191,6 +201,24 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
         plt.title(title)
     else:
         plt.title(title)
+    if objects:
+        ra = [obj.ra.value for obj in objects]
+        dec = [obj.dec.value for obj in objects]
+        x, y = m(np.array(ra) - (dlon / np.pi*180), dec)
+        m.plot(x, y, linestyle='None', marker='p', color=(0, 1, 1, 0.5))
+        for obj, xpos, ypos in zip(objects, x, y):
+            plt.annotate(obj.name, xy=(xpos, ypos), xytext=(xpos, ypos),
+                         ha='center', va='top', size='xx-small')
+    if sun:
+        x, y = m(np.array(sun.ra.value) - (dlon / np.pi*180), sun.dec.value)
+        m.plot(x, y, color=(1, 1, 0, 0.5), marker='o', markerfacecolor=(1, 1, 0, 0.5),
+               markersize=12)
+    if moon:
+        phase = moon.phase
+        print('Phase', phase)
+        x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180), moon.dec.value)
+        m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
+               markerfacecolor=(phase, phase, phase, 0.5))
 
     plt.savefig(plotfilename, dpi=dpi)
     plt.close()
