@@ -110,10 +110,10 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
     return
 
 
-def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals, 
-                    nightsky, scopename, trigger, date, injgal, simpath, 
-                    plotfilename, title=None, sun=False, moon=False, 
-                    objects=None, dpi=300):
+def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals,
+                    nightsky, scopename, trigger, date, injgal, simpath,
+                    plotfilename, title=None, sun=False, moon=False,
+                    objects=None, dpi=300, galcolor='#999999'):
     if title is None:
         formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
         if usegals:
@@ -197,8 +197,8 @@ def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals,
             xgal,ygal=m(np.array(visras)-(dlon/np.pi*180.0),visdecs)
             
         else: xgal,ygal=m(np.array(ras)-(dlon/np.pi*180.0),decs)
-        m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
-                      linewidths=0, zorder=2)
+        m.scatter(xgal, ygal, s=0.5, c=galcolor, alpha=0.5, linewidths=0,
+                  zorder=2)
 
         plt.title(title)
     else:
