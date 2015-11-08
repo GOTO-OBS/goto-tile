@@ -219,7 +219,6 @@ def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals,
                markerfacecolor=(1, 1, 0, 0.5), markersize=12)
     if moon:
         phase = moon.phase
-        print('Phase', phase)
         x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180), moon.dec.value)
         m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
                markerfacecolor=(phase, phase, phase, 0.5))
