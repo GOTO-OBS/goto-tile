@@ -1,0 +1,434 @@
+#! /usr/bin/env python
+
+from __future__ import absolute_import, print_function, division
+
+import argparse
+import os,sys
+from gototile import skymaptools as smt
+from gototile import galtools as gt
+from gototile import simtools as sim
+from gototile import grid
+from gototile import fits
+import glob
+import numpy as np
+import healpy as hp
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from collections import Counter
+from math import sin,cos,atan2,sqrt,pi,radians,log10
+import astropy.coordinates as acoord
+import astropy.units as u
+
+wcolora = '#511c6c'
+wcoloro = '#f26322'
+NSIDE=256
+
+    
+  
+def tilefiles(args):
+
+
+    oldfiles = glob.glob('{0}/*.txt'.format(args.out))
+    [os.remove(fold) for fold in oldfiles]
+        
+    infiles = sorted(glob.glob('{0}/*.txt'.format(args.tiles)))    
+
+    for fname in infiles:
+        
+        fsplit = fname.split('_')
+        injid = fsplit[0][fsplit[0].rfind('/')+1:]
+        scope = fsplit[1][:-4]
+        delns, delew, lat, lon, height = smt.getscopeinfo(scope)
+    
+        inj,year = sim.findinj(injid,args.sim)
+
+        rainj,decinj,distinj = inj['ra'],inj['dec'],inj['dist']
+        tinj,pinj = smt.cel2sph(rainj,decinj)
+        injpix = hp.ang2pix(nside=NSIDE,tinj,pinj,nest=True)
+    
+        outfile = "{0}/{1}_{2}.txt".format(args.out,year,scope)
+        
+        ras,decs,probs,tprobs,fprobs,ftprobs = np.genfromtxt(fname,
+													delimiter=',',unpack=True)
+        fnametiles = fname.replace('txt','pgz')
+        tilelist,pixlist = grid.readtiles(fnametiles)
+
+        if isinstance(probs,np.float64):
+            visprob = ftprobs
+            max = 1
+            fifty = 1
+            tile = tilelist
+            if injpix in set(pixlist): tileinj = 1
+            else: 
+                tileinj=-1
+                probinj=-1
+        else:
+            max = len(probs)
+            visprob = probs[0]/fprobs[0]
+            tilenum = 0
+            tileinj = -1
+            probinj=-1
+
+            for tilenum,[ra,dec,prob] in enumerate(zip(ras,decs,probs)):
+                
+                if (ftprobs[tilenum])<0.5 and ((ftprobs[tilenum+1]))>0.5: 
+                    fifty = tilenum
+        
+                if injpix in set(pixlist[tilenum]): 
+                    tileinj = tilenum+1
+                    probinj = tprobs[tilenum]
+					fprobinj = ftprobs[tilenum]
+                    
+        f = open(outfile, 'a')
+        f.write("{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}\n".format(injid, 
+                fifty, max, rainj, decinj, distinj, tileinj, probinj, fprobinj,
+                visprob))
+        f.close()
+
+def visibleinj(injid,args):
+    #print(injid)
+    lat,lon,height = 28.7636,360.0-17.8947,2396.0 #la palma only right now
+    observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
+        height=height*u.m)
+    radius = 75.
+    
+    inj,year = findinj(injid,args.sim)
+    sidtimes = smt.siderealtimes(lat, lon, height, inj['mjd'])
+    latr = radians(float(lat))
+    
+    seen = False
+    ra = inj['ra']
+    dec = inj['dec']
+    for st in sidtimes:
+        frame = acoord.AltAz(obstime=st, location=observatory)
+        
+        radec = acoord.SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
+        altaz = radec.transform_to(frame)
+        
+        if altaz.alt.degree>(90-radius): 
+            #print(alt)
+            seen = True
+            break
+
+    return seen    
+    
+
+    
+def angsep(ra1,dec1,ra2,dec2):
+    
+    r1 = ra1*pi/180.
+    d1 = dec1*pi/180.
+    r2 = ra2*pi/180.
+    d2 = dec2*pi/180.
+    
+    dra = abs(r1-r2)
+    
+    t = sqrt((cos(d2)*sin(dra))**2+
+        (cos(d1)*sin(d2)-sin(d1)*cos(d2)*cos(dra))**2)
+    b = sin(d1)*sin(d2) + cos(d1)*cos(d2)*cos(dra)
+    
+    ang = atan2(t,b)
+    
+    return ang*180/pi
+    
+def max2inj_dists(args,injids):
+    
+    angdists = []
+    for idx,injid in enumerate(injids):
+        fname = '{0}/{1}_fits/{2}/bayestar.fits.gz'.format(args.sim,args.year,
+                                                    int(injid))
+        skymap, metadata = fits.read_sky_map(fname)
+        orderin = 'NESTED' if metadata['nest'] else 'RINGED'
+        newmap = hp.ud_grade(skymap, nside_out=NSIDE, order_in=orderin,
+                             order_out='NESTED', power=-2)
+        metadata['nest'] = True
+        metadata['nside'] = NSIDE
+        _,maxidx = smt.orderedpixels(newmap)
+        
+        tmax,pmax = hp.pix2ang(nside=NSIDE,maxidx,nest=metadata['nest'])
+        ramax,decmax = smt.sph2cel(tmax,pmax)
+        
+        inj,_=findinj(injid,args.simpath)
+
+        angdists.append(angsep(ramax,decmax,inj['ra']*15.,inj['dec']))
+        
+    fig = plt.figure()
+    fig.clf()
+    
+    plt.hist(angdists,100, histtype='stepfilled',color=wcolora)
+    plt.xlabel('Distance from loudest pixel to true source location (degrees)')
+    plt.savefig('{}/{}_inj2maxdist.png'.format(args.out,args.year))
+    plt.close()
+    
+    return
+    
+def angdisttiles(args):
+
+    infiles = sorted(glob.glob('{0}/*.txt'.format(args.tiles)))
+    angdists = []
+    
+    scopename = getscopename(args.scope)
+    
+    for fname in infiles:
+        fsplit = fname.split('_')
+        injid = fsplit[0][fsplit[0].rfind('/')+1:]
+        scope = fsplit[1][:-4]
+        
+        if scope == scopename:
+            ras,decs,_,_,_,_= np.genfromtxt(fname,delimiter=',',unpack=True)
+            
+            try:
+                for idx,_ in ras[:-1]:
+                    angdists.append(angsep(ras[idx],decs[idx],ras[idx+1],
+                                    decs[idx+1]))
+            except TypeError:
+                angdists.append(angsep(ras[0],decs[0],ras[1],decs[1]))
+            except IndexError:
+                pass
+    fig = plt.figure()
+    fig.clf()
+    
+    plt.hist(angdists,100,range = [0,20], histtype='stepfilled',color=wcolora)
+    plt.xlabel('Average distance between successive tiles')
+    plt.savefig('{}/{}_{}_tiledists.png'.format(args.out,args.year,scopename))
+    plt.close()
+    
+    return
+    
+def readpostfiles(args):
+
+    if args.first: tilefiles(args)
+
+    names = {'g4': 'GOTO4',
+             'g8': 'GOTO8',
+             'swn': 'SuperWASP-N'}
+    scopename = names[args.scope] 
+    postfiles = sorted(glob.glob('{0}/*{1}.txt'.format(args.out,scopename)))
+    for pfile in postfiles:
+        s1 = pfile.split('/')
+        s2 = s1[-1].split('_')
+        year = s2[0]
+        print(year)
+    
+        args.year = year 
+        
+        ids,fifties,nineties,ras,decs,dists,injtiles,injprobs,injfprobs \
+            visprobs = np.genfromtxt(pfile,delimiter=',',unpack=True)
+    
+        if args.injdists: max2inj_dists(args,ids)
+        if args.dists: angdisttiles(args)
+        print("Counting for {0}".format(pfile))
+        cnt = Counter(injtiles)
+        print("Total number of injections triggered: {}".format(len(injtiles)))
+        print("GW location covered in {} injections of those triggered".format(
+                                    len(injtiles)-cnt[-1.0]))
+        print("GW location covered {}% of the time".format(
+                    (1-((float(cnt[-1.0])/float(len(injtiles)))))*100.0))
+        if args.visible:
+            totalseen = len(injtiles)-cnt[-1.0]
+            vis = 0
+            for idx,injtile in enumerate(injtiles):
+        
+                seen=False
+                if injtile<0.: seen = visibleinj(ids[idx],args)
+                if seen: vis+=1
+            print("Number of those not found that are above horizon: "
+                        "{}".format(vis))
+            print("GW location visible but not observed {:2.3f}% of the "
+                "time".format((float(vis)/(float(totalseen)+float(vis)))*100.))
+        
+        
+        if args.mags:
+            maglist = []
+            for idx,injtile in enumerate(injtiles):
+                if injtile>0.0: 
+                    brightmag = injmag(dists[idx],args)
+                    
+                    if brightmag<args.maglim: maglist.append(brightmag)
+                    
+                    
+            print("Number of those correctly tiled that have one or more "
+                "kilonova models above limiting mag: {}".format(len(maglist)))
+        fiftyhist = np.histogram(fifties,bins=10)
+    
+        fig = plt.figure()
+        fig.clf()
+    
+        plt.hist(injtiles, 100, range=[0,max(injtiles)], histtype='stepfilled',
+                        cumulative=True, normed=1,color=wcolora)
+        #plt.show()
+        plt.xlabel('Tile number containing true source location')
+        plt.ylabel('Fraction below ordinate')
+        plt.ylim((0,1))
+        plt.savefig('{}/{}_{}_injtilecum.png'.format(args.out,args.year,
+                    scopename))
+        plt.close()
+        
+        fig = plt.figure()
+        fig.clf()
+    
+        plt.hist(injtiles, 100, range=[0,max(injtiles)+5], 
+            histtype='stepfilled', cumulative=False,color=wcolora)
+        #plt.show()
+        plt.xlabel('Tile number containing true source location')
+        plt.savefig('{}/{}_{}_injtile.png'.format(args.out,args.year,
+                       scopename))
+        plt.close()
+        
+        fig = plt.figure()
+        fig.clf()
+    
+        plt.hist(visprobs, 100, range=[0,1], histtype='stepfilled', 
+                    cumulative=False,color=wcolora)
+        #plt.show()
+        plt.xlabel('Distribution of visible skymap probability')
+        plt.savefig('{}/{}_{}_visprob.png'.format(args.out,args.year,
+                    scopename))
+        plt.close()
+        
+        fig = plt.figure()        
+        fig.clf()
+        plt.hist(injtiles*args.exptime, 100, range=[0,max(injtiles*5.)], 
+                    histtype='stepfilled',color=wcolora)
+        plt.xlabel('Observing time needed to tile true source location '
+                    '(minutes)')
+        plt.savefig('{}/{}_{}_injobstime.png'.format(args.out,args.year,
+                    scopename))
+        plt.close()
+        
+        fig = plt.figure()        
+        fig.clf()
+        plt.hist(injtiles*args.exptime, 100, range=[0,max(injtiles*5.)], 
+                histtype='stepfilled', cumulative=True, normed=1,color=wcolora)
+        plt.xlabel('Observing time needed to tile true source location '
+                    '(minutes)') 
+        plt.ylabel('Fraction below ordinate')
+        plt.ylim((0,1))
+        plt.savefig('{}/{}_{}_injobstimecum.png'.format(args.out,args.year,
+                        scopename))
+        plt.close()
+        
+        fig = plt.figure()        
+        fig.clf()
+        plt.scatter(injtiles,injprobs,color=wcolora)
+        plt.xlim((0,max(injtiles)+5))
+        plt.ylim((0,1))
+        plt.xlabel('Tile number containing true source location')
+        plt.ylabel('Probability searched to image true source location')
+    #    plt.show()
+        plt.savefig('{}/{}_{}_injvsprobs.png'.format(args.out,args.year,
+                        scopename))
+        plt.close()
+        
+        fig = plt.figure()        
+        fig.clf()
+        plt.scatter(injtiles,fifties,color=wcolora)
+        xs = [0,10,20,50,100]
+        ys = xs
+        plt.plot(xs,ys)
+        plt.xlim((0,max(injtiles)+5))
+        plt.ylim((0,max(fifties)+5))
+        plt.xlabel('Tile number containing true source location')
+        plt.ylabel('Number of tiles needed to image at least 50% of GW '    
+                    'probability')
+    #    plt.show()
+        plt.savefig('{}/{}_{}_injvsfifty.png'.format(args.out,args.year,
+                        scopename))
+        plt.close()
+    
+        ratios = [inj-fifty for inj,fifty in zip(injtiles,fifties)]
+        fig = plt.figure()
+        fig.clf()
+        plt.hist(ratios,100,range=[-50,50], histtype='stepfilled',color=wcolora)
+    #    plt.show()
+        plt.close()
+    
+        fig = plt.figure()
+        fig.clf()
+        plt.hist(injprobs,100,range=[0,1], histtype='stepfilled',color=wcolora)
+        plt.xlabel('Probability searched to image tile containing source')
+    #    plt.show()
+        plt.savefig('{}/{}_{}_injprobs.png'.format(args.out,args.year,
+                    scopename))
+        plt.close()
+    
+        fig = plt.figure()
+        fig.clf()
+        plt.hist(injprobs, 100, range=[0,1], histtype='stepfilled',
+                    cumulative=True,normed=1,color=wcolora)
+    #    plt.hlines(0.5, 0, 1)
+    #    plt.vlines(0.5, 0, 1)
+        plt.minorticks_on()
+        plt.grid(which='both')
+        plt.xlim((0,1))
+        plt.ylim((0,1))
+        plt.xlabel('Cumulative probability searched to image tile '
+                    'containing source')
+    #    plt.show()
+        plt.savefig('{}/{}_{}_cuminjprobs.png'.format(args.out,args.year,
+                        scopename))
+        plt.close()
+
+    return
+    
+def injmag(dist,args):
+    dmod = 5*log10(dist*1e6)-5
+    t,g1,g2 = np.genfromtxt('{}/bp_CaFN_mv_m_mags.txt'.format(args.lc), 
+                                skip_header=1,unpack = True)
+    return min(g2+dmod)
+    #return -14+dmod
+    
+def parse_command_line():
+    
+    description = ("This script creates pointings for selected telescopes, "
+                   "with given skymap files.")
+
+    parser = argparse.ArgumentParser(
+        description = description,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    
+    parser.add_argument("--first", action="store_true", default=False,
+                help="Make tilefiles?")
+    parser.add_argument("--out", help="Output folder for plots and text files")
+    parser.add_argument("--tiles", default='./',
+                        help=("Location of f2y tiling algorithm output"))
+    parser.add_argument("--sim", default='/storage/astro2/phsnap/Skymaps',
+                help="Input folder containing original first2years simulations")
+    parser.add_argument("--lc", 
+            default='/storage/astro2/phsnap/lightcurves/GOTO/ns_merger_mags/',
+            help="Input folder containing kilonova lightcurve simulations")
+    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn'],
+                        default='g4',
+                        help=("Telescope to use. GOTO-4, GOTO-8, "
+                              "SuperWASP-North."))    
+    parser.add_argument("--dists", action="store_true", default=False,
+                   help="Find angular distances between successive tiles")
+    parser.add_argument("--injdists", action="store_true", default=False,
+                help="Find angular distances between injection location and "
+                "loudest pixel")
+    parser.add_argument("--visible", action="store_true", default=False,
+                help="Check number of injections above horizon")
+    parser.add_argument("--mags", action="store_true", default=False,
+                help="Check number of injections above limiting mag")     
+    parser.add_argument("--maglim", metavar="MAGLIM", default=21.0,
+                help="Limiting magnitude above which kilonova is visible")
+    parser.add_argument("--exptime", metavar="EXPTIME", default=5.0,
+                help="Exposure time in mins of observations (used for working "
+                "out total time for all tiles)")
+    parser.add_argument("-g", "--usegals", action="store_true", default=False,
+                        help="Use GWGC in tiling/plotting")
+    parser.add_argument("-n", "--nightsky", action="store_true", default=False,
+                        help="Use nightsky visbility in tiling plotting")
+    parser.add_argument("--injgal", action="store_true", default=False,
+                        help="Injection from first2years paper. Take into " 
+                        "account known position and distance.")
+                        
+    return parser.parse_args()
+
+if __name__ == '__main__':
+
+    args = parse_command_line()
+    readpostfiles(args)
+
+

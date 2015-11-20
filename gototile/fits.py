@@ -16,8 +16,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
-
-#
 # Modified by Darren J. White for GOTO project, using non-LIGO systems.
 #
 from __future__ import absolute_import, print_function, division

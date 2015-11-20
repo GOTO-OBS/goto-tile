@@ -5,6 +5,7 @@ import numpy as np
 import healpy as hp
 import astropy.coordinates as acoord
 import astropy.units as u
+from gototile import simtools as sim
 
 def visiblegals(gals, sidtimes, lat, lon, height, radius):
     observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
@@ -33,7 +34,7 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     return np.array(visgal)
 
 
-def readgals(metadata):
+def readgals(metadata,injgal,simpath):
     path = os.path.join(os.path.dirname(__file__), 'GWGCCatalog_I.txt')
     gals = np.genfromtxt(path, skip_header=1, delimiter='|',
                          dtype=None, usecols=(0, 1, 2, 3, 7, 11, 20, 21),
@@ -41,6 +42,9 @@ def readgals(metadata):
                          names=('PGC', 'Name', 'ra', 'dec', 'B', 'I', 'dist',
                                  'e_dist'))
     
+    if injgal:
+		gals = sim.addnewgal(metadata,gals,simpath):
+        
     gals['ra'] = gals['ra']*15.
     
     return gals
@@ -72,3 +76,5 @@ def map2gals(skymap,gals,metadata):
     galmap = masses*skymap
 
     return galmap #normalised?
+
+

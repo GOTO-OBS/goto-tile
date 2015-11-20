@@ -23,7 +23,7 @@ setup(
     author='Darren White',
     author_email='Darren.White@warwick.ac.uk',
     url='http://goto-observatory.org',
-    scripts=['scripts/tileskymap'],
+    scripts=['scripts/tileskymap','scripts/f2ytile','scripts/postmap'],
     packages=['gototile'],
     package_dir={'gototile': 'gototile'},
     data_files=[('gototile', ['gototile/GWGCCatalog_I.txt',

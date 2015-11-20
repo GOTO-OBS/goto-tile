@@ -1,0 +1,85 @@
+#! /usr/bin/env python
+
+from __future__ import absolute_import, print_function, division
+
+import argparse
+import os,sys
+import datetime
+import glob
+import itertools as it
+import shlex
+import subprocess
+from gototile import simtools as sim
+
+
+def parse_command_line():
+
+    description = """This script creates pointings for selected telescopes, 
+        with given skymap files."""
+    
+    parser = argparse.ArgumentParser(description = description,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument("--simpath", type=str, default='./',
+        help="Input folder containing groups of maps (e.g. by year)")
+    parser.add_argument("--out", type=str,
+        help="Output folder for plots and text files")
+    parser.add_argument("--log", type=str, default='f2ytile.log',
+        help="Output log file name")
+    parser.add_argument("--years", default='2015,2016',
+        help="Folder names within input folder containing simulated maps, \
+        comma separated.") #used to only use 2015 simulations for example.
+    parser.add_argument("--scopes", default='g4,g8',
+        help="Telescope variations to use for tiling, comma separated")
+    parser.add_argument("--args", type=str, default='',
+        help="Additional arguments to be passed to tileskymap (e.g. --plot, \
+        --geoplot, --nightsky")
+    
+    
+    return parser.parse_args()
+    
+    
+if __name__=='__main__':
+    args = parse_command_line()
+    if args.years:
+        yarr = [i for i in args.years.split(',')]
+    else: sys.exit("No input folders")
+    print(yarr)
+
+    if args.scopes:
+        sarr = [i for i in args.scopes.split(',')]
+    else: sys.exit("No telescope variation selected")
+    print(sarr)
+
+    for year in yarr:
+        yearfolder = '{0}/{1}_fits'.format(args.simpath,year)
+        infolders = sorted(glob.glob('{0}/*'.format(yearfolder)))
+        print(yearfolder)
+        tss=[]
+        for scope,mapfold in it.product(sarr,infolders):
+            if not args.out: outfold = mapfold
+            else: outfold = args.out
+            injid = mapfold[mapfold.rfind('/')+1:]
+			inj, year = sim.findinj(injid,simpath)
+            callstr = 'tileskymap -i {} -p {} -s {} --sim --simpath {}'
+				'--object {} {} {} ' 
+                '{} {}/bayestar.fits.gz'.format(injid,outfold,scope,
+                args.simpath, inj['ra']/15.0, inj['dec'], injid,
+                args.args,mapfold)
+            callargs = shlex.split(callstr)
+            print('Calling tileskymap script for simulation {0}'.format(name))
+
+            start = datetime.datetime.now()
+            subprocess.call(callargs,stdout=open(args.log,"a"),
+                stderr=subprocess.STDOUT)
+            end = datetime.datetime.now()
+            td = end-start
+            ts = td.total_seconds()
+            tss.append(ts)
+
+    
+    print("Completed.")
+    print("Max time: {0}".format(max(tss)))
+    print("Min time: {0}".format(min(tss)))
+    print("Median time: {0}".format(np.median(tss)))
+

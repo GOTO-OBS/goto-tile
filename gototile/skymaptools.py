@@ -11,7 +11,7 @@ import math
 import numpy as np
 import healpy as hp
 from . import galtools as gt
-from .constants import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
+from .scopetools import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
 
 
 def _convc2s(r,d):
@@ -139,21 +139,21 @@ def findFoV(RA,dec, delns, delew):
 
     return FoV #returns sgp polygon of FoV
 
-def getpoints(FoV): #Get long/lat vertices for shape on sky
+def getpoints(FoV): #Get lra/dec vertices for shape on sky
 
     points = vars(vars(FoV)['_polygons'][0])['_points']
     sphpoints = hp.vec2ang(points)
 
 
-    lon,lat = sph2cel(sphpoints[0],sphpoints[1])
+    ra,dec = sph2cel(sphpoints[0],sphpoints[1])
 
-    return np.array(lon),np.array(lat)
+    return np.array(ra),np.array(dec)
 
 def getshape(FoV): #Get points that allow shape to be drawn on sky
                    #using plot/scatter points
 
     points = vars(vars(FoV)['_polygons'][0])['_points']
-    lons, lats = [],[]
+    ras, decss = [],[]
     for i,A in enumerate(points[:-1]):
         B=points[i+1]
 
@@ -161,18 +161,18 @@ def getshape(FoV): #Get points that allow shape to be drawn on sky
 
         sphpoints = hp.vec2ang(ipoints)
 
-        lon,lat = sph2cel(sphpoints[0],sphpoints[1])
+        ra,dec = sph2cel(sphpoints[0],sphpoints[1])
 
-        lons.extend(lon)
-        lats.extend(lat)
+        ras.extend(ra)
+        decs.extend(dec)
 
-    return np.array(lons),np.array(lats)
+    return np.array(ras),np.array(decss)
 
 def getgrid(FoV,steps = 100): #Get regular grid of points for field to
                               #find pixels using hp.ang2pix
 
     points = vars(vars(FoV)['_polygons'][0])['_points']
-    edgelons, edgelats = [],[]
+    edgeras, edgedecs = [],[]
     for i,A in enumerate(points[:-1]):
         B=points[i+1]
 
@@ -180,29 +180,29 @@ def getgrid(FoV,steps = 100): #Get regular grid of points for field to
 
         sphpoints = hp.vec2ang(ipoints)
 
-        lon,lat = sph2cel(sphpoints[0],sphpoints[1])
+        ra,dec = sph2cel(sphpoints[0],sphpoints[1])
 
-        edgelons.append(lon)
-        edgelats.append(lat)
+        edgeras.append(ra)
+        edgedecs.append(dec)
 
 
-    tt,tp = cel2sph(edgelons[0],edgelats[0])
-    bt,bp = cel2sph(edgelons[2],edgelats[2])
+    tt,tp = cel2sph(edgeras[0],edgedecs[0])
+    bt,bp = cel2sph(edgeras[2],edgedecs[2])
 
     top = hp.ang2vec(tt,tp)
     bottom = hp.ang2vec(bt[::-1],bp[::-1])
 
-    gridlons,gridlats=[],[]
+    gridras,griddecs=[],[]
     for A,B in zip(top,bottom):
         gpoints = sggc.interpolate(A,B,steps=steps)
 
         gsphpoints = hp.vec2ang(gpoints)
 
-        glon,glat = sph2cel(gsphpoints[0],gsphpoints[1])
+        gra,gdec = sph2cel(gsphpoints[0],gsphpoints[1])
 
-        gridlons.extend(glon)
-        gridlats.extend(glat)
-    return np.array(gridlons),np.array(gridlats)
+        gridras.extend(gra)
+        gridds.extend(gdec)
+    return np.array(gridras),np.array(griddecs)
 
 def getvectors(FoV):
 
@@ -226,12 +226,6 @@ def ordertiles(tiles,pixlist,tileprobs):
     otiles = tiles[np.argsort(tileprobs)]
     opixs = pixlist[np.argsort(tileprobs)]
     return np.array(otiles[::-1]),np.array(opixs[::-1]),np.array(oprobs[::-1])
-
-def outputtile(tileinfo,outfile,writecode):
-    f = open(outfile, writecode)
-    f.write(tileinfo)
-    f.close()
-    return
 
 def siderealtimes(lat, lon, height, date):
     #t = atime.Time(mjd, format='mjd', scale='utc')
@@ -291,31 +285,6 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
     return maskedmap
 
 
-def getscopeinfo(name):
-    if name.startswith('temp__'):
-        delns, delew, lat, lon, height = (
-            TEMP__SCOPE['fov-dec']/2, TEMP__SCOPE['fov-ra']/2,
-            TEMP__SCOPE['lat'], TEMP__SCOPE['lon'], TEMP__SCOPE['height'])
-    elif name.startswith('SuperWASP'):
-        delns, delew = SWASPN['fov-dec']/2, SWASPN['fov-ra']/2
-        if name.endswith('N'):
-            lat, lon, height = SWASPN['lat'], SWASPN['lon'], SWASPN['height']
-        else:
-            raise ValueError("unknown SuperWASP configuration")
-    elif name.startswith('GOTO'):
-        if name.endswith('4'):
-            delns, delew = GOTO4['fov-dec']/2, GOTO4['fov-ra']/2
-        elif name.endswith('8'):
-            delns, delew = GOTO8['fov-dec']/2, GOTO8['fov-ra']/2
-        else:
-            raise ValueError("unknown GOTO configuration")
-        lat, lon, height = GOTO4['lat'], GOTO4['lon'], GOTO4['height']
-    else:
-        raise ValueError("Unknown telescope")
-
-    return delns, delew, lat, lon, height
-
-
 def filltiles(skymap, tiles, pixlist):
 
     tileprobs = np.array([skymap[pixels].sum() for pixels in pixlist])
@@ -323,13 +292,14 @@ def filltiles(skymap, tiles, pixlist):
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky,
-              maxf, maxt, lat, lon, height, tiles, pixlist):
+def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf
+              maxf, maxt, sim, injgal, simpath, lat, lon, height, tiles, 
+              pixlist):
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, date)
 
     if usegals:
-        allgals = gt.readgals(metadata)
+        allgals = gt.readgals(metadata,injgal,simpath)
 
         if nightsky:
             gals = gt.visiblegals(allgals, sidtimes, lat, lon, height, 75.)
@@ -339,18 +309,14 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky,
 
         if not nightsky:
             skymap = allskymap.copy()
-
-
-        skymap = skymap/allskymap.sum() #gets fractional percentage
-                                        #covered, normalised
-        allskymap = allskymap/allskymap.sum() #normalised
+       
     elif nightsky:
         skymap = visiblemap(skymap, sidtimes, lat, lon, height, 75., metadata)
 
-
-
+    skymap = skymap/allskymap.sum() #gets fractional percentage covered per pix
+    allskymap = allskymap/allskymap.sum() #normalised so allskymap.sum()===1
     GWtot = skymap.sum()
-    if GWtot<0.05:
+    if GWtot<minf:
         sys.exit("Less than 5% of the skymap probability is visible, "
                  "ignoring...")
     tileprobs = filltiles(skymap, tiles, pixlist)
@@ -361,6 +327,8 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky,
 
 
     pointings = []
+    obstilelist = []
+    obspixlist = []
     seenpix = []
     usedmap = skymap.copy()
     GWobs = 0.0
@@ -376,18 +344,17 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky,
 
         _,center = getvectors(otiles[0])
         sphpoints = hp.vec2ang(center)
-        clon,clat = sph2cel(sphpoints[0],sphpoints[1])
+        cra,cdec = sph2cel(sphpoints[0],sphpoints[1])
 
-        pointings.append([clon,clat,otiles[0],oprobs[0],GWobs])
+        pointings.append([cra,cdec,oprobs[0],GWobs,oprobs[0]/GWtot,
+                        GWobs/GWtot])
+        obstilelist.append(otiles[0])
+        obspixlist.append(opixs[0])
         oprobs[0] = 0.0 #seen so set tile prob to zero
-
-        for idx,[tile,tpix,tprob] in enumerate(zip(otiles[1:],
-                                                   opixs[1:],
-                                                   oprobs[1:])):
-            if len(list(set(tpix).intersection(seenpix)))>0:
-                oprobs[idx+1] = usedmap[tpix].sum()
-            else: break
-
         otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs)
+        while len(list(set(opixs[0]).intersection(seenpix)))>0: 
+            #does new top tile overlap with seen?
+            oprobs[0] = usedmap[tpix].sum() #recalc prob from seen map
+            otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs) #reorder
 
-    return pointings, skymap, allskymap
+    return pointings, obstilelist, obspixlist, skymap, allskymap

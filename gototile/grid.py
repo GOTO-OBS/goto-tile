@@ -10,19 +10,42 @@ except ImportError:
 from . import skymaptools as smt
 import gzip
 import os
+import tempfile
 
+def makegrid(tilesdir, name=None):
+    if not os.path.exists(tilesdir):
+        os.makedirs(tilesdir)
+    if name:
+        fp = tempfile.NamedTemporaryFile(prefix='temp__', dir='.', delete=False)
+        path = fp.name
+        fp.close()
+        print("Creating temporary grid in file {}".format(path))
+        tileallsky(path, name, NSIDE)
+        return path
+    print("Creating the fixed grid GOTO-4, GOTO-8 and SuperWASP-N "
+          "This could take some time.")
+    for scope in (4, 8):
+        scopename = "GOTO{}".format(scope)
+        filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+        path = os.path.join(tilesdir, filename)
+        tileallsky(path, scopename, NSIDE)
+    scopename = "SuperWASP-N"
+    filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+    path = os.path.join(tilesdir, filename)
+    grid.tileallsky(path, scopename, NSIDE)
+    return path
 
 def tileallsky(filename, scopename, nside):
 
-    delns, delew = smt.getscopeinfo(scopename)[:2]
+    delns, delew, _, _, _ = smt.getscopeinfo(scopename)
 
     north = np.arange(0.0, 90.0, delns)
     south = -1*north
     n2s = np.append(south[::-2], north)
     e2w = np.arange(0.0, 360., delew)
 
-    tilelist = np.array([smt.findFoV(lon, lat, delns, delew) 
-                         for lat, lon in it.product(n2s, e2w)])
+    tilelist = np.array([smt.findFoV(ra, dec, delns, delew) 
+                         for ra, dec in it.product(n2s, e2w)])
 
     pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
     pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=True) 
@@ -32,7 +55,7 @@ def tileallsky(filename, scopename, nside):
         pickle.dump([tilelist, pixlist], f) #makes gzip compressed pickles
 
 
-def readtiles(infile,metadata):
+def readtiles(infile):
 
     with gzip.GzipFile(infile, 'r') as f:
         tilelist,pixlist = pickle.load(f)
@@ -40,7 +63,9 @@ def readtiles(infile,metadata):
 
     return tilelist,pixlist
 
+def writetiles(outfile,tilelist,pixlist):
+    
+    with gzip.GzipFile(outfile, 'w') as f:
+        pickle.dump([tilelist, pixlist], f) #makes gzip compressed pickles
+    return
 
-if __name__=='__main__':
-
-    tileallsky()

@@ -17,7 +17,7 @@ import ephem
 
 
 def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky, 
-                     date, output, path, scopename):
+                     date, injgal, simpath, output, path, scopename):
     fig = plt.figure()
     fig.clf()
 
@@ -52,8 +52,8 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
     ####################
     # Plot Skymap
     ###################
-    longs, lats = smt.sph2cel(thetas,phis-dlon)
-    xmap,ymap=m(longs,lats)
+    decs, ras = smt.sph2cel(thetas,phis-dlon)
+    xmap,ymap=m(decs,ras)
     m.scatter(xmap, ymap, s=1, c=skymap, cmap='cylon', alpha=0.5, linewidths=0)
 
     #################
@@ -63,13 +63,13 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
         plotFoV = tileinfo[2]
 
-        FoVlon,FoVlat = smt.getshape(plotFoV)
-        FoVx,FoVy = m(FoVlon-(dlon/np.pi*180.0),FoVlat)
+        FoVdec,FoVra = smt.getshape(plotFoV)
+        FoVx,FoVy = m(FoVdec-(dlon/np.pi*180.0),FoVra)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
     if usegals:
         
-        gals = gt.readgals(metadata)
+        gals = gt.readgals(metadata,injgal,simpath)
 
         ras = gals['ra']
         decs = gals['dec']
@@ -110,8 +110,8 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
 
 def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
-                    scopename, trigger, date, plotfilename, title=None,
-                    sun=False, moon=False, objects=None, dpi=300):
+                    scopename, trigger, date, injgal, simpath, plotfilename, 
+					title=None, sun=False, moon=False, objects=None, dpi=300):
     if title is None:
         formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
         if usegals:
@@ -154,8 +154,8 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     ipix = np.arange(npix)
     thetas,phis = hp.pix2ang(nside,ipix,nest=metadata['nest'])
 
-    longs, lats = smt.sph2cel(thetas,phis-dlon)
-    xmap,ymap=m(longs,lats)
+    decs, ras = smt.sph2cel(thetas,phis-dlon)
+    xmap,ymap=m(decs,ras)
     m.scatter(xmap, ymap, s=1, c=skymap, cmap='cylon', alpha=0.5, linewidths=0)
 
     #################
@@ -165,13 +165,13 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
 
         plotFoV = tileinfo[2]
 
-        FoVlon,FoVlat = smt.getshape(plotFoV)
-        FoVx,FoVy = m(FoVlon-(dlon/np.pi*180.0),FoVlat)
+        FoVdec,FoVra = smt.getshape(plotFoV)
+        FoVx,FoVy = m(FoVdec-(dlon/np.pi*180.0),FoVra)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
     if usegals:
         
-        gals = gt.readgals(metadata)
+        gals = gt.readgals(metadata, injgal, simpath)
 
         ras = gals['ra']
         decs = gals['dec']
