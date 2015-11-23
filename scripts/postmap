@@ -5,8 +5,8 @@ from __future__ import absolute_import, print_function, division
 import argparse
 import os,sys
 from gototile import skymaptools as smt
-from gototile import galtools as gt
-from gototile import simtools as sim
+from gototile import simtools as simt
+from gototile import scopetools as sct
 from gototile import grid
 from gototile import fits
 import glob
@@ -26,28 +26,28 @@ NSIDE=256
 
     
   
-def tilefiles(args):
+def tilefiles(out, tiles, sim):
 
 
-    oldfiles = glob.glob('{0}/*.txt'.format(args.out))
+    oldfiles = glob.glob('{0}/*.txt'.format(out))
     [os.remove(fold) for fold in oldfiles]
         
-    infiles = sorted(glob.glob('{0}/*.txt'.format(args.tiles)))    
+    infiles = sorted(glob.glob('{0}/*.txt'.format(tiles)))    
 
     for fname in infiles:
         
         fsplit = fname.split('_')
         injid = fsplit[0][fsplit[0].rfind('/')+1:]
         scope = fsplit[1][:-4]
-        delns, delew, lat, lon, height = smt.getscopeinfo(scope)
+        delns, delew, lat, lon, height = sct.getscopeinfo(scope)
     
-        inj,year = sim.findinj(injid,args.sim)
+        inj,year = simt.findinj(injid,sim)
 
         rainj,decinj,distinj = inj['ra'],inj['dec'],inj['dist']
         tinj,pinj = smt.cel2sph(rainj,decinj)
         injpix = hp.ang2pix(nside=NSIDE,tinj,pinj,nest=True)
     
-        outfile = "{0}/{1}_{2}.txt".format(args.out,year,scope)
+        outfile = "{0}/{1}_{2}.txt".format(out,year,scope)
         
         ras,decs,probs,tprobs,fprobs,ftprobs = np.genfromtxt(fname,
 													delimiter=',',unpack=True)
@@ -86,14 +86,14 @@ def tilefiles(args):
                 visprob))
         f.close()
 
-def visibleinj(injid,args):
-    #print(injid)
-    lat,lon,height = 28.7636,360.0-17.8947,2396.0 #la palma only right now
+def visibleinj(injid, sim, scope):
+    scopename = getscopename(scope)
+    delns, delew, lat, lon, height = sct.getscopeinfo(scopename)
     observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
         height=height*u.m)
     radius = 75.
     
-    inj,year = findinj(injid,args.sim)
+    inj,year = findinj(injid,sim)
     sidtimes = smt.siderealtimes(lat, lon, height, inj['mjd'])
     latr = radians(float(lat))
     
@@ -132,11 +132,11 @@ def angsep(ra1,dec1,ra2,dec2):
     
     return ang*180/pi
     
-def max2inj_dists(args,injids):
+def max2inj_dists(injids, sim, year, simpath, out, year):
     
     angdists = []
     for idx,injid in enumerate(injids):
-        fname = '{0}/{1}_fits/{2}/bayestar.fits.gz'.format(args.sim,args.year,
+        fname = '{0}/{1}_fits/{2}/bayestar.fits.gz'.format(sim,year,
                                                     int(injid))
         skymap, metadata = fits.read_sky_map(fname)
         orderin = 'NESTED' if metadata['nest'] else 'RINGED'
@@ -149,7 +149,7 @@ def max2inj_dists(args,injids):
         tmax,pmax = hp.pix2ang(nside=NSIDE,maxidx,nest=metadata['nest'])
         ramax,decmax = smt.sph2cel(tmax,pmax)
         
-        inj,_=findinj(injid,args.simpath)
+        inj,_=findinj(injid,simpath)
 
         angdists.append(angsep(ramax,decmax,inj['ra']*15.,inj['dec']))
         
@@ -158,17 +158,17 @@ def max2inj_dists(args,injids):
     
     plt.hist(angdists,100, histtype='stepfilled',color=wcolora)
     plt.xlabel('Distance from loudest pixel to true source location (degrees)')
-    plt.savefig('{}/{}_inj2maxdist.png'.format(args.out,args.year))
+    plt.savefig('{}/{}_inj2maxdist.png'.format(out,year))
     plt.close()
     
     return
     
-def angdisttiles(args):
+def angdisttiles(tiles, scope, out, year):
 
-    infiles = sorted(glob.glob('{0}/*.txt'.format(args.tiles)))
+    infiles = sorted(glob.glob('{0}/*.txt'.format(tiles)))
     angdists = []
     
-    scopename = getscopename(args.scope)
+    scopename = getscopename(scope)
     
     for fname in infiles:
         fsplit = fname.split('_')
@@ -191,33 +191,34 @@ def angdisttiles(args):
     
     plt.hist(angdists,100,range = [0,20], histtype='stepfilled',color=wcolora)
     plt.xlabel('Average distance between successive tiles')
-    plt.savefig('{}/{}_{}_tiledists.png'.format(args.out,args.year,scopename))
+    plt.savefig('{}/{}_{}_tiledists.png'.format(out,year,scopename))
     plt.close()
     
     return
     
-def readpostfiles(args):
+def readpostfiles(first, out, tiles, sim, scope, year, visible, dists,
+                injdists, mags, maglim, exptime):
 
-    if args.first: tilefiles(args)
+    if first: tilefiles(out=out, tiles=tiles, sim=sim)
 
-    names = {'g4': 'GOTO4',
-             'g8': 'GOTO8',
-             'swn': 'SuperWASP-N'}
-    scopename = names[args.scope] 
-    postfiles = sorted(glob.glob('{0}/*{1}.txt'.format(args.out,scopename)))
+    scopename = getscopename(scope)
+    postfiles = sorted(glob.glob('{0}/*{1}.txt'.format(out,scopename)))
     for pfile in postfiles:
         s1 = pfile.split('/')
         s2 = s1[-1].split('_')
         year = s2[0]
         print(year)
     
-        args.year = year 
+        year = year 
         
         ids,fifties,nineties,ras,decs,dists,injtiles,injprobs,injfprobs \
             visprobs = np.genfromtxt(pfile,delimiter=',',unpack=True)
     
-        if args.injdists: max2inj_dists(args,ids)
-        if args.dists: angdisttiles(args)
+        if injdists: 
+            max2inj_dists(injids=ids, sim=sim, year=year, simpath=simpath, 
+            out=out, year=year)
+        if dists: angdisttiles(tiles=tiles, scope=scope, out=out, year=year)
+        
         print("Counting for {0}".format(pfile))
         cnt = Counter(injtiles)
         print("Total number of injections triggered: {}".format(len(injtiles)))
@@ -225,7 +226,7 @@ def readpostfiles(args):
                                     len(injtiles)-cnt[-1.0]))
         print("GW location covered {}% of the time".format(
                     (1-((float(cnt[-1.0])/float(len(injtiles)))))*100.0))
-        if args.visible:
+        if visible:
             totalseen = len(injtiles)-cnt[-1.0]
             vis = 0
             for idx,injtile in enumerate(injtiles):
@@ -239,13 +240,13 @@ def readpostfiles(args):
                 "time".format((float(vis)/(float(totalseen)+float(vis)))*100.))
         
         
-        if args.mags:
+        if mags:
             maglist = []
             for idx,injtile in enumerate(injtiles):
                 if injtile>0.0: 
-                    brightmag = injmag(dists[idx],args)
+                    brightmag = injmag(dists[idx],lc)
                     
-                    if brightmag<args.maglim: maglist.append(brightmag)
+                    if brightmag<maglim: maglist.append(brightmag)
                     
                     
             print("Number of those correctly tiled that have one or more "
@@ -257,11 +258,10 @@ def readpostfiles(args):
     
         plt.hist(injtiles, 100, range=[0,max(injtiles)], histtype='stepfilled',
                         cumulative=True, normed=1,color=wcolora)
-        #plt.show()
         plt.xlabel('Tile number containing true source location')
         plt.ylabel('Fraction below ordinate')
         plt.ylim((0,1))
-        plt.savefig('{}/{}_{}_injtilecum.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injtilecum.png'.format(out,year,
                     scopename))
         plt.close()
         
@@ -270,9 +270,8 @@ def readpostfiles(args):
     
         plt.hist(injtiles, 100, range=[0,max(injtiles)+5], 
             histtype='stepfilled', cumulative=False,color=wcolora)
-        #plt.show()
         plt.xlabel('Tile number containing true source location')
-        plt.savefig('{}/{}_{}_injtile.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injtile.png'.format(out,year,
                        scopename))
         plt.close()
         
@@ -281,31 +280,30 @@ def readpostfiles(args):
     
         plt.hist(visprobs, 100, range=[0,1], histtype='stepfilled', 
                     cumulative=False,color=wcolora)
-        #plt.show()
         plt.xlabel('Distribution of visible skymap probability')
-        plt.savefig('{}/{}_{}_visprob.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_visprob.png'.format(out,year,
                     scopename))
         plt.close()
         
         fig = plt.figure()        
         fig.clf()
-        plt.hist(injtiles*args.exptime, 100, range=[0,max(injtiles*5.)], 
+        plt.hist(injtiles*exptime, 100, range=[0,max(injtiles*5.)], 
                     histtype='stepfilled',color=wcolora)
         plt.xlabel('Observing time needed to tile true source location '
                     '(minutes)')
-        plt.savefig('{}/{}_{}_injobstime.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injobstime.png'.format(out,year,
                     scopename))
         plt.close()
         
         fig = plt.figure()        
         fig.clf()
-        plt.hist(injtiles*args.exptime, 100, range=[0,max(injtiles*5.)], 
+        plt.hist(injtiles*exptime, 100, range=[0,max(injtiles*5.)], 
                 histtype='stepfilled', cumulative=True, normed=1,color=wcolora)
         plt.xlabel('Observing time needed to tile true source location '
                     '(minutes)') 
         plt.ylabel('Fraction below ordinate')
         plt.ylim((0,1))
-        plt.savefig('{}/{}_{}_injobstimecum.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injobstimecum.png'.format(out,year,
                         scopename))
         plt.close()
         
@@ -316,8 +314,7 @@ def readpostfiles(args):
         plt.ylim((0,1))
         plt.xlabel('Tile number containing true source location')
         plt.ylabel('Probability searched to image true source location')
-    #    plt.show()
-        plt.savefig('{}/{}_{}_injvsprobs.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injvsprobs.png'.format(out,year,
                         scopename))
         plt.close()
         
@@ -332,8 +329,7 @@ def readpostfiles(args):
         plt.xlabel('Tile number containing true source location')
         plt.ylabel('Number of tiles needed to image at least 50% of GW '    
                     'probability')
-    #    plt.show()
-        plt.savefig('{}/{}_{}_injvsfifty.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injvsfifty.png'.format(out,year,
                         scopename))
         plt.close()
     
@@ -341,15 +337,13 @@ def readpostfiles(args):
         fig = plt.figure()
         fig.clf()
         plt.hist(ratios,100,range=[-50,50], histtype='stepfilled',color=wcolora)
-    #    plt.show()
         plt.close()
     
         fig = plt.figure()
         fig.clf()
         plt.hist(injprobs,100,range=[0,1], histtype='stepfilled',color=wcolora)
         plt.xlabel('Probability searched to image tile containing source')
-    #    plt.show()
-        plt.savefig('{}/{}_{}_injprobs.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_injprobs.png'.format(out,year,
                     scopename))
         plt.close()
     
@@ -357,27 +351,23 @@ def readpostfiles(args):
         fig.clf()
         plt.hist(injprobs, 100, range=[0,1], histtype='stepfilled',
                     cumulative=True,normed=1,color=wcolora)
-    #    plt.hlines(0.5, 0, 1)
-    #    plt.vlines(0.5, 0, 1)
         plt.minorticks_on()
         plt.grid(which='both')
         plt.xlim((0,1))
         plt.ylim((0,1))
         plt.xlabel('Cumulative probability searched to image tile '
                     'containing source')
-    #    plt.show()
-        plt.savefig('{}/{}_{}_cuminjprobs.png'.format(args.out,args.year,
+        plt.savefig('{}/{}_{}_cuminjprobs.png'.format(out,year,
                         scopename))
         plt.close()
 
     return
     
-def injmag(dist,args):
+def injmag(dist,lc):
     dmod = 5*log10(dist*1e6)-5
-    t,g1,g2 = np.genfromtxt('{}/bp_CaFN_mv_m_mags.txt'.format(args.lc), 
+    t,g1,g2 = np.genfromtxt('{}/bp_CaFN_mv_m_mags.txt'.format(lc), 
                                 skip_header=1,unpack = True)
     return min(g2+dmod)
-    #return -14+dmod
     
 def parse_command_line():
     
@@ -416,19 +406,15 @@ def parse_command_line():
     parser.add_argument("--exptime", metavar="EXPTIME", default=5.0,
                 help="Exposure time in mins of observations (used for working "
                 "out total time for all tiles)")
-    parser.add_argument("-g", "--usegals", action="store_true", default=False,
-                        help="Use GWGC in tiling/plotting")
-    parser.add_argument("-n", "--nightsky", action="store_true", default=False,
-                        help="Use nightsky visbility in tiling plotting")
-    parser.add_argument("--injgal", action="store_true", default=False,
-                        help="Injection from first2years paper. Take into " 
-                        "account known position and distance.")
-                        
+
     return parser.parse_args()
 
 if __name__ == '__main__':
 
     args = parse_command_line()
-    readpostfiles(args)
+    readpostfiles(first=args.first, out=args.out, tiles=args.tiles, 
+    sim=args.sim, scope=args.scope, year=args.year, visible=args.visible, 
+    dists=args.dists, injdists=args.injdists, mags=args.mags, 
+    maglim=args.maglim, exptime=args.exptime)
 
 

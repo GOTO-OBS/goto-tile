@@ -5,7 +5,6 @@ import numpy as np
 import healpy as hp
 import astropy.coordinates as acoord
 import astropy.units as u
-from gototile import simtools as sim
 
 def visiblegals(gals, sidtimes, lat, lon, height, radius):
     observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
@@ -43,7 +42,8 @@ def readgals(metadata,injgal,simpath):
                                  'e_dist'))
     
     if injgal:
-		gals = sim.addnewgal(metadata,gals,simpath):
+        from gototile import simtools as simt
+		gals = simt.addnewgal(metadata,gals,simpath):
         
     gals['ra'] = gals['ra']*15.
     
@@ -59,7 +59,7 @@ def getmass(gal):
     return Ilum(gal['I'])*pow(10.,-0.88+0.6*(gal['B']-gal['I']))
 
 def map2gals(skymap,gals,metadata):
-    from . import skymaptools as smt
+    from gototile import skymaptools as smt
     masses = np.zeros(len(skymap))
     ras = gals['ra']
     decs = gals['dec']
