@@ -42,7 +42,7 @@ def readgals(metadata,injgal,simpath):
                                  'e_dist'))
     
     if injgal:
-        from gototile import simtools as simt
+        from . import simtools as simt
 		gals = simt.addnewgal(metadata,gals,simpath):
         
     gals['ra'] = gals['ra']*15.
@@ -59,7 +59,7 @@ def getmass(gal):
     return Ilum(gal['I'])*pow(10.,-0.88+0.6*(gal['B']-gal['I']))
 
 def map2gals(skymap,gals,metadata):
-    from gototile import skymaptools as smt
+    from . import skymaptools as smt
     masses = np.zeros(len(skymap))
     ras = gals['ra']
     decs = gals['dec']

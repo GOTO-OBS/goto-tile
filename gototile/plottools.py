@@ -1,7 +1,7 @@
 from __future__ import absolute_import, print_function, division
-from gototile import skymaptools as smt
-from gototile import galtools as gt
-from gototile import cmap
+from . import skymaptools as smt
+from . import galtools as gt
+from . import cmap
 
 import numpy as np
 import healpy as hp

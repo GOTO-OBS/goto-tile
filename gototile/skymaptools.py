@@ -10,8 +10,8 @@ import sys
 import math
 import numpy as np
 import healpy as hp
-from gototile import galtools as gt
-from gototile.scopetools import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
+from . import galtools as gt
+from .scopetools import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
 
 
 def _convc2s(r,d):

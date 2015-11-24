@@ -7,7 +7,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-from gototile import skymaptools as smt
+from . import skymaptools as smt
 import gzip
 import os
 import tempfile
