@@ -34,7 +34,7 @@ using
 
     $ pip install -r requirements.txt
     
-However, if certain modules already exists, you should
+However, if certain modules already exist, you should
 be able to easily install modules required by hand.
 
 Known issues: 
@@ -78,10 +78,13 @@ A list of user-changeable options can be found using:
 
 Output:-
 
-usage: tileskymap [-h] [-i ID] [-p PATH] [-t MAXT] [-f MAXF] [-s SCOPES]
-                     [-g] [-n] [--geoplot] [--plot] [--makegrid]
-                     [--tiles TILES]
-                     [infiles [infiles ...]]
+usage: tileskymap [-h] [-i ID] [-p PATH] [--maxtiles MAXTILES]
+                  [--maxfrac MAXFRAC] [--minfrac MINFRAC] [-s {g4,g8,swn}]
+                  [--site SITE SITE SITE] [--fov FOV FOV] [-g] [-n]
+                  [-d [DATE]] [--geoplot] [--plot] [--title TITLE]
+                  [--makegrid] [--tiles TILES] [--object OBJECT OBJECT OBJECT]
+                  [--sun] [--moon] [--sim] [--injgal] [--simpath SIMPATH]
+                  [infiles [infiles ...]]
 
 This script creates pointings for selected telescopes, with given skymap
 files.
@@ -93,30 +96,159 @@ optional arguments:
   -h, --help            show this help message and exit
   -i ID, --id ID        Name of output files (without extension) (default: )
   -p PATH, --path PATH  Output path (default: ./)
-  -t MAXT, --maxt MAXT  Number of tiles to return (default: 100)
-  -f MAXF, --maxf MAXF  Maximum fraction of visible skymap to tile (default:
+  --maxtiles MAXTILES   Maximum number of tiles to return (default: 100)
+  --maxfrac MAXFRAC     Maximum fraction of visible skymap to tile (default:
                         0.95)
-  -s SCOPES, --scopes SCOPES
-                        Number of telescopes for GOTO configuration, 4 or 8
-                        (default: 4)
+  --minfrac MINFRAC     Minimum fraction of visible skymap required to attempt
+                        tiling (default: 0.05)
+  -s {g4,g8,swn}, --scope {g4,g8,swn}
+                        Telescope to use. GOTO-4, GOTO-8, SuperWASP-North.
+                        (default: g4)
+  --site SITE SITE SITE
+                        Set the longitude, latitude and elevation. Overrides
+                        the defaults from the 'scope' setting. (default: None)
+  --fov FOV FOV         Set the width (RA) and height (dec) of the field of
+                        view, in degrees. Overrides the default from the
+                        'scope' setting. (default: None)
   -g, --usegals         Use GWGC in tiling/plotting (default: False)
   -n, --nightsky        Use nightsky visbility in tiling/plotting (default:
                         False)
+  -d [DATE], --date [DATE]
+                        Set observation date. If not used, defaults to the
+                        current date. If given without argument, defaults to
+                        the trigger date in the input file(s). The optional
+                        argument can be a date-time string that can be parsed
+                        by astropy.time.Time, such as '2012-12-12T12:12:12'. A
+                        single number is interpreted as Julian days; use a
+                        number with 'mjd' appended to specify Modified Julian
+                        Days. (default: now)
   --geoplot             Plot in geographic coordinates, (lat, lon) (default:
                         False)
   --plot                Plot in RA-Dec (default: False)
+  --title TITLE         Use suppied title in skymap plot. (default: None)
   --makegrid            Create fixed grid of tiles on sky. WARNING: Can take
                         some time. (default: False)
   --tiles TILES         Location of pre-made fixed grid of tiles on sky.
                         (default: ./tiles/)
-    
+  --object OBJECT OBJECT OBJECT
+                        Overplot an object. Requires three values: RA, Dec and
+                        an object name. (default: [])
+  --sun                 Plot the Sun position (default: False)
+  --moon                Plot the Moon position (default: False)
+  --sim                 A first2years simulation. Check tiles for known
+                        position of source. (default: False)
+  --injgal              Inject galaxy at location in f2y map. Take into
+                        account known position and distance. (default: False)
+  --simpath SIMPATH     Path to folder of Skymaps, organised into folders by
+                        year. (default: ./Skymaps)
+                        
+An example command might be:
 
-Notes
-=====
+tileskymap -i 10206 -p allskyinjgal -s g4 --sim --simpath /storage/astro2/phsnap/LIGO/Skymaps --object 64.9 42.2 10206 --date  --plot --injgal --usegals /storage/astro2/phsnap/LIGO/Skymaps/2015_fits/10206/bayestar.fits.gz
 
+Notes:
     Currently the script assumes greedy tiling is required. However, this may
     be sub-optimal given the large filed-of-view of GOTO, and poor pointing
     from the GW detectors, particularly in the 2-detector scenario, and is
     an avenue of future work.
     
+Running f2ytile
+================
+
+The script f2ytile is essentially a wrapper around the tileskymap script, that
+allows the user to run the tiling algorith across the first2years simulated
+skymaps produced by Singer et al. (http://www.ligo.org/scientists/first2years/).
+The usage and list of user-configurable options are:
+  
+usage: f2ytile [-h] [--simpath SIMPATH] [--out OUT] [--log LOG]
+               [--years YEARS] [--scopes SCOPES] [-d [DATE]] [--args ARGS]
+
+This script creates pointings for selected telescopes, with given skymap
+files.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --simpath SIMPATH     Input folder containing groups of maps (e.g. by year)
+                        (default: ./)
+  --out OUT             Output folder for plots and text files (default: None)
+  --log LOG             Output log file name (default: f2ytile.log)
+  --years YEARS         Folder names within input folder containing simulated
+                        maps, comma separated. (default: 2015,2016)
+  --scopes SCOPES       Telescope variations to use for tiling, comma
+                        separated (default: g4,g8)
+  -d [DATE], --date [DATE]
+                        Set observation date. If not used, defaults to the
+                        current date. If given without argument, defaults to
+                        the trigger date in the input file(s). The optional
+                        argument can be a date-time string that can be parsed
+                        by astropy.time.Time, such as '2012-12-12T12:12:12'. A
+                        single number is interpreted as Julian days; use a
+                        number with 'mjd' appended to specify Modified Julian
+                        Days. (default: now)
+  --args ARGS           Additional arguments to be passed to tileskymap (e.g.
+                        --plot, --geoplot, --nightsky (default: )
+
+With an example command of:
+
+f2ytile --out nightskyinjgal --log nightskyinjgal.log --years 2015 --scopes g4 --simpath /storage/astro2/phsnap/LIGO/Skymaps --date --args "--plot --injgal --usegals --nightsky"
+
+Notes:
+    The script allows users to provide all extra flags to the tileskymap script
+    using the --args option. The options to be passed must be contained within
+    quotes. If only one option is passed, for example to plot, then a space must
+    be added at the end. For example: --args "--plot ". This is a bug that I 
+    have not been able to figure out just yet.
+    
+Running postmap
+===============
+
+The postmap script is included to generate plots, combined data and basic
+statistics on the tiles generated by f2ytile. 
+
+usage: postmap [-h] [--first] [--out OUT] [--tiles TILES] [--simpath SIMPATH]
+               [--lc LC] [-s {g4,g8,swn}] [--tiledists] [--injdists]
+               [--visible] [--mags] [--maglim MAGLIM] [--exptime EXPTIME]
+               [-d [DATE]]
+
+This script creates pointings for selected telescopes, with given skymap
+files.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --first               Make tilefiles? (default: False)
+  --out OUT             Output folder for plots and text files (default: None)
+  --tiles TILES         Location of f2y tiling algorithm output (default: ./)
+  --simpath SIMPATH     Input folder containing original first2years
+                        simulations (default: /storage/astro2/phsnap/Skymaps)
+  --lc LC               Input folder containing kilonova lightcurve
+                        simulations (default: /storage/astro2/phsnap/lightcurv
+                        es/GOTO/ns_merger_mags/)
+  -s {g4,g8,swn}, --scope {g4,g8,swn}
+                        Telescope to use. GOTO-4, GOTO-8, SuperWASP-North.
+                        (default: g4)
+  --tiledists           Find angular distances between successive tiles
+                        (default: False)
+  --injdists            Find angular distances between injection location and
+                        loudest pixel (default: False)
+  --visible             Check number of injections above horizon (default:
+                        False)
+  --mags                Check number of injections above limiting mag
+                        (default: False)
+  --maglim MAGLIM       Limiting magnitude above which kilonova is visible
+                        (default: 21.0)
+  --exptime EXPTIME     Exposure time in mins of observations (used for
+                        working out total time for all tiles) (default: 5.0)
+  -d [DATE], --date [DATE]
+                        Set observation date. If not used, defaults to the
+                        current date. If given without argument, defaults to
+                        the trigger date in the input file(s). The optional
+                        argument can be a date-time string that can be parsed
+                        by astropy.time.Time, such as '2012-12-12T12:12:12'. A
+                        single number is interpreted as Julian days; use a
+                        number with 'mjd' appended to specify Modified Julian
+                        Days. (default: now)
+
+An example command to produce output from the example f2ytile command above: 
+
+postmap -s g4 --tiledists --injdists --visible --mags --simpath /storage/astro2/phsnap/LIGO/Skymaps --tiles nightskyinjgal --out nightskyinjgal/postmap --date --first
     

@@ -19,6 +19,14 @@ SWASPN = {
     'lon': 360.0-17.8793802,
     'height': 2396
 }
+
+VISTA = {
+    'fov-dec': 1.017*2.0,
+    'fov-ra': 1.475*2,
+    'lat': -24.6158,
+    'lon': 360.0-70.3975,
+    'height': 2518.0
+}
 TEMP__SCOPE = {
     'fov-dec': 0,
     'fov-ra': 0,
@@ -46,7 +54,8 @@ def getscopename(scope):
     
     names = {'g4': 'GOTO4',
              'g8': 'GOTO8',
-             'swn': 'SuperWASP-N'}
+             'swn': 'SuperWASP-N',
+             'v': 'VISTA'}
     scopename = names[scope]
     
     return scopename
@@ -70,6 +79,9 @@ def getscopeinfo(name):
         else:
             raise ValueError("unknown GOTO configuration")
         lat, lon, height = GOTO4['lat'], GOTO4['lon'], GOTO4['height']
+    elif name.startswith('VISTA'):
+        delns, delew = VISTA['fov-dec']/2, VISTA['fov-ra']/2
+        lat, lon, height = VISTA['lat'], VISTA['lon'], VISTA['height']
     else:
         raise ValueError("Unknown telescope")
 

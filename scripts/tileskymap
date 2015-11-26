@@ -50,17 +50,15 @@ def parse_command_line():
     parser.add_argument("-p", "--path",default='./', help="Output path")
     parser.add_argument("--maxtiles", type=int, default=100,
                         help="Maximum number of tiles to return")
-    parser.add_argument("--maxtiles", type=int, default=100, dest='maxtiles',
-                        help=argparse.SUPPRESS)
     parser.add_argument("--maxfrac", type=float, default=0.95,
                         help="Maximum fraction of visible skymap to tile")
     parser.add_argument("--minfrac", type=float, default=0.05,
                         help="Minimum fraction of visible skymap required to "
                         "attempt tiling")
-    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn'],
+    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn','v'],
                         default='g4',
                         help=("Telescope to use. GOTO-4, GOTO-8, "
-                              "SuperWASP-North."))
+                              "SuperWASP-North, VISTA."))
     parser.add_argument('--site', nargs=3,
                         help="Set the longitude, latitude and elevation. "
                         "Overrides the defaults from the 'scope' setting.")
@@ -105,7 +103,7 @@ def parse_command_line():
     parser.add_argument("--sim", action="store_true", default=False,
                         help="A first2years simulation. Check tiles for known "
                         "position of source.")               
-	parser.add_argument("--injgal", action="store_true", default=False,
+    parser.add_argument("--injgal", action="store_true", default=False,
                         help="Inject galaxy at location in f2y map. Take into " 
                         "account known position and distance.")
     parser.add_argument("--simpath",default='./Skymaps', 
@@ -116,10 +114,9 @@ def parse_command_line():
 
 def parse_date(string):
     """Turn a string into an astropy.time.Time date"""
-
     if string is None:
         return None
-    if string is 'now':
+    if string == 'now':
         return Time.now()
     if string.lower().endswith('jd'):
         if string.lower().endswith('mjd'):
@@ -157,7 +154,7 @@ def parse_site(site):
 def main(args):
     temptilespath = None
     if args.makegrid:
-        grid.makegrid(args.tiles)
+        grid.makegrid(args.tiles,NSIDE)
 
     if not os.path.exists(args.path):
         os.makedirs(args.path)
@@ -175,7 +172,7 @@ def main(args):
         print("No output name detected, output taken from "
               "object id metadata.")
               
-    scopename = sct.getscopename(scope)
+    scopename = sct.getscopename(args.scope)
     delns, delew, lat, lon, height = sct.getscopeinfo(scopename)
     if args.site or args.fov:
         defaults = (delns, delew, lat, lon, height)
@@ -203,12 +200,12 @@ def main(args):
         if not os.path.isfile(tilefile):
             sys.exit("No existing pre-made tiles found. Please run tileskymap "
                      "with the --makegrid option.")
-        alltiles, pixlist = grid.readtiles(tilefile, metadata)
+        alltiles, pixlist = grid.readtiles(tilefile)
 
         date = metadata['date-det'] if args.date is None else args.date
         pointings, tilelist, pixlist, tiledmap, allskymap = smt.findtiles(
             newmap, date, delns, delew, metadata, args.usegals,
-            args.nightsky, args.minfrac args.maxfrac, args.maxtiles, args.sim,
+            args.nightsky, args.minfrac, args.maxfrac, args.maxtiles, args.sim,
             args.injgal, args.simpath, lat, lon, height, alltiles, pixlist)
 
         gwtot = tiledmap.sum()
@@ -219,26 +216,27 @@ def main(args):
             (gwtot/allskymap.sum())*100.))
 
         outfiletxt = "{}_{}.txt".format(args.id, scopename)
-        outfiletxt = os.path.join(args.path, outfiletxtt)
+        outfiletxt = os.path.join(args.path, outfiletxt)
         with open(outfiletxt, 'w') as outfile:
             for pointing in pointings:
                 cra, cdec, prob, gwobs, probfrac, gwfrac = pointing
-                outfile.write("{},{},{},{}\n".format(
+                outfile.write("{},{},{},{},{},{}\n".format(
                     cra[0], cdec[0], prob, gwobs, probfrac, gwfrac))
-                print("{:9.5f}, {:+9.5f}, {:8.6f}, {:8.6f}, {:8.6f}".format(
-                    cra[0], cdec[0], prob, gwobs, probfrac, gwfrac))
+                print("{:9.5f}, {:+9.5f}, {:8.6f}, {:8.6f}, {:8.6f}, "
+                    "{:8.6f}".format(cra[0], cdec[0], prob, gwobs, probfrac, 
+                    gwfrac))
         
-        outfilepkl = outfiletxt.replace('.txt','pgz')
-        writetiles(outfilepkl,tilelist,pixlist)
+        outfilepkl = outfiletxt.replace('.txt','.pgz')
+        grid.writetiles(outfilepkl,tilelist,pixlist)
         
         if args.plot or args.geoplot:
             plotfilename = os.path.join(args.path, "{}moll{}.png".format(
                 args.id, scopename))
-            pt.plotskymapsmoll(tiledmap, pointings, metadata, args.geoplot,
-                               args.usegals, args.nightsky, scopename, args.id, 
-                               date, args.injgal, args.simpath, plotfilename,
-                               title=args.title, objects=objects,
-                               sun=args.sun, moon=args.moon)
+            pt.plotskymapsmoll(tiledmap, pointings, tilelist, metadata, 
+                               args.geoplot, args.usegals, args.nightsky, 
+                               scopename, args.id, date, args.injgal, 
+                               args.simpath, plotfilename, title=args.title, 
+                               objects=objects, sun=args.sun, moon=args.moon)
     if temptilespath:
         os.unlink(temptilespath)
 

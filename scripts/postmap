@@ -19,14 +19,13 @@ from collections import Counter
 from math import sin,cos,atan2,sqrt,pi,radians,log10
 import astropy.coordinates as acoord
 import astropy.units as u
+import astropy.time
 
 wcolora = '#511c6c'
 wcoloro = '#f26322'
 NSIDE=256
 
-    
-  
-def tilefiles(out, tiles, sim):
+def tilefiles(out, tiles, simpath):
 
 
     oldfiles = glob.glob('{0}/*.txt'.format(out))
@@ -41,11 +40,11 @@ def tilefiles(out, tiles, sim):
         scope = fsplit[1][:-4]
         delns, delew, lat, lon, height = sct.getscopeinfo(scope)
     
-        inj,year = simt.findinj(injid,sim)
+        inj,year = simt.findinj(injid,simpath)
 
         rainj,decinj,distinj = inj['ra'],inj['dec'],inj['dist']
         tinj,pinj = smt.cel2sph(rainj,decinj)
-        injpix = hp.ang2pix(nside=NSIDE,tinj,pinj,nest=True)
+        injpix = hp.ang2pix(NSIDE,tinj,pinj,nest=True)
     
         outfile = "{0}/{1}_{2}.txt".format(out,year,scope)
         
@@ -78,23 +77,23 @@ def tilefiles(out, tiles, sim):
                 if injpix in set(pixlist[tilenum]): 
                     tileinj = tilenum+1
                     probinj = tprobs[tilenum]
-					fprobinj = ftprobs[tilenum]
+                    fprobinj = ftprobs[tilenum]
                     
         f = open(outfile, 'a')
-        f.write("{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}\n".format(injid, 
-                fifty, max, rainj, decinj, distinj, tileinj, probinj, fprobinj,
-                visprob))
+        f.write("{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9} \n".format(
+                injid, fifty, max, rainj, decinj, distinj, 
+                tileinj, probinj, fprobinj, visprob))
         f.close()
 
-def visibleinj(injid, sim, scope):
-    scopename = getscopename(scope)
+def visibleinj(injid, simpath, scope, date):
+    scopename = sct.getscopename(scope)
     delns, delew, lat, lon, height = sct.getscopeinfo(scopename)
     observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
         height=height*u.m)
     radius = 75.
-    
-    inj,year = findinj(injid,sim)
-    sidtimes = smt.siderealtimes(lat, lon, height, inj['mjd'])
+    inj,year = simt.findinj(injid,simpath)
+    date = astropy.time.Time(inj['mjd'],format='mjd') if date is None else date
+    sidtimes = smt.siderealtimes(lat, lon, height, date)
     latr = radians(float(lat))
     
     seen = False
@@ -132,11 +131,11 @@ def angsep(ra1,dec1,ra2,dec2):
     
     return ang*180/pi
     
-def max2inj_dists(injids, sim, year, simpath, out, year):
+def max2inj_dists(injids, simpath, year, out):
     
     angdists = []
     for idx,injid in enumerate(injids):
-        fname = '{0}/{1}_fits/{2}/bayestar.fits.gz'.format(sim,year,
+        fname = '{0}/{1}_fits/{2}/bayestar.fits.gz'.format(simpath,year,
                                                     int(injid))
         skymap, metadata = fits.read_sky_map(fname)
         orderin = 'NESTED' if metadata['nest'] else 'RINGED'
@@ -144,12 +143,12 @@ def max2inj_dists(injids, sim, year, simpath, out, year):
                              order_out='NESTED', power=-2)
         metadata['nest'] = True
         metadata['nside'] = NSIDE
-        _,maxidx = smt.orderedpixels(newmap)
+        _,oidx = smt.orderedpixels(newmap)
         
-        tmax,pmax = hp.pix2ang(nside=NSIDE,maxidx,nest=metadata['nest'])
+        tmax,pmax = hp.pix2ang(NSIDE,oidx[0],nest=metadata['nest'])
         ramax,decmax = smt.sph2cel(tmax,pmax)
         
-        inj,_=findinj(injid,simpath)
+        inj,_=simt.findinj(injid,simpath)
 
         angdists.append(angsep(ramax,decmax,inj['ra']*15.,inj['dec']))
         
@@ -168,7 +167,7 @@ def angdisttiles(tiles, scope, out, year):
     infiles = sorted(glob.glob('{0}/*.txt'.format(tiles)))
     angdists = []
     
-    scopename = getscopename(scope)
+    scopename = sct.getscopename(scope)
     
     for fname in infiles:
         fsplit = fname.split('_')
@@ -196,12 +195,12 @@ def angdisttiles(tiles, scope, out, year):
     
     return
     
-def readpostfiles(first, out, tiles, sim, scope, year, visible, dists,
-                injdists, mags, maglim, exptime):
+def readpostfiles(first, out, tiles, simpath, scope, visible, tiledists,
+                injdists, mags, maglim, exptime, date, lc):
 
-    if first: tilefiles(out=out, tiles=tiles, sim=sim)
+    if first: tilefiles(out=out, tiles=tiles, simpath=simpath)
 
-    scopename = getscopename(scope)
+    scopename = sct.getscopename(scope)
     postfiles = sorted(glob.glob('{0}/*{1}.txt'.format(out,scopename)))
     for pfile in postfiles:
         s1 = pfile.split('/')
@@ -211,13 +210,12 @@ def readpostfiles(first, out, tiles, sim, scope, year, visible, dists,
     
         year = year 
         
-        ids,fifties,nineties,ras,decs,dists,injtiles,injprobs,injfprobs \
+        ids,fifties,nineties,ras,decs,dists,injtiles,injprobs,injfprobs, \
             visprobs = np.genfromtxt(pfile,delimiter=',',unpack=True)
-    
+            
         if injdists: 
-            max2inj_dists(injids=ids, sim=sim, year=year, simpath=simpath, 
-            out=out, year=year)
-        if dists: angdisttiles(tiles=tiles, scope=scope, out=out, year=year)
+            max2inj_dists(injids=ids, simpath=simpath, year=year, out=out)
+        if tiledists: angdisttiles(tiles=tiles, scope=scope, out=out, year=year)
         
         print("Counting for {0}".format(pfile))
         cnt = Counter(injtiles)
@@ -232,7 +230,7 @@ def readpostfiles(first, out, tiles, sim, scope, year, visible, dists,
             for idx,injtile in enumerate(injtiles):
         
                 seen=False
-                if injtile<0.: seen = visibleinj(ids[idx],args)
+                if injtile<0.: seen = visibleinj(ids[idx],simpath,scope,date)
                 if seen: vis+=1
             print("Number of those not found that are above horizon: "
                         "{}".format(vis))
@@ -383,16 +381,16 @@ def parse_command_line():
     parser.add_argument("--out", help="Output folder for plots and text files")
     parser.add_argument("--tiles", default='./',
                         help=("Location of f2y tiling algorithm output"))
-    parser.add_argument("--sim", default='/storage/astro2/phsnap/Skymaps',
+    parser.add_argument("--simpath", default='/storage/astro2/phsnap/Skymaps',
                 help="Input folder containing original first2years simulations")
     parser.add_argument("--lc", 
             default='/storage/astro2/phsnap/lightcurves/GOTO/ns_merger_mags/',
             help="Input folder containing kilonova lightcurve simulations")
-    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn'],
+    parser.add_argument("-s", "--scope", choices=['g4', 'g8', 'swn', 'v'],
                         default='g4',
                         help=("Telescope to use. GOTO-4, GOTO-8, "
-                              "SuperWASP-North."))    
-    parser.add_argument("--dists", action="store_true", default=False,
+                              "SuperWASP-North, VISTA."))    
+    parser.add_argument("--tiledists", action="store_true", default=False,
                    help="Find angular distances between successive tiles")
     parser.add_argument("--injdists", action="store_true", default=False,
                 help="Find angular distances between injection location and "
@@ -406,15 +404,40 @@ def parse_command_line():
     parser.add_argument("--exptime", metavar="EXPTIME", default=5.0,
                 help="Exposure time in mins of observations (used for working "
                 "out total time for all tiles)")
+    parser.add_argument("-d", "--date", nargs='?', default='now',
+                        help="Set observation date. If not used, defaults to "
+                        "the current date.  If given without argument, "
+                        "defaults to the trigger date in the input file(s). "
+                        "The optional "
+                        "argument can be a date-time string that can be parsed "
+                        "by astropy.time.Time, such as '2012-12-12T12:12:12'. "
+                        "A single number is interpreted as Julian days; use a "
+                        "number with 'mjd' appended to specify Modified Julian "
+                        "Days.")
 
     return parser.parse_args()
 
+def parse_date(string):
+    """Turn a string into an astropy.time.Time date"""
+    if string is None:
+        return None
+    if string == 'now':
+        return Time.now()
+    if string.lower().endswith('jd'):
+        if string.lower().endswith('mjd'):
+            return Time(float(string[:-3]), format='mjd', scale='utc')
+        return Time(float(string[:-2]), format='jd', scale='utc')
+    return Time(string)
+    
 if __name__ == '__main__':
 
     args = parse_command_line()
+    if not os.path.exists(args.out):
+        os.makedirs(args.out)
+    args.date = parse_date(args.date)
     readpostfiles(first=args.first, out=args.out, tiles=args.tiles, 
-    sim=args.sim, scope=args.scope, year=args.year, visible=args.visible, 
-    dists=args.dists, injdists=args.injdists, mags=args.mags, 
-    maglim=args.maglim, exptime=args.exptime)
+    simpath=args.simpath, scope=args.scope, visible=args.visible, 
+    tiledists=args.tiledists, injdists=args.injdists, mags=args.mags, 
+    maglim=args.maglim, exptime=args.exptime, date=args.date, lc=args.lc)
 
 

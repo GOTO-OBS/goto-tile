@@ -11,8 +11,6 @@ import math
 import numpy as np
 import healpy as hp
 from . import galtools as gt
-from .scopetools import TEMP__SCOPE, GOTO4, GOTO8, SWASPN
-
 
 def _convc2s(r,d):
     p = r*np.pi/180
@@ -153,7 +151,7 @@ def getshape(FoV): #Get points that allow shape to be drawn on sky
                    #using plot/scatter points
 
     points = vars(vars(FoV)['_polygons'][0])['_points']
-    ras, decss = [],[]
+    ras, decs = [],[]
     for i,A in enumerate(points[:-1]):
         B=points[i+1]
 
@@ -166,7 +164,7 @@ def getshape(FoV): #Get points that allow shape to be drawn on sky
         ras.extend(ra)
         decs.extend(dec)
 
-    return np.array(ras),np.array(decss)
+    return np.array(ras),np.array(decs)
 
 def getgrid(FoV,steps = 100): #Get regular grid of points for field to
                               #find pixels using hp.ang2pix
@@ -288,11 +286,13 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
 def filltiles(skymap, tiles, pixlist):
 
     tileprobs = np.array([skymap[pixels].sum() for pixels in pixlist])
-
+    
+    #~ lenlist=[len(pixels) for pixels in pixlist]
+    #~ print(max(lenlist))
     return tileprobs
 
 # return pixel to center on for next tile
-def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf
+def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf,
               maxf, maxt, sim, injgal, simpath, lat, lon, height, tiles, 
               pixlist):
     allskymap = skymap.copy()
@@ -334,7 +334,7 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf
     GWobs = 0.0
 
     otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
-
+    l=0
     while GWobs <= maxf*GWtot and len(pointings) < maxt:
 
         # first tile will be brightest, so blank out pixels of usedmap
@@ -350,11 +350,18 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf
                         GWobs/GWtot])
         obstilelist.append(otiles[0])
         obspixlist.append(opixs[0])
-        oprobs[0] = 0.0 #seen so set tile prob to zero
+        #oprobs[0] = 0.0 #seen so set tile prob to zero
+        oprobs = filltiles(usedmap, otiles, opixs)
         otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs)
-        while len(list(set(opixs[0]).intersection(seenpix)))>0: 
-            #does new top tile overlap with seen?
-            oprobs[0] = usedmap[tpix].sum() #recalc prob from seen map
-            otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs) #reorder
+        #~ l+=1
+        #~ #print("Loop: {}".format(l))
+        #~ ro=0
+        #~ while len(list(set(opixs[0]).intersection(seenpix)))>0: 
+            #~ #does new top tile overlap with seen?
+            #~ ro+=1
+            #~ #print("Loop: {}".format(l))
+            #~ #print("Reordered: {}".format(ro))
+            #~ oprobs[0] = usedmap[opixs[0]].sum() #recalc prob from seen map
+            #~ otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs) #reorder
 
     return pointings, obstilelist, obspixlist, skymap, allskymap

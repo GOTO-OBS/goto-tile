@@ -7,6 +7,7 @@ import os,sys
 import datetime
 import glob
 import itertools as it
+import numpy as np
 import shlex
 import subprocess
 from gototile import simtools as sim
@@ -31,6 +32,16 @@ def parse_command_line():
         comma separated.") #used to only use 2015 simulations for example.
     parser.add_argument("--scopes", default='g4,g8',
         help="Telescope variations to use for tiling, comma separated")
+    parser.add_argument("-d", "--date", nargs='?', default='now',
+                        help="Set observation date. If not used, defaults to "
+                        "the current date.  If given without argument, "
+                        "defaults to the trigger date in the input file(s). "
+                        "The optional "
+                        "argument can be a date-time string that can be parsed "
+                        "by astropy.time.Time, such as '2012-12-12T12:12:12'. "
+                        "A single number is interpreted as Julian days; use a "
+                        "number with 'mjd' appended to specify Modified Julian "
+                        "Days.")
     parser.add_argument("--args", type=str, default='',
         help="Additional arguments to be passed to tileskymap (e.g. --plot, \
         --geoplot, --nightsky")
@@ -41,34 +52,40 @@ def parse_command_line():
     
 if __name__=='__main__':
     args = parse_command_line()
+    if not os.path.exists(args.out):
+        os.makedirs(args.out)
     if args.years:
         yarr = [i for i in args.years.split(',')]
     else: sys.exit("No input folders")
-    print(yarr)
-
+    #print(yarr)
+    if args.date is None:args.date=''
     if args.scopes:
         sarr = [i for i in args.scopes.split(',')]
     else: sys.exit("No telescope variation selected")
-    print(sarr)
+    #print(sarr)
 
     for year in yarr:
         yearfolder = '{0}/{1}_fits'.format(args.simpath,year)
         infolders = sorted(glob.glob('{0}/*'.format(yearfolder)))
-        print(yearfolder)
+        #print(yearfolder)
         tss=[]
         for scope,mapfold in it.product(sarr,infolders):
             if not args.out: outfold = mapfold
             else: outfold = args.out
             injid = mapfold[mapfold.rfind('/')+1:]
-			inj, year = sim.findinj(injid,simpath)
-            callstr = 'tileskymap -i {} -p {} -s {} --sim --simpath {}'
-				'--object {} {} {} ' 
-                '{} {}/bayestar.fits.gz'.format(injid,outfold,scope,
-                args.simpath, inj['ra']/15.0, inj['dec'], injid,
-                args.args,mapfold)
+            inj, year = sim.findinj(injid,args.simpath)
+            callstr = 'tileskymap -i {} -p {} -s {} --sim --simpath {} '\
+                '--object {} {} {} --date {} {} {}/bayestar.fits.gz'.format(
+                injid, outfold,scope, args.simpath, inj['ra'], inj['dec'], 
+                injid, args.date, args.args, mapfold)
+            
             callargs = shlex.split(callstr)
-            print('Calling tileskymap script for simulation {0}'.format(name))
-
+            print('Calling tileskymap script for simulation {0}'.format(injid))
+            print('{}\n'.format(callstr))
+            
+            with open(args.log, 'a') as outfile:
+                outfile.write("Injection ID: {}\n{}\n".format(injid,callstr))
+                
             start = datetime.datetime.now()
             subprocess.call(callargs,stdout=open(args.log,"a"),
                 stderr=subprocess.STDOUT)

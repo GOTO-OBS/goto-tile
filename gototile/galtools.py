@@ -43,7 +43,7 @@ def readgals(metadata,injgal,simpath):
     
     if injgal:
         from . import simtools as simt
-		gals = simt.addnewgal(metadata,gals,simpath):
+        gals = simt.addnewgal(metadata,gals,simpath)
         
     gals['ra'] = gals['ra']*15.
     

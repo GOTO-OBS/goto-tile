@@ -8,11 +8,12 @@ try:
 except ImportError:
     import pickle
 from . import skymaptools as smt
+from . import scopetools as sct
 import gzip
 import os
 import tempfile
 
-def makegrid(tilesdir, name=None):
+def makegrid(tilesdir, NSIDE, name=None):
     if not os.path.exists(tilesdir):
         os.makedirs(tilesdir)
     if name:
@@ -22,7 +23,7 @@ def makegrid(tilesdir, name=None):
         print("Creating temporary grid in file {}".format(path))
         tileallsky(path, name, NSIDE)
         return path
-    print("Creating the fixed grid GOTO-4, GOTO-8 and SuperWASP-N "
+    print("Creating the fixed grid GOTO-4, GOTO-8, SuperWASP-N and VISTA. "
           "This could take some time.")
     for scope in (4, 8):
         scopename = "GOTO{}".format(scope)
@@ -32,12 +33,17 @@ def makegrid(tilesdir, name=None):
     scopename = "SuperWASP-N"
     filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
     path = os.path.join(tilesdir, filename)
-    grid.tileallsky(path, scopename, NSIDE)
+    tileallsky(path, scopename, NSIDE)
+    
+    scopename = "VISTA"
+    filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+    path = os.path.join(tilesdir, filename)
+    tileallsky(path, scopename, NSIDE)
     return path
 
 def tileallsky(filename, scopename, nside):
 
-    delns, delew, _, _, _ = smt.getscopeinfo(scopename)
+    delns, delew = sct.getscopeinfo(scopename)[:2]
 
     north = np.arange(0.0, 90.0, delns)
     south = -1*north
@@ -45,7 +51,7 @@ def tileallsky(filename, scopename, nside):
     e2w = np.arange(0.0, 360., delew)
 
     tilelist = np.array([smt.findFoV(ra, dec, delns, delew) 
-                         for ra, dec in it.product(n2s, e2w)])
+                         for dec, ra in it.product(n2s, e2w)])
 
     pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
     pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=True) 

@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, division
 from . import skymaptools as smt
+from . import scopetools as sct
 from . import galtools as gt
 from . import cmap
 
@@ -109,9 +110,10 @@ def plotskymapsnsper(skymap, pointings, metadata, geoplot, usegals, nightsky,
     return
 
 
-def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
-                    scopename, trigger, date, injgal, simpath, plotfilename, 
-					title=None, sun=False, moon=False, objects=None, dpi=300):
+def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals, 
+                    nightsky, scopename, trigger, date, injgal, simpath, 
+                    plotfilename, title=None, sun=False, moon=False, 
+                    objects=None, dpi=300):
     if title is None:
         formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
         if usegals:
@@ -125,7 +127,8 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     if moon:
         moon = ephem.Moon(date.iso)
         phase = moon.phase
-        moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, unit=units.degree)
+        moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, 
+                        unit=units.degree)
         moon.phase = phase/100
     fig = plt.figure()
     fig.clf()
@@ -154,19 +157,18 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     ipix = np.arange(npix)
     thetas,phis = hp.pix2ang(nside,ipix,nest=metadata['nest'])
 
-    decs, ras = smt.sph2cel(thetas,phis-dlon)
-    xmap,ymap=m(decs,ras)
-    m.scatter(xmap, ymap, s=1, c=skymap, cmap='cylon', alpha=0.5, linewidths=0)
+    ras,decs = smt.sph2cel(thetas,phis-dlon)
+    xmap,ymap=m(ras,decs)
+    m.scatter(xmap, ymap, s=1, c=skymap, cmap='cylon', alpha=0.5, linewidths=0,
+                zorder=1)
 
     #################
     # Plot FoVs
     #################
-    for tileinfo in pointings:
+    for plotFoV in tilelist:
 
-        plotFoV = tileinfo[2]
-
-        FoVdec,FoVra = smt.getshape(plotFoV)
-        FoVx,FoVy = m(FoVdec-(dlon/np.pi*180.0),FoVra)
+        FoVra,FoVdec = smt.getshape(plotFoV)
+        FoVx,FoVy = m(FoVra-(dlon/np.pi*180.0),FoVdec)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
     if usegals:
@@ -180,7 +182,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
             visras,visdecs = [],[]
             import astropy.coordinates as acoord
             import astropy.units as u
-            delns, delew, lat, lon, height = smt.getscopeinfo(scopename)
+            delns, delew, lat, lon, height = sct.getscopeinfo(scopename)
             sidtimes = smt.siderealtimes(lat, lon, height, date)
 
             observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg, 
@@ -196,7 +198,7 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
             
         else: xgal,ygal=m(np.array(ras)-(dlon/np.pi*180.0),decs)
         m.scatter(xgal, ygal, s=0.5, c='k', cmap='cylon', alpha=0.5, 
-                      linewidths=0)
+                      linewidths=0, zorder=2)
 
         plt.title(title)
     else:
@@ -204,15 +206,17 @@ def plotskymapsmoll(skymap, pointings, metadata, geoplot, usegals, nightsky,
     if objects:
         ra = [obj.ra.value for obj in objects]
         dec = [obj.dec.value for obj in objects]
-        x, y = m(np.array(ra) - (dlon / np.pi*180), dec)
-        m.plot(x, y, linestyle='None', marker='p', color=(0, 1, 1, 0.5))
+        x, y = m(np.array(ra) - (dlon / np.pi*180), np.array(dec))
+        m.plot(x, y, linestyle='None', marker='p', color=(0, 1, 1, 0.5),
+                zorder=5)
         for obj, xpos, ypos in zip(objects, x, y):
             plt.annotate(obj.name, xy=(xpos, ypos), xytext=(xpos, ypos),
-                         ha='center', va='top', size='xx-small')
+                         ha='center', va='top', size='x-small',
+                         zorder=12)
     if sun:
         x, y = m(np.array(sun.ra.value) - (dlon / np.pi*180), sun.dec.value)
-        m.plot(x, y, color=(1, 1, 0, 0.5), marker='o', markerfacecolor=(1, 1, 0, 0.5),
-               markersize=12)
+        m.plot(x, y, color=(1, 1, 0, 0.5), marker='o', 
+               markerfacecolor=(1, 1, 0, 0.5), markersize=12)
     if moon:
         phase = moon.phase
         print('Phase', phase)
