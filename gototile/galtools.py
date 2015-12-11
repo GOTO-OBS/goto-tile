@@ -1,4 +1,4 @@
-from __future__ import absolute_import, print_function, division
+from __future__ import absolute_import, division
 
 import os.path
 import numpy as np
@@ -26,6 +26,27 @@ def visiblegals(gals, sidtimes, lat, lon, height, radius):
     galradecs = {tuple(row):gals[i] for i,row in enumerate(zip(ras,decs))}
     galradecseen = {tuple(row) for row in zip(visras,visdecs)}
     
+    visgal = []
+    for row in galradecseen:
+        visgal.append(galradecs[row])
+
+    return np.array(visgal)
+
+
+def visiblegals_new(gals, sidtimes, location, min_elevation):
+    visras,visdecs = [],[]
+    ras = gals['ra']
+    decs = gals['dec']
+
+    for st in sidtimes:
+        frame = acoord.AltAz(obstime=st, location=location)
+        radecs = acoord.SkyCoord(ra=ras*u.deg, dec=decs*u.deg)
+        altaz = radecs.transform_to(frame)
+        visras.extend(ras[np.where(altaz.alt.degree > min_elevation)])
+        visdecs.extend(decs[np.where(altaz.alt.degree > min_elevation)])
+        
+    galradecs = {tuple(row):gals[i] for i,row in enumerate(zip(ras,decs))}
+    galradecseen = {tuple(row) for row in zip(visras,visdecs)}    
     visgal = []
     for row in galradecseen:
         visgal.append(galradecs[row])

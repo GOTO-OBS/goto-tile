@@ -1,7 +1,4 @@
-from __future__ import print_function
-from __future__ import absolute_import
-import healpy as hp
-import numpy as np
+from __future__ import division
 import itertools as it
 try:
     import cPickle as pickle
@@ -12,6 +9,10 @@ from . import scopetools as sct
 import gzip
 import os
 import tempfile
+import healpy as hp
+import numpy as np
+from astropy import units
+
 
 def makegrid(tilesdir, NSIDE, name=None):
     if not os.path.exists(tilesdir):
@@ -20,25 +21,22 @@ def makegrid(tilesdir, NSIDE, name=None):
         fp = tempfile.NamedTemporaryFile(prefix='temp__', dir='.', delete=False)
         path = fp.name
         fp.close()
-        print("Creating temporary grid in file {}".format(path))
         tileallsky(path, name, NSIDE)
         return path
-    print("Creating the fixed grid GOTO-4, GOTO-8, SuperWASP-N and VISTA. "
-          "This could take some time.")
     for scope in (4, 8):
         scopename = "GOTO{}".format(scope)
-        filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+        filename = "{}_nside{}_nestTrue.pgz".format(scopename, nside)
         path = os.path.join(tilesdir, filename)
-        tileallsky(path, scopename, NSIDE)
+        tileallsky(path, scopename, nside)
     scopename = "SuperWASP-N"
-    filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+    filename = "{}_nside{}_nested.pgz".format(scopename, nside)
     path = os.path.join(tilesdir, filename)
     tileallsky(path, scopename, NSIDE)
-    
+
     scopename = "VISTA"
-    filename = "{}_nside{}_nestTrue.pgz".format(scopename, NSIDE)
+    filename = "{}_nside{}_nested.pgz".format(scopename, nside)
     path = os.path.join(tilesdir, filename)
-    tileallsky(path, scopename, NSIDE)
+    tileallsky(path, scopename, nside)
     return path
 
 def tileallsky(filename, scopename, nside):
@@ -50,28 +48,44 @@ def tileallsky(filename, scopename, nside):
     n2s = np.append(south[::-2], north)
     e2w = np.arange(0.0, 360., delew)
 
-    tilelist = np.array([smt.findFoV(ra, dec, delns, delew) 
+    tilelist = np.array([smt.findFoV(ra, dec, delns, delew)
                          for dec, ra in it.product(n2s, e2w)])
 
     pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
-    pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=True) 
+    pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=True)
                         for points in pointlist])
 
     with gzip.GzipFile(filename, 'w') as f:
         pickle.dump([tilelist, pixlist], f) #makes gzip compressed pickles
 
 
-def readtiles(infile):
+def tileallsky_new(filename, fov, nside):
+    """Create a grid across all sky and store in a file"""
+    delns = fov['dec'].decompose(bases=[units.degree]).value/2
+    delew = fov['ra'].decompose(bases=[units.degree]).value/2
 
+    north = np.arange(0.0, 90.0, delns)
+    south = -1*north
+    n2s = np.append(south[::-2], north)
+    e2w = np.arange(0.0, 360., delew)
+
+    tilelist = np.array([smt.findFoV(ra, dec, delns, delew)
+                         for dec, ra in it.product(n2s, e2w)])
+
+    pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
+    pixlist = np.array([hp.query_polygon(nside, points[:-1], nest=True)
+                        for points in pointlist])
+
+    writetiles(filename, tilelist, pixlist)
+
+
+def readtiles(infile):
     with gzip.GzipFile(infile, 'r') as f:
         tilelist,pixlist = pickle.load(f)
         f.close()
-
     return tilelist,pixlist
 
-def writetiles(outfile,tilelist,pixlist):
-    
+
+def writetiles(outfile, tilelist, pixlist):
     with gzip.GzipFile(outfile, 'w') as f:
         pickle.dump([tilelist, pixlist], f) #makes gzip compressed pickles
-    return
-

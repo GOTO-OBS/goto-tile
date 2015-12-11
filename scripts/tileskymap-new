@@ -1,0 +1,289 @@
+#! /usr/bin/env python
+
+from __future__ import absolute_import, print_function, division
+
+import argparse
+import os,sys
+import tempfile
+import datetime
+import healpy as hp
+import matplotlib
+matplotlib.use('Agg')
+from astropy.time import Time, TimeDelta
+from astropy.coordinates import SkyCoord, EarthLocation, Angle
+from astropy import units
+from gototile import fits
+from gototile import skymaptools as smt
+from gototile import scopetools as sct
+from gototile import plottools as pt
+from gototile import grid
+from gototile.skymap import SkyMap
+from gototile.settings import NSIDE
+from gototile.telescope import (GOTON4, GOTON8, GOTOS4, GOTOS8,
+                                SuperWASPN, VISTA)
+
+
+def pretty_time_delta(seconds):
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    if days > 0:
+        return '%dd%dh%dm%ds' % (days, hours, minutes, seconds)
+    elif hours > 0:
+        return '%dh%dm%ds' % (hours, minutes, seconds)
+    elif minutes > 0:
+        return '%dm%ds' % (minutes, seconds)
+    else:
+        return '%ds' % (seconds,)
+
+
+def parse_command_line():
+
+    description = ("This script creates pointings for selected telescopes, "
+                   "with given skymap files.")
+
+    parser = argparse.ArgumentParser(
+        description = description,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('-i', '--id', default='',
+                        help="Name of output files (without extension)")
+    parser.add_argument('-p', '--path',default='./', help="Output path")
+    parser.add_argument('--maxtiles', type=int, default=100,
+                        help="Maximum number of tiles to return")
+    parser.add_argument('--maxfrac', type=float, default=0.95,
+                        help="Maximum fraction of visible skymap to tile")
+    parser.add_argument('--minfrac', type=float, default=0.05,
+                        help="Minimum fraction of visible skymap required to "
+                        "attempt tiling")
+    parser.add_argument('-s', '--scope', choices=['g4', 'g8', 'swn','v'],
+                        default='g4',
+                        help=("Telescope to use. GOTO-4, GOTO-8, "
+                              "SuperWASP-North, VISTA."))
+    parser.add_argument('--site', nargs='+',
+                        help="Set the longitude, latitude and elevation."
+                        "Overrides the defaults from the 'scope' setting."
+                        "The site name can be specified as an optional "
+                        "fourth argument")
+    parser.add_argument('--fov', nargs=2, type=float,
+                        help="Set the width (RA) and height (dec) of the "
+                        "field of view, in degrees. Overrides the default "
+                        "from the 'scope' setting.")
+    parser.add_argument('-g', '--usegals', action="store_true", default=False,
+                        help="Use GWGC in tiling/plotting")
+    parser.add_argument('-n', '--nightsky', action="store_true", default=False,
+                        help="Use nightsky visbility in tiling/plotting")
+    parser.add_argument('-d', '--date', nargs='?', default='now',
+                        help="Set observation date. If not used, defaults to "
+                        "the current date.  If given without argument, "
+                        "defaults to the trigger date in the input file(s). "
+                        "The optional value can be a date-time string that "
+                        "can be parsed by astropy.time.Time, such as "
+                        "'2012-12-12T12:12:12'. A single number is interpreted "
+                        "as Julian days; use a number with 'mjd' appended to "
+                        "specify Modified Julian Days.")
+    parser.add_argument('-j', '--jobs', nargs='?', default=1,
+                        help="Number of processes. If specified without a value, "
+                        "use all available processes (cores).")
+    parser.add_argument("--geoplot", action="store_true", default=False,
+                        help="Plot in geographic coordinates, (lat, lon)")
+    parser.add_argument("--plot", action="store_true", default=False,
+                        help="Plot in RA-Dec")
+    parser.add_argument("--title", help="Use suppied title in skymap plot.")
+    parser.add_argument("--makegrid", action="store_true", default=False,
+                        help=("Create fixed grid of tiles on sky. "
+                              "WARNING: Can take some time."))
+    parser.add_argument("--tiles", default='./tiles/', dest='tilesdir',
+                        help=("Location of pre-made fixed grid of tiles "
+                              "on sky."))
+    parser.add_argument("infiles", help="Space separated input files",
+                        nargs='*')
+    parser.add_argument("--object", nargs=3, action='append',
+                        default=[], help="Overplot an object. "
+                        "Requires three values: RA, Dec and an object name.")
+    parser.add_argument('--sun', action='store_true',
+                        help="Plot the Sun position")
+    parser.add_argument('--moon', action='store_true',
+                        help="Plot the Moon position")
+    parser.add_argument("--sim", action="store_true", default=False,
+                        help="A first2years simulation. Check tiles for known "
+                        "position of source.")
+    parser.add_argument("--injgal", action="store_true", default=False,
+                        help="Inject galaxy at location in f2y map. Take into "
+                        "account known position and distance.")
+    parser.add_argument("--simpath",default='./Skymaps',
+              help="Path to folder of Skymaps, organised into folders by year.")
+    parser.add_argument('--within',
+                        help="Only calculate when an area is observable within "
+                        "the given amount of time. Default unit is days; append "
+                        "an 'h' (hour), 'm' (minute) or 's' (second) for "
+                        "convenience.")
+    args = parser.parse_args()
+
+    if args.site and len(args.site) not in [3, 4]:
+        parser.error("--site takes 3 or 4 values")
+    if args.within:
+        try:
+            val = float(args.within) * units.day
+        except ValueError:
+            val = args.within[:-1]
+            if args.within[-1] == 'h':
+                val = float(val) * units.hour
+            elif args.within[-1] == 'm':
+                val = float(val) * units.minute
+            elif args.within[-1] == 's':
+                val = float(val) * units.second
+            elif args.within[-1] == 'd':
+                val = float(val) * units.day
+            else:
+                raise
+        args.within = TimeDelta(val)
+
+    return args
+
+
+def parse_date(string):
+    """Turn a string into an astropy.time.Time date"""
+    if string is None:
+        return None
+    if string == 'now':
+        return Time.now()
+    if string.lower().endswith('jd'):
+        if string.lower().endswith('mjd'):
+            return Time(float(string[:-3]), format='mjd', scale='utc')
+        return Time(float(string[:-2]), format='jd', scale='utc')
+    return Time(string)
+
+
+def parse_object(args):
+    if ':' in args[0] and ':' in args[1]:
+        coords = SkyCoord(args[0], args[1], unit=(units.hour, units.degree))
+    else:
+        try:
+            float(args[0]), float(args[1])
+        except ValueError:
+            coords = SkyCoord(args[0], args[1])
+        else:
+            coords = SkyCoord(args[0], args[1], unit=units.degree)
+    coords.name = args[2]
+    return coords
+
+
+def parse_site(site):
+    if site is None:
+        return site
+    try:
+        lon = Angle(site[0])
+    except units.UnitsError:
+        lon = Angle(site[0], unit=units.hour)
+    lat = Angle(site[1], unit=units.degree)
+    height = float(site[2])
+    return EarthLocation.from_geodetic(lon, lat, height)
+
+
+def main(args):
+    temptilespath = None
+    telclasses = {
+        'g4': GOTON4,
+        'g8': GOTON8,
+        's4': GOTOS4,
+        's8': GOTOS8,
+        'swn': SuperWASPN,
+        'v': VISTA
+    }
+    telclass = telclasses[args.scope]
+    telescope = telclass()
+    tilespath = None
+    if args.site or args.fov:
+        location = ([float(x) for x in args.site[:3]] if args.site
+                    else telescope.location)
+        fov = args.fov if args.fov else telescope.fov
+        name = args.site[3] if len(args.site) == 4 else '_temporary_telescope'
+        #tilespath = grid.makegrid('.', name=name)
+        telescope = telclass(location=location, fov=fov, name=name)
+        telescope.makegrid(args.tilesdir)        
+    elif args.makegrid:
+        for key, telclass in telclasses.items():
+            telescope = telclass()
+            telescope.makegrid(args.tilesdir)
+        return
+
+    if not os.path.exists(args.path):
+        os.makedirs(args.path)
+
+    args.date = parse_date(args.date)
+    objects = [parse_object(obj) for obj in args.object]
+    args.site = parse_site(args.site)
+
+    if not args.infiles:
+        sys.exit("No input files detected, please provide input skymap.")
+    if len(args.infiles) > 1:
+        print("Multiple input files detected, outfile argument ignored, "
+              "outfile name taken from metadata object id.")
+    elif args.id == '':
+        print("No output name detected, output taken from "
+              "object id metadata.")
+    print(args)
+
+    for infile in args.infiles:
+        skymap = SkyMap(infile)
+        skymap.regrade(nside=NSIDE)
+        date = skymap.header['date-det'] if args.date is None else args.date
+        telescope.calculate_tiling(skymap, date=date,
+                                   coverage={'min': args.minfrac, 'max': args.maxfrac},
+                                   maxtiles=args.maxtiles,
+                                   within=args.within,
+                                   nightsky=args.nightsky,
+                                   galaxies=args.usegals,
+                                   tilespath=tilespath,
+                                   njobs=args.jobs)
+        pointings, tilelist, pixlist, tiledmap, allskymap = telescope.results_
+        gwtot = tiledmap.sum()
+        allsky = allskymap.sum()
+        print("Tiling map obtained for {}".format(date.datetime))
+        print("The total probability visible during the next "
+              "observing period is {:.3f}".format(gwtot))
+        print("This is {:5.2f}% of the original skymap".format(
+            (gwtot/allsky)*100.))
+
+        outfiletxt = "{}_{}.txt".format(skymap.object, telescope.name)
+        outfiletxt = os.path.join(args.path, outfiletxt)
+        with open(outfiletxt, 'w') as outfile:
+            outfile.write("#RA,Dec,probability,observable-sky-fraction,")
+            outfile.write("probability-fraction,cum-prob\n")
+            print("#      RA,       Dec,  obs-sky-frac,  cum-obs-sky-frac,  "
+                  "tileprob,  cum-prob,  probability")
+            for pointing in pointings:
+                cra, cdec, prob, gwobs, probfrac, gwfrac = pointing
+                outfile.write("{},{},{},{},{},{}\n".format(
+                    cra[0], cdec[0], prob, gwobs, probfrac, gwfrac))
+                print("{:>8.3f}, {:>+8.3f}, {:>15.6f}, {:>17.6f}, "
+                      "{:>9.6f}, {:>9.6f}, {:>12.2f}".format(
+                          cra[0], cdec[0], prob, gwobs, probfrac, gwfrac,
+                          100*gwfrac))
+
+        continue
+        outfilepkl = outfiletxt.replace('.txt','.pgz')
+        grid.writetiles(outfilepkl,tilelist,pixlist)
+
+        if args.plot or args.geoplot:
+            plotfilename = os.path.join(args.path, "{}moll{}.png".format(
+                skymap.object, telescope.name))
+            pt.plotskymapsmoll(tiledmap, pointings, tilelist, metadata,
+                               args.geoplot, args.usegals, args.nightsky,
+                               scopename, args.id, date, args.injgal,
+                               args.simpath, plotfilename, title=args.title,
+                               objects=objects, sun=args.sun, moon=args.moon)
+    if temptilespath:
+        os.unlink(temptilespath)
+
+
+if __name__ == '__main__':
+    start = datetime.datetime.now()
+    args = parse_command_line()
+    main(args)
+    end = datetime.datetime.now()
+    td = end-start
+    ts = td.total_seconds()
+    print("Time taken to tile skymap: {}".format(pretty_time_delta(ts)))

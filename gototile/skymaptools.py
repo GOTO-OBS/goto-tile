@@ -1,4 +1,5 @@
-from __future__ import absolute_import, print_function, division
+from __future__ import absolute_import, division
+import os
 import spherical_geometry as sg
 import spherical_geometry.great_circle_arc as sggc
 import spherical_geometry.polygon as sgp
@@ -8,9 +9,12 @@ import astropy.units as u
 import ephem
 import sys
 import math
+import multiprocessing
 import numpy as np
 import healpy as hp
 from . import galtools as gt
+from .settings import SUNALTITUDE, TIMESTEP, ARC_PRECISION
+
 
 def _convc2s(r,d):
     p = r*np.pi/180
@@ -88,7 +92,6 @@ def sph2cel(ts,ps):
 
 def findedge(GC,delta):
     for i,step in enumerate(GC):
-        #print(sggc.length(plusGC[0],step,degrees=True))
         if sggc.length(GC[0],step,degrees=True)>delta:
 
             edge=step
@@ -111,8 +114,8 @@ def findFoV(RA,dec, delns, delew):
     epole = hp.ang2vec(te,pe)
     wpole = hp.ang2vec(tw,pw)
 
-    eastGC = sggc.interpolate(center,epole,steps=9000)
-    westGC = sggc.interpolate(center,wpole,steps=9000)
+    eastGC = sggc.interpolate(center,epole,steps=ARC_PRECISION)
+    westGC = sggc.interpolate(center,wpole,steps=ARC_PRECISION)
 
     e = findedge(eastGC,delew)
     w = findedge(westGC,delew)
@@ -225,6 +228,69 @@ def ordertiles(tiles,pixlist,tileprobs):
     opixs = pixlist[np.argsort(tileprobs)]
     return np.array(otiles[::-1]),np.array(opixs[::-1]),np.array(oprobs[::-1])
 
+
+def calc_siderealtimes(date, location, within=None):
+    """Calculate the sidereal times from sunset to sunrise for `date`.
+
+    This uses either the current night, or, if daytime, the upcoming
+    night. If the within argument is given, sideral times are only
+    calculated within the given amount of days from date.
+
+    Arguments
+    ---------
+
+    date :
+
+    location :
+
+    within :
+
+
+    Remarks
+    -------
+
+    Sunset and sunrise are defined by the Sun's altitude being
+    below -18. (This can be changed in the settings module.)
+
+    The list of sidereal times is stepped in intervals of 300
+    seconds (this can be changed in the settings module).
+
+
+    """
+    obs = ephem.Observer()
+    obs.pressure = 0
+    obs.horizon = str(SUNALTITUDE)
+    obs.lon = str(location.longitude.value)
+    obs.lat = str(location.latitude.value)
+    obs.elevation = location.height.value
+    obs.date = ephem.Date(date.iso)
+    sun = ephem.Sun(obs)
+
+    # daytime so want to know time of next setting and rising of sun
+    if sun.alt > ephem.degrees(str(SUNALTITUDE)):
+        start = atime.Time(
+            obs.next_setting(ephem.Sun()).datetime(), format='datetime')
+        stop = atime.Time(
+            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+    else: # night time so need to know current when it will rise again
+        start = date
+        stop = atime.Time(
+            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+    if within:
+        stop_ = date + within
+        if stop_ <= start:  # Stop before Sun set
+            return []
+        if stop_ < stop:  # Stop before Sun rise
+            stop = stop_
+    delta = atime.TimeDelta(TIMESTEP, format='sec')
+    diff = stop - start
+    steps = int(np.round(diff / delta))
+    times = np.linspace(start.mjd, stop.mjd, steps)
+    times = atime.Time(times, format='mjd')
+
+    return times
+
+
 def siderealtimes(lat, lon, height, date):
     #t = atime.Time(mjd, format='mjd', scale='utc')
 
@@ -233,7 +299,6 @@ def siderealtimes(lat, lon, height, date):
     obs.horizon='-18:00'
     obs.lat,obs.lon = str(lat),str(lon)
     obs.date = ephem.Date(date.iso)
-    #print(t.datetime)
     sun = ephem.Sun(obs)
     # daytime so want to know time of next setting and rising of sun
     if sun.alt>ephem.degrees(str(-18.)):
@@ -283,18 +348,134 @@ def visiblemap(skymap, sidtimes, lat, lon, height, radius, metadata):
     return maskedmap
 
 
+def visiblemap_new(skymap, sidtimes, lat, lon, height, radius, metadata):
+
+
+    observatory = acoord.EarthLocation(lat=lat*u.deg, lon=lon*u.deg,
+                                       height=height*u.m)
+    seen = []
+    npix = len(skymap)
+    ipix = np.arange(npix)
+    theta, phi = hp.pix2ang(metadata['nside'], ipix, nest=metadata['nest'])
+    radecs = acoord.SkyCoord(ra=phi*u.rad, dec=(0.5*np.pi - theta)*u.rad)
+    unseen = np.ones(npix, dtype=np.bool)
+    for st in sidtimes:
+        # Since we need the ipix indices over the full range, we can't
+        # simply shorten radec using radec = radec[unseen], but we
+        # need the boolean indices.
+        frame = acoord.AltAz(obstime=st, location=observatory)
+        altaz = radecs[unseen].transform_to(frame)
+        seenpix = ipix[unseen][np.where(altaz.alt.degree>(90-radius))]
+        unseen[seenpix] = False
+        seen.extend(list(seenpix))
+        seen = list(np.unique(seen))
+
+    maskedmap = skymap.copy()
+    maskedmap[:] = 0.0
+    maskedmap[seen] = skymap[seen]
+
+    return maskedmap
+
+
+class VisibleMap(object):
+    def __init__(self, location, skycoords, ipix, min_elevation=15):
+        self.location = location
+        self.skycoords = skycoords
+        self.ipix = ipix
+        self.min_elevation = min_elevation
+
+    def __call__(self, sidtime):
+        frame = acoord.AltAz(obstime=sidtime, location=self.location)
+        obscoords = self.skycoords.transform_to(frame)
+        seenpix = self.ipix[np.where(obscoords.alt.degree > self.min_elevation)]
+        return seenpix
+
+
+
+def getbatch(data, size=1):
+    for i in range(0, len(data), size):
+        yield data[i:i+size]
+
+
+def get_visiblemap(skymap, sidtimes, location, min_elevation, njobs=1):
+    if njobs == -1:
+        njobs = None
+    skycoords = skymap.skycoords()
+    ipix = np.arange(len(skymap.skymap))
+    pool = multiprocessing.Pool(njobs)
+    func = VisibleMap(location, skycoords, ipix, min_elevation)
+    seen = pool.map(func, sidtimes)
+    # Close and free up the memory
+    pool.close()
+    pool.join()
+    seen = np.unique(np.hstack(seen))
+
+    maskedmap = skymap.skymap.copy()
+    maskedmap[:] = 0.0
+    maskedmap[seen] = skymap.skymap[seen]
+
+    return maskedmap
+
+# For further speed-up, one can use the class and function below
+# instead of the above.. It is not implemented, since it gains
+# relatively little (20%-40%), at the cost of being more complex to
+# read.
+class VisibleMapBitFaster(object):
+    def __init__(self, location, skycoords, ipix, min_elevation=15,
+                 unseen=None):
+        self.location = location
+        self.skycoords = skycoords
+        self.ipix = ipix
+        self.min_elevation = min_elevation
+        self.unseen = [] if unseen is None else unseen
+
+    def __call__(self, sidtime):
+        frame = acoord.AltAz(obstime=sidtime, location=self.location)
+        obscoords = self.skycoords[self.unseen].transform_to(frame)
+        indices = np.where(obscoords.alt.degree > self.min_elevation)
+        seenpix = self.ipix[self.unseen][indices]
+        return seenpix
+
+
+def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
+                              njobs=1):
+    if njobs == -1 or njobs is None:
+        njobs = os.cpu_count()
+    skycoords = skymap.skycoords()
+    ipix = np.arange(len(skymap.skymap))
+    seenlist = []
+    pool = multiprocessing.Pool(njobs)
+    unseen = np.ones(len(skymap.skymap), dtype=np.bool)
+    for times_batch in getbatch(sidtimes, size=njobs):
+        func = VisibleMapBitFaster(location, skycoords, ipix, min_elevation,
+                                   unseen)
+        seen = pool.map(func, times_batch)
+        if seen:
+            seenlist.extend(seen)
+        unseen[np.hstack(seenlist)] = False
+    # Close and free up the memory
+    pool.close()
+    pool.join()
+    seen = np.unique(np.hstack(seenlist))
+
+    maskedmap = skymap.skymap.copy()
+    maskedmap[:] = 0.0
+    maskedmap[seen] = skymap.skymap[seen]
+
+    return maskedmap
+
+
 def filltiles(skymap, tiles, pixlist):
 
     tileprobs = np.array([skymap[pixels].sum() for pixels in pixlist])
-    
+
     #~ lenlist=[len(pixels) for pixels in pixlist]
-    #~ print(max(lenlist))
     return tileprobs
 
 # return pixel to center on for next tile
 def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf,
-              maxf, maxt, sim, injgal, simpath, lat, lon, height, tiles, 
-              pixlist):
+              maxf, maxt, sim, injgal, simpath, lat, lon, height, tiles,
+              pixlist, min_elevation=15):
     allskymap = skymap.copy()
     sidtimes = siderealtimes(lat, lon, height, date)
 
@@ -309,14 +490,14 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf,
 
         if not nightsky:
             skymap = allskymap.copy()
-       
+
     elif nightsky:
         skymap = visiblemap(skymap, sidtimes, lat, lon, height, 75., metadata)
 
     skymap = skymap/allskymap.sum() #gets fractional percentage covered per pix
     allskymap = allskymap/allskymap.sum() #normalised so allskymap.sum()===1
     GWtot = skymap.sum()
-    if GWtot<minf:
+    if GWtot < minf:
         sys.exit("Less than 5% of the skymap probability is visible, "
                  "ignoring...")
     tileprobs = filltiles(skymap, tiles, pixlist)
@@ -354,13 +535,10 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf,
         oprobs = filltiles(usedmap, otiles, opixs)
         otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs)
         #~ l+=1
-        #~ #print("Loop: {}".format(l))
         #~ ro=0
-        #~ while len(list(set(opixs[0]).intersection(seenpix)))>0: 
+        #~ while len(list(set(opixs[0]).intersection(seenpix)))>0:
             #~ #does new top tile overlap with seen?
             #~ ro+=1
-            #~ #print("Loop: {}".format(l))
-            #~ #print("Reordered: {}".format(ro))
             #~ oprobs[0] = usedmap[opixs[0]].sum() #recalc prob from seen map
             #~ otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs) #reorder
 

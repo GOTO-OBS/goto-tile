@@ -1,0 +1,196 @@
+\documentclass[twocolumn]{article}
+\usepackage{graphicx}
+\usepackage{natbib}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+
+\newcommand{\apj}{ApJ}
+
+
+\begin{document}
+
+Very preliminary.
+
+\section{Introduction}
+
+This note reports on the visibility for four potential southern sites
+for a new telescope in the Gravitational-wave Optical Transient
+Observer (GOTO) project.
+
+\begin{table*}
+  \begin{tabular}{p{4cm}|p{2cm}|p{2cm}|p{2cm}|p{3cm}}
+    Name & Longitude & Latitude & Elevation above sea level
+    & number of nights in a year with clear sky\footnotemark \\
+    Siding Spring Observatory (SSO) & 1 & 2 & 3 & 114 \\
+    Mount Bruce & 1 & 2 & 3 & 197 \\
+    Mount Meharry & 1 & 2 & 3 & 201 \\
+    Mereenie & 1 & 2 & 3 & 193 \\
+    \hline
+    La Palma & 1 & 2 & 3 & XYZ \\
+    \end{tabular}
+  \caption{Details of the potential sites. La Palma (Los Roque de los
+    Muchachos Observatory) contains the Northern telescope of the GOTO
+    project and is given as reference.}
+  \label{tab:sites}
+\end{table*}
+% \footenotetext{Clear sky data for SSO from XYZ; clear sky data for La
+%   Palma from XYZ; clear sky data for other sites from XYZ.}
+ 
+The project targets optical counterparts of gravitational wave in
+particular, and consists of a set of wide-field telescopes. A first
+telescope is erected at the Los Roque de los Muchachos Observatory, at
+the Canary Island of La Palma. A further telescope is planned in
+Australia, to provide more coverage of the Southern Hemisphere.
+Several potential sites have been selected, indicated in Table
+\ref{tab:sites}. This note compares the visibility of these sites,
+when used to follow-up gravitational wave triggers. Such triggers come
+with a large probabiliy area for the actual position of the
+gravitational wave source, requiring a wide field-of-view and
+generally a considerable amount of telescope time to cover the 90\% or
+more probability area.
+
+\section{GOTO}
+
+8-telescope configuration. Field of view 8.4 along Right Ascension
+(RA) by 4.2 along decliation, which is about 35 square degree.
+
+5 minutes per tile. This consists of 2x2 minutes on source and 1 minute
+overhead (slewing and read-out).
+
+
+\section{Simulations}
+
+\subsection{Tiling software}
+
+XYZ description.
+
+
+At the moment, there are a few shortcomings in our simulations
+that will not accuractly reflect the results given below:
+
+\begin{itemize}
+  
+\item it is assumed that all tiles can be observed equally well, and at
+the same time. That is, if the tile with the highest probability can
+be observed in a given night and within a certain timespan, it is
+assumed that this will be the first one to be observed. No rise or set
+times are taken into account, and if this tile happens to be visible
+only in the second half of the the night, this is not taken into
+account.
+
+\item similarly, if a constrained timespan is given (for example, 4
+hours), and the gravitional wave trigger occurs 1 hour before sunset,
+there is no consideration about the fact that the first observations
+only start after 1 hour. The tiling software does take into account
+that no observations will take place 3 hours after sunset, and thus
+does not include probability skymap areas that rise more than 3 hours
+after sunset. But the timings for each tile are calculated since the
+trigger, and the first tile is then assumed to have been completed 5
+minutes after the trigger, not 5 minutes after sunset.
+
+\end{itemize}
+
+The actual shortcomings are not so much the result of the tiling
+software, but the lack of an actual scheduler. Such a scheduler would
+take the Sun altitude into account, as well as altitude of each tile.
+The scheduler can then arrange the tiles to be observed in a best
+effort. It will take into account the priorities set by the tiling
+software where multiple tiles are visible at the same time.
+
+This is planned to be fixed in a future version, by providing a simple
+scheduler that processes the output of the tiling software.
+
+\subsection{Setup}
+
+Probability maps used for the simulations are the simulated maps
+created for binary-neutron star (bns) coalescences
+\citep{singer2014,berry2015}, for the year 2016. These maps provide a
+probability sky area for a simulated source, together with the actual
+injected position of the source. We can therefore create a follow-up
+scenario and deduce if GOTO covers the actual source position, as well
+as how fast it observes the source location.
+
+Only the 2016 scenario maps are used, as these assume a more sensitive
+gravitational wave detector (LIGO with Virgo combined). By the time
+the Southern node of GOTO is operational, the overall gravitational
+wave detector sensitivity is likely to be even better than the 2016
+scenario.
+
+Only the rapid localization maps are used, since these will be the
+ones available for the first few hours after a gravitional trigger.
+These maps only provide a sky probability position (RA and
+declination), with no distance estimates.
+
+In addition to the bns coalescences maps, simulated probability maps
+created for a variety of other sources have been used, as provided by
+\citep{essick2015}. While the behaviour of optical counterparts for
+these sources is much less known (for example, for binary black hole
+coalescences) or non-existent (for the sine-Gaussian and Gaussian
+sources), the probability maps can still provide a good estimate for
+the GOTO follow-up results. As before, selected probability maps are
+the early-response maps, and for 2016 only.
+
+
+\subsection{Results}
+
+\begin{figure*}
+  \includegraphics[width=\textwidth]{coverage}  
+  \caption{ Coverage runs along the x-axis from 0 (where none of the
+    probability area could be observed) to 1, when the full map
+    (essentially the full sky) could be observed from the site. The
+    counts in the histograms represents the number of triggers, which
+    is simply the number of simulated maps used. The various colours
+    in the histograms present the time elapsed since the gravitational
+    wave detection. The 24 hours elapsed corresponds to the full night
+    sky observable for that date. }
+  \label{fig:coverage}
+\end{figure*}
+
+Figure \ref{fig:coverage} provides a comparison of the probability
+coverage for the four potential sites. Results are given for a variety
+of delays since the initial detection time. Since the optical
+counterparts are assumed to decay fast (likely with a power-law
+decline), fast coverage of the probabiliy map can be of essence.
+
+The histograms for 24 hours are the best coverage that can be get for a site: any area not covered is simply not visible in the night sky at the date of the trigger. The full probability map includes areas that are in daylight or too far north (for Australian sites) or south (for La Palma). As a result, the actual coverage is often significanty less than 90\%, as indicated by these 24 hours results. 
+
+More interesting are the 1 and 2 hour coverages. The optimal case is when it is night at the time of the trigger and for the next 1-2 hours. In such a case, 1 and 2 hour observations cover about 12 and 24 tiles, respectively, or 420 and 480 square degree on the sky. Generally, this covers 90 -- 99\% of the actual visible probability map.
+
+There are, however, plenty of times when a trigger happens during day
+time, and observation cannot start within several hours. This is
+indicated by the occurrences of 0\% coverage in the histograms.
+
+\begin{figure*}
+  \includegraphics[width=\textwidth]{coverage-clearnights}
+  \caption{Same as Figure \ref{fig:coverage}, but with the clear sky coverage folded in for each site.}
+  \label{fig:coverage-clear}
+\end{figure*}
+
+
+Figure \ref{fig:coverage-clear} shows the same results as in Figure \ref{fig:coverage}, but this time the clear sky percentage from Table \ref{tab:sites} is folded in.
+
+
+\begin{figure*}
+  \includegraphics[width=\textwidth]{detections}
+  \caption{Histograms of the times since trigger that the actual source position is observed. This uses an observing strategy that observes tiles in decreasing order of probability skymap coverage.}
+  \label{fig:detections}
+\end{figure*}
+
+Figure \ref{fig:detections} shows the time since the trigger that the actual source position is observed (the source position is taken from the injected source in the simulations). For example, if the source position would be observed in the second tile, the time since trigger would be ten minutes (two four minute exposures and overhead). If the trigger happens during the day and the corresponding timespan of 1, 2, 4 or 8 hours does not cover any night time, this delay time is essentially infinite.
+
+There is the aforementioned shortcoming that a timespan may partly
+overlap with the start of a night. This results in all delays being (much) shorter than the actual delays, and the figures should be read as the time to the source being observed from the actual start of the observations.
+
+
+
+\begin{figure*}
+  \includegraphics[width=\textwidth]{detections-clearnights}
+  \caption{The same as Figure \ref{fig:detections}, but with the clear sky coverage folded in for each site.}
+  \label{fig:detections-clear}
+\end{figure*}
+
+
+\bibliographystyle{named}
+\bibliography{bibliography}
+
+\end{document}
