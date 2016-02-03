@@ -223,18 +223,21 @@ class Telescope(object):
             calculated if the full coverage is reached before maxtiles
             is reached.
 
-        - nightsky: bool
+        - nightsky: bool, or 'all'
 
             Take into account the current or next (upcoming) night.
             Only calculate tiles that are inside the Earth's shadow.
             Night here is astronomical night, but the Sun's minimum
             altitude is configurable in the settings module.
 
+            If nigthsky equals 'all', all of the night sky is taken
+            into account, including tiles that have already set for
+            the current night.
+
         - galaxies: bool
 
             Fold the probability sky map with the Gravitational Wave
             Galaxy Catalog (White et al 2011), for optimal tiling.
-
 
         """
 
@@ -257,9 +260,11 @@ class Telescope(object):
                   sim=False, injgal=False, simpath='.', njobs=1):
         tiles, pixlist = self.readtiles(tilespath)
         allskymap = skymap.skymap.copy()
-        sidtimes = calc_siderealtimes(date, self.location, within=within)
+        allnight = True if nightsky == 'all' else False
+        sidtimes = calc_siderealtimes(date, self.location, within=within,
+                                      allnight=allnight)
         if len(sidtimes) == 0:
-            return [], [], [], np.array([]), allskymap            
+            return [], [], [], np.array([]), allskymap
         if tileduration:
             maxtiles = int((max(sidtimes) - min(sidtimes)) / tileduration)
         if usegals:
@@ -276,7 +281,7 @@ class Telescope(object):
                                        self.min_elevation.value, njobs=njobs)
         else:
             newskymap = skymap.skymap
-            
+
         newskymap = newskymap/allskymap.sum() # gets fractional percentage covered per pix
         allskymap = allskymap/allskymap.sum() # normalised so allskymap.sum() == 1
         GWtot = newskymap.sum()
@@ -317,7 +322,7 @@ class Telescope(object):
             filename = "{}_nside{}_nested.pgz".format(self.name, NSIDE)
             tilespath = os.path.join(tilespath, filename)
         return tilespath
-    
+
     def readtiles(self, tilespath=None):
         tilespath = self.gettilespath(tilespath)
         if not os.path.isfile(tilespath):
@@ -327,7 +332,7 @@ class Telescope(object):
         self.logger.debug("Read %s: %d tiles, %d pixels", tilespath,
                       len(tilelist), len(pixlist))
         return tilelist, pixlist
-        
+
     def makegrid(self, tilespath=None):
         tilespath = self.gettilespath(tilespath)
         if os.path.isdir(tilespath):

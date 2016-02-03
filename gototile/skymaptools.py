@@ -4,7 +4,7 @@ import spherical_geometry as sg
 import spherical_geometry.great_circle_arc as sggc
 import spherical_geometry.polygon as sgp
 import astropy.coordinates as acoord
-import astropy.time as atime
+from astropy.time import Time, TimeDelta
 import astropy.units as u
 import ephem
 import sys
@@ -229,7 +229,7 @@ def ordertiles(tiles,pixlist,tileprobs):
     return np.array(otiles[::-1]),np.array(opixs[::-1]),np.array(oprobs[::-1])
 
 
-def calc_siderealtimes(date, location, within=None):
+def calc_siderealtimes(date, location, within=None, allnight=False):
     """Calculate the sidereal times from sunset to sunrise for `date`.
 
     This uses either the current night, or, if daytime, the upcoming
@@ -268,31 +268,38 @@ def calc_siderealtimes(date, location, within=None):
 
     # daytime so want to know time of next setting and rising of sun
     if sun.alt > ephem.degrees(str(SUNALTITUDE)):
-        start = atime.Time(
+        start = Time(
             obs.next_setting(ephem.Sun()).datetime(), format='datetime')
-        stop = atime.Time(
+        stop = Time(
             obs.next_rising(ephem.Sun()).datetime(), format='datetime')
-    else: # night time so need to know current when it will rise again
+    elif allnight: # currently night, but take into account the part
+                   # of sky that has already set.
+        start = Time(
+            obs.previous_setting(ephem.Sun()).datetime(), format='datetime')
+        stop = Time(
+            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+    else: # currently night; only calculate from now until Sun rise
         start = date
-        stop = atime.Time(
+        stop = Time(
             obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+
     if within:
         stop_ = date + within
         if stop_ <= start:  # Stop before Sun set
             return []
         if stop_ < stop:  # Stop before Sun rise
             stop = stop_
-    delta = atime.TimeDelta(TIMESTEP, format='sec')
+    delta = TimeDelta(TIMESTEP, format='sec')
     diff = stop - start
     steps = int(np.round(diff / delta))
     times = np.linspace(start.mjd, stop.mjd, steps)
-    times = atime.Time(times, format='mjd')
+    times = Time(times, format='mjd')
 
     return times
 
 
-def siderealtimes(lat, lon, height, date):
-    #t = atime.Time(mjd, format='mjd', scale='utc')
+def siderealtimes(lat, lon, height, date, allnight=False):
+    #t = Time(mjd, format='mjd', scale='utc')
 
     obs = ephem.Observer()
     obs.pressure=0
@@ -301,25 +308,31 @@ def siderealtimes(lat, lon, height, date):
     obs.date = ephem.Date(date.iso)
     sun = ephem.Sun(obs)
     # daytime so want to know time of next setting and rising of sun
-    if sun.alt>ephem.degrees(str(-18.)):
-        ATstart = atime.Time(
-            obs.next_setting(ephem.Sun()).datetime(),format='datetime')
-        ATend = atime.Time(
-            obs.next_rising(ephem.Sun()).datetime(),format='datetime')
-    else: #night time so need to know current  when it will rise again
+    if sun.alt > ephem.degrees(str(-18.)):
+        ATstart = Time(
+            obs.next_setting(ephem.Sun()).datetime(), format='datetime')
+        ATend = Time(
+            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+    elif allnight: # currently night, but take into account the part
+                   # of sky that has already set.
+        ATstart = Time(
+            obs.previous_setting(ephem.Sun()).datetime(), format='datetime')
+        ATend = Time(
+            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+    else: # currently night; only calculate from now until Sun rise
         ATstart = date
-        ATend = atime.Time(
-            obs.next_rising(ephem.Sun()).datetime(),format='datetime')
+        ATend = Time(
+            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
 
 
-    delt = atime.TimeDelta(300., format='sec')
+    delt = TimeDelta(300., format='sec')
 
     diff = ATend-ATstart
     steps = diff/delt
 
     times = np.linspace(ATstart.mjd,ATend.mjd,steps+1)
 
-    timeobjs = atime.Time(times, format='mjd')
+    timeobjs = Time(times, format='mjd')
 
     return timeobjs
 
