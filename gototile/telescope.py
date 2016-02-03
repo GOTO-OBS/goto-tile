@@ -11,6 +11,7 @@ from astropy.coordinates import EarthLocation, Latitude, Longitude
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.units import Quantity, UnitConversionError
 from astropy import units
+from astropy.table import Table
 import healpy
 import ephem
 from .settings import NSIDE, TILESDIR, TIMESTEP, SUNALTITUDE, COVERAGE
@@ -245,6 +246,9 @@ class Telescope(object):
             coverage=coverage, maxtiles=maxtiles, within=within,
             tilespath=tilespath, tileduration=tileduration,
             sim=False, injgal=False, simpath='.', njobs=njobs)
+        pointings = Table(rows=pointings, names=('ra', 'dec', 'obs_sky_frac',
+                                                 'cum_obs_sky_frac',
+                                                 'tileprob', 'cum_prob'))
         self.results_ = (pointings, tilelist, pixlist, tiledmap, allskymap)
 
     def findtiles(self, skymap, date, usegals=False, nightsky=False,
