@@ -61,6 +61,10 @@ class Telescope(object):
         if name is not None:
             self.name = name
 
+    @property
+    def logger(self):
+        return logging.getLogger(__name__)
+
     def _parse_location(self, location):
         """Parse a location.
 
@@ -315,8 +319,10 @@ class Telescope(object):
         if not os.path.isfile(tilespath):
             raise FileNotFoundError("no pre-made tiled grid file found")
         with gzip.GzipFile(tilespath, 'r') as infile:
-            tilelist,pixlist = pickle.load(infile)
-        return tilelist,pixlist
+            tilelist, pixlist = pickle.load(infile)
+        self.logger.debug("Read %s: %d tiles, %d pixels", tilespath,
+                      len(tilelist), len(pixlist))
+        return tilelist, pixlist
         
     def makegrid(self, tilespath=None):
         tilespath = self.gettilespath(tilespath)
@@ -325,7 +331,7 @@ class Telescope(object):
             tilespath = os.path.join(tilespath, filename)
         if os.path.exists(tilespath):
             raise FileExistsError("tile file {} already exists".format(tilespath))
-        logging.info("Creating tiling database map %s", tilespath)
+        self.logger.info("Creating tiling database map %s", tilespath)
         tileallsky_new(tilespath, self.fov, NSIDE)
 
 
