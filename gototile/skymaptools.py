@@ -222,11 +222,12 @@ def orderedpixels(skymap):
 
 # return the pixel list in order of loudest to quietest, with
 # corresponding original indices
-def ordertiles(tiles,pixlist,tileprobs):
-    oprobs = np.sort(tileprobs)
-    otiles = tiles[np.argsort(tileprobs)]
-    opixs = pixlist[np.argsort(tileprobs)]
-    return np.array(otiles[::-1]),np.array(opixs[::-1]),np.array(oprobs[::-1])
+def ordertiles(tiles, pixlist, tileprobs):
+    indices = np.argsort(tileprobs)[::-1]
+    oprobs = tileprobs[indices]
+    otiles = tiles[indices]
+    opixs = pixlist[indices]
+    return otiles, opixs, oprobs, indices
 
 
 def calc_siderealtimes(date, location, within=None, allnight=False):
@@ -527,8 +528,8 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf,
     usedmap = skymap.copy()
     GWobs = 0.0
 
-    otiles,opixs,oprobs = ordertiles(tiles,pixlist,tileprobs)
-    l=0
+    otiles, opixs, oprobs, itiles = ordertiles(tiles, pixlist, tileprobs)
+    l = 0
     while GWobs <= maxf*GWtot and len(pointings) < maxt:
 
         # first tile will be brightest, so blank out pixels of usedmap
@@ -546,13 +547,13 @@ def findtiles(skymap, date, delns, delew, metadata, usegals, nightsky, minf,
         obspixlist.append(opixs[0])
         #oprobs[0] = 0.0 #seen so set tile prob to zero
         oprobs = filltiles(usedmap, otiles, opixs)
-        otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs)
+        otiles, opixs, oprobs, itiles = ordertiles(otiles,opixs,oprobs)
         #~ l+=1
         #~ ro=0
         #~ while len(list(set(opixs[0]).intersection(seenpix)))>0:
             #~ #does new top tile overlap with seen?
             #~ ro+=1
             #~ oprobs[0] = usedmap[opixs[0]].sum() #recalc prob from seen map
-            #~ otiles,opixs,oprobs = ordertiles(otiles,opixs,oprobs) #reorder
+            #~ otiles,opixs,oprobs,itiles = ordertiles(otiles,opixs,oprobs) #reorder
 
     return pointings, obstilelist, obspixlist, skymap, allskymap

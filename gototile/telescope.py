@@ -296,8 +296,8 @@ class Telescope(object):
         seenpix = []
         usedmap = newskymap.copy()
         GWobs = 0.0
-        otiles, opixs, oprobs = ordertiles(tiles, pixlist, tileprobs)
-        l=0
+        otiles, opixs, oprobs, itiles = ordertiles(tiles, pixlist, tileprobs)
+        l = 0
         while GWobs <= coverage['max']*GWtot and len(pointings) < maxtiles:
             # first tile will be brightest, so blank out pixels of usedmap
             usedmap[opixs[0]] = 0.0
@@ -307,12 +307,12 @@ class Telescope(object):
             sphpoints = healpy.vec2ang(center)
             cra, cdec = sph2cel(sphpoints[0], sphpoints[1])
 
-            pointings.append([cra, cdec, oprobs[0], GWobs, oprobs[0]/GWtot,
-                            GWobs/GWtot])
+            pointings.append([cra[0], cdec[0], oprobs[0], GWobs, oprobs[0]/GWtot,
+                              GWobs/GWtot])
             obstilelist.append(otiles[0])
             obspixlist.append(opixs[0])
             oprobs = filltiles(usedmap, otiles, opixs)
-            otiles, opixs, oprobs = ordertiles(otiles, opixs, oprobs)
+            otiles, opixs, oprobs, itiles = ordertiles(otiles, opixs, oprobs)
         return pointings, obstilelist, obspixlist, newskymap, allskymap
 
     def gettilespath(self, tilespath=None):
