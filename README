@@ -13,29 +13,24 @@ as well as optional plots (geocentric, or celestial).
 Pre-requisites:
 ===============
 
-Before installing additional pre-requisite modules, please ensure that the 
-following packages (and their pre-requisites) are installed: 
-    numpy
-    matplotlib
-    mpl_toolkits
+Before installing additional pre-requisite modules, please ensure that
+the `numpy` package is installed. Using the ``pip`` command below will
+automatically do this as the first step for you.
     
-Both numpy and matplotlib need to be installed before installing the remaining
-pakages. Numpy and matplotlib can be installed via 'pip install' (assuming the 
-correct development libraries, eg: python-dev, are installed) or using your 
-local package manager.
+The remaining modules required for GOTO-tile to work can be found in
+the `requirements.txt` file. Two dependencies are not found in the
+regular spot: `basemap` and `spherical-geometry` (there is a `basemap`
+listed when using ``pip search basemap``, but this is an outdated
+version).
 
-The mpl-toolkits can either be installed via your local package manager or from
-source (see http://matplotlib.org/basemap/users/download.html and
-http://matplotlib.org/basemap/users/installing.html).
-
-The remaining modules required for the script to work can be found listed 
-under the main directory. Easy installation can be completed
-using
+The easiest way to install all requirements is:
 
     $ pip install -r requirements.txt
     
-However, if certain modules already exist, you should
-be able to easily install modules required by hand.
+
+Note that basemap requires the geos C library, which is usually found
+in package managers as `libgeos-dev` or `libgeos-devel`.
+
 
 Known issues: 
 
