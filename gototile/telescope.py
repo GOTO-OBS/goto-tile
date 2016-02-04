@@ -249,9 +249,11 @@ class Telescope(object):
             coverage=coverage, maxtiles=maxtiles, within=within,
             tilespath=tilespath, tileduration=tileduration,
             sim=False, injgal=False, simpath='.', njobs=njobs)
-        pointings = Table(rows=pointings, names=('ra', 'dec', 'obs_sky_frac',
-                                                 'cum_obs_sky_frac',
-                                                 'tileprob', 'cum_prob'))
+        if not pointings:
+            pointings = None
+        pointings = Table(rows=pointings,
+                          names=('ra', 'dec', 'obs_sky_frac',
+                                 'cum_obs_sky_frac', 'tileprob', 'cum_prob'))
         self.results_ = (pointings, tilelist, pixlist, tiledmap, allskymap)
 
     def findtiles(self, skymap, date, usegals=False, nightsky=False,
