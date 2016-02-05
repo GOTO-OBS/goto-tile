@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 from distutils.command.install import INSTALL_SCHEMES
 import os.path
 import glob
@@ -20,12 +20,14 @@ setup(
     version='0.1',
     description=('Create a set of tiled observation pointings '
                  'for GOTO for GW follow-up'),
-    author='Darren White',
-    author_email='Darren.White@warwick.ac.uk',
+    author='Darren White, Evert Rol',
+    author_email='Darren.White@warwick.ac.uk, evert.rol@monash.edu',
     url='http://goto-observatory.org',
     scripts=['scripts/tileskymap','scripts/f2ytile','scripts/postmap'],
     packages=['gototile'],
     package_dir={'gototile': 'gototile'},
+    install_requires=['numpy', 'astropy', 'matplotlib', 'basemap',
+                      'healpy', 'spherical-geometry', 'pyephem'],
     data_files=[('gototile', ['gototile/GWGCCatalog_I.txt',
                               'gototile/cylon.csv']),],
 )
