@@ -1,6 +1,9 @@
+from astropy import units
+from astropy.time import TimeDelta
+
 NSIDE = 256
 TILESDIR = 'tiles'
-TIMESTEP = 300
-SUNALTITUDE = -18
+TIMESTEP = TimeDelta(300 * units.second)
+SUNALTITUDE = -18 * units.degree
 COVERAGE = {'min': 0.05, 'max': 0.95}
 ARC_PRECISION = 9000
