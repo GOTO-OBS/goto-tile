@@ -39,8 +39,8 @@ def set_temp_scope(defaults, site=None, fov=None):
         TEMP__SCOPE['lon'] = site.longitude.value
         TEMP__SCOPE['height'] = site.height.value
     if fov:
-        TEMP__SCOPE['fov-dec'] = fov[0]
-        TEMP__SCOPE['fov-ra'] = fov[1]
+        TEMP__SCOPE['fov-ra'] = fov[0]
+        TEMP__SCOPE['fov-dec'] = fov[1]
 
 def getscopename(scope):
     

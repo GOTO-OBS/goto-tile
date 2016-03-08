@@ -26,8 +26,8 @@ setup(
     scripts=['scripts/tileskymap','scripts/f2ytile','scripts/postmap'],
     packages=['gototile'],
     package_dir={'gototile': 'gototile'},
-    install_requires=['numpy', 'astropy', 'matplotlib', 'basemap',
-                      'healpy', 'spherical-geometry', 'pyephem'],
+    install_requires=['numpy', 'astropy', 'matplotlib', 'healpy',
+                      'spherical-geometry', 'pyephem', 'basemap'],
     data_files=[('gototile', ['gototile/GWGCCatalog_I.txt',
                               'gototile/cylon.csv']),],
 )

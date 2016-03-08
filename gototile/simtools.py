@@ -1,4 +1,4 @@
-from __future__ import absolute_import, print_function, division
+from __future__ import absolute_import, division
 import numpy as np
 
 def read2015(sim):
@@ -85,38 +85,59 @@ def findinj(injid,simpath):
                 year = 2016
                 break
 
-    if not found2015 and not found2016: sys.exit("Not found in either year?!")
+    if not found2015 and not found2016:
+        sys.exit("Not found in either year?!")
        
     return foundinj,year
 
-def findinjtile(inj,otiles,opixs):
+def findinjtile(inj, otiles, opixs):
     
-    rainj,decinj,distinj = inj['ra'],inj['dec'],inj['dist']
-    tinj,pinj = smt.cel2sph(rainj,decinj)
-    injpix = hp.ang2pix(tinj,pinj,nest=True,nside=NSIDE)
+    rainj, decinj, distinj = inj['ra'], inj['dec'], inj['dist']
+    tinj, pinj = smt.cel2sph(rainj, decinj)
+    injpix = hp.ang2pix(tinj, pinj, nest=True, nside=NSIDE)
     
     for tilenum,[tile,pixels] in enumerate(zip(otiles,opixs)):
         if injpix in set(pixels): 
-            tileinj = tilenum+1
+            tileinj = tilenum + 1
             probinj = tprobs[tilenum]
             fprobinj = ftprobs[tilenum]
             break
     return tile,tilenum
 
+
 def addnewgal(metadata,gals,simpath):
-    
+
     objid = metadata['objid'].split(':')
     injid = objid[-1]
     inj,year = findinj(injid,simpath)
+    
+    closegals = [gal for gal in gals if
+                 abs(gal['dist']-inj['dist'])<3.0*gal['e_dist']]
+    closegals = np.array(closegals,dtype=gals.dtype)
+    newgalidx = np.argmin(closegals['B'])
+    newgal = closegals[newgalidx]
+    
+    newgal['PGC'] = '0'
+    newgal['ra'] = inj['ra']/15.0
+    newgal['dec'] = inj['dec']
+    
+    gals = np.append(gals,newgal)
+    
+    return gals
+
+
+def addnewgal_new(injid, gals, simpath):
+    
+    inj, year = findinj(injid, simpath)
 
     closegals = [gal for gal in gals if 
-            abs(gal['dist']-inj['dist'])<3.0*gal['e_dist']]
-    closegals = np.array(closegals,dtype=gals.dtype)
+            abs(gal['dist'] - inj['dist']) < 3.0 * gal['e_dist']]
+    closegals = np.array(closegals, dtype=gals.dtype)
     newgalidx = np.argmin(closegals['B'])
     newgal = closegals[newgalidx]
 
     newgal['PGC'] = '0'
-    newgal['ra'] = inj['ra']/15.0
+    newgal['ra'] = inj['ra'] / 15
     newgal['dec'] = inj['dec']
 
     gals = np.append(gals,newgal)
