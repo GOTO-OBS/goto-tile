@@ -202,14 +202,17 @@ class SkyMap(object):
             #m.plot(x, y, color=color, linewidth=100 * pointing['prob'])
 
         if galaxies:
-            gals = gt.readgals_new()
+            gals = gt.readgals()
 
             ras = gals['ra']
             decs = gals['dec']
 
             if nightsky:
-                visras, visdecs = [], []
-                sidtimes = smt.calc_siderealtimes(date, telescope.location)
+                sidtimes = []                    
+                for telescope in telescopes:
+                    visras, visdecs = [], []
+                    sidtimes.append(smt.calc_siderealtimes(date, telescope.location))
+                sidtimes = np.hstack(sidtimes)
                 radius = 75
                 for st in sidtimes:
                     frame = AltAz(obstime=st, location=telescope.location)
@@ -218,7 +221,6 @@ class SkyMap(object):
                     visras.extend(ras[np.where(altaz.alt.degree > (90-radius))])
                     visdecs.extend(decs[np.where(altaz.alt.degree > (90-radius))])
                 xgal, ygal = m(np.array(visras) - (dlon/np.pi*180.0), visdecs)
-
             else:
                 xgal, ygal = m(np.array(ras) - (dlon/np.pi*180.0), decs)
             m.scatter(xgal, ygal, s=0.5, c=galcolor, alpha=0.5, linewidths=0,

@@ -16,8 +16,8 @@ import healpy
 import ephem
 from . import galtools as gt
 from .settings import NSIDE, TILESDIR, SUNALTITUDE, COVERAGE
-from .grid import readtiles, tileallsky_new
-from .skymaptools import (findtiles, calc_siderealtimes, get_visiblemap,
+from .grid import tileallsky
+from .skymaptools import (calc_siderealtimes, get_visiblemap,
                           filltiles, ordertiles, getvectors, sph2cel)
 
 try:  # Python 3
@@ -324,11 +324,11 @@ class Telescope(object):
         if tileduration:
             maxtiles = int((max(sidtimes) - min(sidtimes)) / tileduration)
         if galaxies:
-            allgals = gt.readgals(skymap.object, injgal, simpath)
+            allgals = gt.readgals(injgal, simpath)
             if nightsky:
-                gals, _ = gt.visiblegals_new(allgals, sidtimes, self)
-                newskymap = gt.map2gals_new(allskymap, gals)
-            allskymap = gt.map2gals_new(allskymap, allgals)
+                gals, _ = gt.visiblegals(allgals, sidtimes, self)
+                newskymap = gt.map2gals(allskymap, gals)
+            allskymap = gt.map2gals(allskymap, allgals)
             if not nightsky:
                 newskymap = allskymap.copy()
         elif nightsky:
@@ -401,7 +401,7 @@ class Telescope(object):
         if os.path.exists(tilespath):
             raise FileExistsError("tile file {} already exists".format(tilespath))
         logging.info("Creating tiling database map %s", tilespath)
-        tileallsky_new(tilespath, self.fov, NSIDE)
+        tileallsky(tilespath, self.fov, NSIDE)
 
 
 
