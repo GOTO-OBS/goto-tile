@@ -14,8 +14,8 @@ import math
 import multiprocessing
 import numpy as np
 import healpy as hp
-from . import galtools as gt
-from .settings import SUNALTITUDE, TIMESTEP, ARC_PRECISION, COVERAGE
+from .settings import SUNALTITUDE, TIMESTEP, ARC_PRECISION, COVERAGE, MINPROB
+from .catalog import visible_catalog, read_catalog, map2catalog
 
 
 PI_2 = np.pi / 2
@@ -154,7 +154,7 @@ def getpoints(FoV): #Get lra/dec vertices for shape on sky
     return np.array(ra),np.array(dec)
 
 
-def find_tile(ra, dec, delns, delew):
+def find_tile(ra, dec, delra, deldec):
 
     tc, pc = cel2sph(ra, dec)
     # find vertices needed for drawing along great circles.
@@ -173,13 +173,13 @@ def find_tile(ra, dec, delns, delew):
     eastGC = sggc.interpolate(center, epole, steps=ARC_PRECISION)
     westGC = sggc.interpolate(center, wpole, steps=ARC_PRECISION)
 
-    e = findedge(eastGC, delew)
-    w = findedge(westGC, delew)
+    e = findedge(eastGC, delra)
+    w = findedge(westGC, delra)
 
     # don't need to interpolate for stepping along RA great circle, so
     # just do +/- step
-    dmin = dec - delns
-    dmax = dec + delns
+    dmin = dec - deldec
+    dmax = dec + deldec
 
     tmax, pmax = cel2sph(ra, dmax)
     tmin, pmin = cel2sph(ra, dmin)
@@ -191,7 +191,6 @@ def find_tile(ra, dec, delns, delew):
     ne = sggc.intersection(npole, e, epole, n)
     sw = sggc.intersection(spole, w, wpole, s)
     se = sggc.intersection(spole, e, epole, s)
-
     fov = sgp.SphericalPolygon([nw,ne,se,sw,nw], inside=center)
 
     return fov, center
@@ -405,17 +404,13 @@ def calc_tilecenter(tile):
 
 def calculate_tiling(skymap, telescopes, date=None,
                      coverage=None, maxtiles=100, within=None,
-                     nightsky=False, galaxies=False,
-                     injgal=False, simpath='.',
+                     nightsky=False, catalog=None,
                      tilespath=None, njobs=1, tileduration=None):
     if coverage is None:
         coverage = COVERAGE
+    if catalog is None:
+        catalog = {'path': None, 'key': None}
     date = skymap.header['date-det'] if date is None else date
-    #pointings, tilelist, pixlist, tiledmap, allskymap = self.findtiles(
-    #    skymap, date, usegals=galaxies, nightsky=nightsky,
-    #    coverage=coverage, maxtiles=maxtiles, within=within,
-    #    tilespath=tilespath, tileduration=tileduration,
-    #    sim=False, injgal=False, simpath='.', njobs=njobs)
 
     allskymap = skymap.copy()
     tiles, pixlist, sidtimes = {}, {}, {}
@@ -425,21 +420,21 @@ def calculate_tiling(skymap, telescopes, date=None,
         telescope.sidtimes = calc_siderealtimes(date, telescope.location,
                                                 within=within,
                                                 allnight=(nightsky == 'all'))
-    if galaxies:
-        allgals = gt.readgals(objid=injgal, simpath=simpath)
-        allskymap = gt.map2gals(allskymap, allgals)
+    if catalog['path']:
+        cattable = read_catalog(**catalog)
+        allskymap = map2catalog(allskymap, cattable)
         if nightsky:
             indiceslist = []
             for telescope in telescopes:
-                gals, indices = gt.visiblegals(
-                    allgals, telescope.sidtimes,
+                _, indices = visible_catalog(
+                    cattable, telescope.sidtimes,
                     telescope)
-                telescope.indices['gal'] = indices
-                telescope.skymap = gt.map2gals(skymap, gals)
+                telescope.indices['catalog'] = indices
+                telescope.skymap = map2catalog(skymap, cattable[indices])
                 indiceslist.append(indices)
             indices = np.unique(np.hstack(indiceslist))
-            gals = allgals[indices]
-            newskymap = gt.map2gals(skymap, gals)
+            cattable = cattable[indices]
+            newskymap = map2catalog(skymap, cattable)
         else:
             newskymap = allskymap.copy()
             for telescope in telescopes:
@@ -511,11 +506,12 @@ def calculate_tiling(skymap, telescopes, date=None,
             prob = telescope.topprob
             GWobs += prob
             center = telescope.topcenter
-            pointings.append([center, prob, GWobs, prob/GWtot,
-                              GWobs/GWtot, telescope.name,
-                              time, time-date, tile])
-            obstilelist.append(tile)
-            obspixlist.append(telescope.toppixlist)
+            if prob >= MINPROB:
+                pointings.append([center, prob, GWobs, prob/GWtot,
+                                  GWobs/GWtot, telescope.name,
+                                  time, time-date, tile])
+                obstilelist.append(tile)
+                obspixlist.append(telescope.toppixlist)
             # Blank out used pixels in all telescope skymaps
             pixlist = telescope.toppixlist
             for telescope in telescopes:
@@ -543,7 +539,7 @@ def filltiles(telescopes, time):
 # NB: the telescope instances are modified in-place, so we don't
 # return from this function
 def ordertiles(telescopes):
-    for i, telescope in enumerate(telescopes):
+    for telescope in telescopes:
         vismask = telescope.vismask
         if not len(telescope.tileprobs[vismask]):
             telescope.topprob = 0
@@ -553,6 +549,7 @@ def ordertiles(telescopes):
             continue
         indices = np.argsort(telescope.tileprobs[vismask])[::-1]
         itop = np.where(vismask)[0][indices[0]]
+        itops = np.where(vismask)[0][indices[:10]]
         telescope.topprob = telescope.tileprobs[itop]
         telescope.toptile = telescope.tiles[itop]
         telescope.toppixlist = telescope.pixlist[itop]

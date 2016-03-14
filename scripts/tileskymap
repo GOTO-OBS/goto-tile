@@ -13,6 +13,7 @@ matplotlib.use('Agg')
 from astropy.time import Time, TimeDelta
 from astropy.coordinates import SkyCoord, EarthLocation, Angle
 from astropy import units
+import gototile
 from gototile import fits
 from gototile import skymaptools as smt
 from gototile import scopetools as sct
@@ -26,6 +27,9 @@ try:
     FileExistsError
 except NameError:
     from gototile.utils import FileExistsError, FileNotFoundError
+
+
+GWGC_PATH = os.path.join(os.path.dirname(gototile.__file__), 'GWGC.csv')
 
 
 def pretty_time_delta(seconds):
@@ -77,8 +81,12 @@ def parse_args():
                         help="Set the width (RA) and height (dec) of the "
                         "field of view, in degrees. Overrides the default "
                         "from the 'scope' setting.")
-    parser.add_argument('-g', '--galaxies', action="store_true", default=False,
-                        help="Use GWGC in tiling/plotting")
+    parser.add_argument('-c', '--catalog', nargs='?', const=True,
+                        help="Use a catalog to convolve with; specify as an "
+                        "astropy readable table format (default catalog: GWGC)")
+    parser.add_argument('--catalog-weight-key',
+                        help="Field name to serve as a catalog weight. "
+                        "Default is no weighting (spatial density only)")
     parser.add_argument('-n', '--nightsky', action="store_true", default=False,
                         help="Use nightsky visbility in tiling/plotting")
     parser.add_argument('-d', '--date', nargs='?', default='now',
@@ -113,14 +121,6 @@ def parse_args():
                         help="Plot the Sun position")
     parser.add_argument('--moon', action='store_true',
                         help="Plot the Moon position")
-    parser.add_argument("--sim", action="store_true", default=False,
-                        help="A first2years simulation. Check tiles for known "
-                        "position of source.")
-    parser.add_argument("--injgal", action="store_true", default=False,
-                        help="Inject galaxy at location in f2y map. Take into "
-                        "account known position and distance.")
-    parser.add_argument("--simpath",default='./Skymaps',
-              help="Path to folder of Skymaps, organised into folders by year.")
     parser.add_argument('--within',
                         help="Only calculate when an area is observable within "
                         "the given amount of time. Default unit is seconds; "
@@ -131,7 +131,6 @@ def parse_args():
     parser.add_argument('--latex',
                         help="Write LaTeX table of pointings")
     args = parser.parse_args()
-    print(args)
     if not len(args.scope):
         args.scope = ['g4']
     for i, scope in enumerate(args.scope):
@@ -158,6 +157,10 @@ def parse_args():
                 raise
         args.within = TimeDelta(val)
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
+    if args.catalog is True:
+        args.catalog = GWGC_PATH
+        args.catalog_weight_key = 'weight'
+    args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}
     if not args.figure:
         args.figure = os.path.splitext(args.skymap)[0] + '.png'
     return args
@@ -243,24 +246,12 @@ def main(args):
     skymap = SkyMap(args.skymap)
     skymap.regrade(nside=NSIDE)
     date = skymap.header['date-det'] if args.date is None else args.date
-    #if len(telescopes) == 1:
-    #    telescopes[0].calculate_tiling(
-    #        skymap, date=date,
-    #        coverage=args.coverage,
-    #        maxtiles=args.maxtiles,
-    #        within=args.within,
-    #        nightsky=args.nightsky,
-    #        galaxies=args.galaxies,
-    #        tilespath=args.tiles,
-    #        njobs=args.jobs)
-    #    pointings, _, _, tiledmap, allskymap = telescopes[0].results_
-    #else:
-    if True:
-        pointings, _, _, tiledmap, allskymap = smt.calculate_tiling(
-            skymap, telescopes, date=date, coverage=args.coverage,
-            maxtiles=args.maxtiles, within=args.within,
-            nightsky=args.nightsky, galaxies=args.galaxies,
-            tilespath=args.tiles, njobs=args.jobs, tileduration=args.exptime)
+
+    pointings, _, _, tiledmap, allskymap = smt.calculate_tiling(
+        skymap, telescopes, date=date, coverage=args.coverage,
+        maxtiles=args.maxtiles, within=args.within,
+        nightsky=args.nightsky, catalog=args.catalog,
+        tilespath=args.tiles, njobs=args.jobs, tileduration=args.exptime)
     gwtot = tiledmap.sum()
     allsky = allskymap.sum()
     print("Tiling map obtained for {}".format(date.datetime))
@@ -296,7 +287,7 @@ def main(args):
 
     if args.plot or args.geoplot:
         skymap.plot(args.figure, telescopes, date, pointings,
-                    geoplot=args.geoplot, galaxies=args.galaxies,
+                    geoplot=args.geoplot, catalog=args.catalog,
                     nightsky=args.nightsky,
                     title=args.title, objects=objects,
                     sun=args.sun, moon=args.moon)

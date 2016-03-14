@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division
 from . import skymaptools as smt
 from . import scopetools as sct
-from . import galtools as gt
+from .catalog import read_catalog
 from . import cmap
 
 import numpy as np
@@ -17,18 +17,20 @@ from astropy import units
 import ephem
 
 
-def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals,
-                    nightsky, scopename, trigger, date, injgal, simpath,
+def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, catalog,
+                    nightsky, scopename, trigger, date,
                     plotfilename, title=None, sun=False, moon=False,
-                    objects=None, dpi=300, galcolor='#999999'):
+                    objects=None, dpi=300, catcolor='#999999'):
     if title is None:
         formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
-        if usegals:
-            title = ("Skymap, GWGC galaxies and {0} tiling for trigger {1}\n"
-                     "{2}".format(scopename, trigger, formatted_date))
+        if catalog:
+            title = ("Skymap, {catalog} and {scopename} tiling "
+                     "for trigger {trigger}\n{formatted_data}".format(
+                         scopename, trigger, formatted_date))
         else:
-            title = "Skymap and {0} tiling for trigger {1}\n{2}".format(
-                scopename, trigger, formatted_date)
+            title = ("Skymap and {scopename} tiling "
+                     "for trigger {trigger}\n{formatted_data}".format(
+                         scopename, trigger, formatted_date))
     if sun:
         sun = get_sun(date)
     if moon:
@@ -78,14 +80,14 @@ def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals,
         FoVx,FoVy = m(FoVra-(dlon/np.pi*180.0),FoVdec)
         m.plot(FoVx,FoVy,marker='.',markersize=1,linestyle='none')
 
-    if usegals:
-        gals = gt.readgals(injgal, simpath)
+    if catalog:
+        cattable = read_catalog()
 
-        ras = gals['ra']
-        decs = gals['dec']
+        ras = cattable['ra']
+        decs = cattable['dec']
 
         if nightsky:
-            visras,visdecs = [],[]
+            visras, visdecs = [],[]
             import astropy.coordinates as acoord
             import astropy.units as u
             delns, delew, lat, lon, height = sct.getscopeinfo(scopename)
@@ -100,10 +102,11 @@ def plotskymapsmoll(skymap, pointings, tilelist, metadata, geoplot, usegals,
                 altaz = radecs.transform_to(frame)
                 visras.extend(ras[np.where(altaz.alt.degree>(90-radius))])
                 visdecs.extend(decs[np.where(altaz.alt.degree>(90-radius))])
-            xgal,ygal=m(np.array(visras)-(dlon/np.pi*180.0),visdecs)
+            xcat, ycat = m(np.array(visras)-(dlon/np.pi*180.0), visdecs)
 
-        else: xgal,ygal=m(np.array(ras)-(dlon/np.pi*180.0),decs)
-        m.scatter(xgal, ygal, s=0.5, c=galcolor, alpha=0.5, linewidths=0,
+        else:
+            xcat, ycat = m(np.array(ras)-(dlon/np.pi*180.0),decs)
+        m.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
                   zorder=2)
 
         plt.title(title)

@@ -18,17 +18,16 @@ from . import scopetools as sct
 
 def tileallsky(filename, fov, nside):
     """Create a grid across all sky and store in a file"""
-    delns = fov['dec'].decompose(bases=[units.degree]).value / 2
-    delew = fov['ra'].decompose(bases=[units.degree]).value / 2
-
-    north = np.arange(0.0, 90.0, delns)
+    delra = fov['ra'].decompose(bases=[units.degree]).value / 2
+    deldec = fov['dec'].decompose(bases=[units.degree]).value / 2
+    north = np.arange(0.0, 90.0, deldec)
     south = -north[:]
     n2s = np.append(south[::-2], north)
-    e2w = np.arange(0.0, 360., delew)
+    e2w = np.arange(0.0, 360., delra)
 
     ras, decs = zip(*[(ra, dec) for ra, dec in it.product(e2w, n2s)])
     gridcoords = SkyCoord(np.asarray(ras), np.asarray(decs), unit=units.deg)
-    tilelist = [smt.find_tile(ra, dec, delns, delew)[0]
+    tilelist = [smt.find_tile(ra, dec, deldec, delra)[0]
                 for ra, dec in zip(ras, decs)]
 
     pointlist = [smt.getvectors(tile)[0] for tile in tilelist]
@@ -36,4 +35,4 @@ def tileallsky(filename, fov, nside):
                         for points in pointlist])
 
     with gzip.GzipFile(filename, 'w') as fp:
-        pickle.dump([tilelist, pixlist, centers], fp, protocol=2)
+        pickle.dump([tilelist, pixlist, gridcoords], fp, protocol=2)
