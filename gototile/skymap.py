@@ -14,7 +14,6 @@ from astropy.coordinates import get_sun, SkyCoord, AltAz
 from astropy import units
 import healpy
 import ephem
-from . import galtools as gt
 from . import skymaptools as smt
 try:
     stringtype = basestring  # Python 2
@@ -110,23 +109,28 @@ class SkyMap(object):
         return skycoords
 
     def plot(self, filename, telescopes, date, pointings,
-             geoplot=False, galaxies=False, nightsky=False,
+             geoplot=False, catalog=None, nightsky=False,
              title="", objects=None, sun=False, moon=False,
-             galcolor='#999999', dpi=300):
+             catcolor='#999999', dpi=300):
         """Plot the skymap in a Moll-Weide projection"""
 
+        if catalog is None:
+            catalog = {'path': None, 'key': None}
         if not title:
             formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
             telescope_names = ", ".join([telescope.name
                                            for telescope in telescopes])
             telescope_names = ' and '.join(telescope_names.rsplit(', ', 1))
-            if galaxies:
-                title = ("Skymap, GWGC galaxies and {0} tiling for trigger {1}\n"
-                         "{2}".format(telescope_names,
-                                      self.objid, formatted_date))
+            if catalog['path']:
+                title = ("Skymap, catalog {catalog} and {telescope} tiling "
+                         "for trigger {trigger}\n{formatted_date}".format(
+                             catalog=os.path.basename(catalog['path']),
+                             telescope=telescope_names, trigger=self.objid,
+                             formatted_date=formatted_date))
             else:
-                title = "Skymap and {0} tiling for trigger {1}\n{2}".format(
-                    telescope_names, self.objid, formatted_date)
+                title = ("Skymap and {telescope} tiling for trigger {trigger}\n"
+                         "{formatted_data}".format(
+                             telescope_names, self.objid, formatted_date))
         if sun:
             sun = get_sun(date)
         if moon:
@@ -201,11 +205,11 @@ class SkyMap(object):
                           edgecolor='black')
             #m.plot(x, y, color=color, linewidth=100 * pointing['prob'])
 
-        if galaxies:
-            gals = gt.readgals()
+        if catalog['path']:
+            table = read_catalog()
 
-            ras = gals['ra']
-            decs = gals['dec']
+            ras = table['ra']
+            decs = table['dec']
 
             if nightsky:
                 sidtimes = []                    
@@ -220,10 +224,10 @@ class SkyMap(object):
                     altaz = radecs.transform_to(frame)
                     visras.extend(ras[np.where(altaz.alt.degree > (90-radius))])
                     visdecs.extend(decs[np.where(altaz.alt.degree > (90-radius))])
-                xgal, ygal = m(np.array(visras) - (dlon/np.pi*180.0), visdecs)
+                xcat, ycat = m(np.array(visras) - (dlon/np.pi*180.0), visdecs)
             else:
-                xgal, ygal = m(np.array(ras) - (dlon/np.pi*180.0), decs)
-            m.scatter(xgal, ygal, s=0.5, c=galcolor, alpha=0.5, linewidths=0,
+                xcat, ycat = m(np.array(ras) - (dlon/np.pi*180.0), decs)
+            m.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
                       zorder=2)
 
         if objects:
