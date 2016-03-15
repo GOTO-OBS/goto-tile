@@ -315,8 +315,12 @@ class VisibleMap(object):
 
 
 def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
+    maskedmap = skymap.copy()
+    maskedmap.skymap[:] = 0.0
     if njobs == -1:
         njobs = None
+    if not sidtimes:
+        return maskedmap, np.array([], dtype=np.int)
     skycoords = skymap.skycoords()
     ipix = np.arange(len(skymap.skymap))
     pool = multiprocessing.Pool(njobs)
@@ -327,8 +331,6 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     pool.join()
     indices = np.unique(np.hstack(seen))
 
-    maskedmap = skymap.copy()
-    maskedmap.skymap[:] = 0.0
     maskedmap.skymap[indices] = skymap.skymap[indices]
 
     return maskedmap, indices
