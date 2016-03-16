@@ -14,10 +14,10 @@ from astropy import units
 from astropy.table import Table
 import healpy
 import ephem
-from . import galtools as gt
+from .catalog import visible_catalog, read_catalog, map2catalog
 from .settings import NSIDE, TILESDIR, SUNALTITUDE, COVERAGE
-from .grid import readtiles, tileallsky_new
-from .skymaptools import (findtiles, calc_siderealtimes, get_visiblemap,
+from .grid import tileallsky
+from .skymaptools import (calc_siderealtimes, get_visiblemap,
                           filltiles, ordertiles, getvectors, sph2cel)
 
 try:  # Python 3
@@ -243,7 +243,7 @@ class Telescope(object):
 
     def calculate_tiling(self, skymap, date=None,
                          coverage=None, maxtiles=100, within=None,
-                         nightsky=False, galaxies=False,
+                         nightsky=False, catalog=None,
                          tilespath=None, njobs=1, tileduration=None):
 
         """Calculate the best tiling coverage of the probability skymap for a
@@ -286,10 +286,13 @@ class Telescope(object):
             into account, including tiles that have already set for
             the current night.
 
-        - galaxies: bool
+        - catalog: None or dict
 
-            Fold the probability sky map with the Gravitational Wave
-            Galaxy Catalog (White et al 2011), for optimal tiling.
+            Fold the probability sky map with a catalog. Specify a
+            dict containing 'path' and 'key' keys; the 'key' indicates
+            the column to weigh with. If set to `None`, use no
+            weighting (equivalent to folding with just the galaxy
+            density).
 
         """
 
@@ -297,10 +300,10 @@ class Telescope(object):
             coverage = COVERAGE
         date = skymap.header['date-det'] if date is None else date
         pointings, tilelist, pixlist, tiledmap, allskymap = self.findtiles(
-            skymap, date, galaxies=galaxies, nightsky=nightsky,
+            skymap, date, catalog=catalog, nightsky=nightsky,
             coverage=coverage, maxtiles=maxtiles, within=within,
             tilespath=tilespath, tileduration=tileduration,
-            sim=False, injgal=False, simpath='.', njobs=njobs)
+            njobs=njobs)
         if not pointings:
             pointings = None
         pointings = Table(rows=pointings,
@@ -310,10 +313,11 @@ class Telescope(object):
 
         self.results_ = (pointings, tilelist, pixlist, tiledmap, allskymap)
 
-    def findtiles(self, skymap, date, galaxies=False, nightsky=False,
+    def findtiles(self, skymap, date, catalog=None, nightsky=False,
                   coverage=(0.05, 0.95), maxtiles=100, within=None,
-                  tilespath=None, tileduration=None,
-                  sim=False, injgal=False, simpath='.', njobs=1):
+                  tilespath=None, tileduration=None, njobs=1):
+        if catalog is None:
+            catalog = {'path': None, 'key': None}        
         tiles, pixlist = self.readtiles(tilespath)
         allskymap = skymap.copy()
         allnight = True if nightsky == 'all' else False
@@ -323,12 +327,12 @@ class Telescope(object):
             return [], [], [], np.array([]), allskymap.skymap
         if tileduration:
             maxtiles = int((max(sidtimes) - min(sidtimes)) / tileduration)
-        if galaxies:
-            allgals = gt.readgals(skymap.object, injgal, simpath)
+        if catalog['path']:
+            table = read_catalog(**catalog)
             if nightsky:
-                gals, _ = gt.visiblegals_new(allgals, sidtimes, self)
-                newskymap = gt.map2gals_new(allskymap, gals)
-            allskymap = gt.map2gals_new(allskymap, allgals)
+                _, mask = visible_catalog(table , sidtimes, self)
+                newskymap = map2catalog(allskymap, table[mask])
+            allskymap = map2catalog(allskymap, table)
             if not nightsky:
                 newskymap = allskymap.copy()
         elif nightsky:
@@ -401,7 +405,7 @@ class Telescope(object):
         if os.path.exists(tilespath):
             raise FileExistsError("tile file {} already exists".format(tilespath))
         logging.info("Creating tiling database map %s", tilespath)
-        tileallsky_new(tilespath, self.fov, NSIDE)
+        tileallsky(tilespath, self.fov, NSIDE)
 
 
 
