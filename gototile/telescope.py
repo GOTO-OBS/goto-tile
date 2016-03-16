@@ -430,7 +430,8 @@ def read_config_file(filename):
 
 class GOTON4(Telescope):
     def __init__(self,
-                 location=EarthLocation(-17.8793802, 28.7598742, 2396),  # La Palma
+                 location=EarthLocation(lon=-17.8793802, lat=28.7598742,
+                                        height=2396),  # La Palma
                  fov={'ra': 4.2 * units.deg,
                       'dec': 4.2 * units.deg},
                  name='GOTO-N-4', min_elevation=15, **kwargs):
@@ -440,7 +441,8 @@ class GOTON4(Telescope):
 
 class GOTON8(Telescope):
     def __init__(self,
-                 location=EarthLocation(-17.8793802, 28.7598742, 2396),  # La Palma
+                 location=EarthLocation(lon=-17.8793802, lat=28.7598742,
+                                        height=2396),  # La Palma
                  fov={'ra': 8.4 * units.deg,
                       'dec': 4.2 * units.deg},
                  name='GOTO-N-8', min_elevation=15, **kwargs):
@@ -449,7 +451,8 @@ class GOTON8(Telescope):
 
 
 class SuperWASPN(Telescope):
-    def __init__(self, location=EarthLocation(-17.8793802, 28.7598742, 2396),
+    def __init__(self, location=EarthLocation(lon=-17.8793802, lat=28.7598742,
+                                              height=2396),
                  fov={'ra': 15 * units.deg,
                       'dec': 30 * units.deg},
                  name='SuperWASP-N', min_elevation=15, **kwargs):
@@ -459,7 +462,8 @@ class SuperWASPN(Telescope):
 
 class GOTOS4(Telescope):
     def __init__(self,
-                 location=EarthLocation(118.144, -22.608, 1200),  # Mt Bruce, WA
+                 location=EarthLocation(lon=118.144, lat=-22.608,
+                                        height=1200),  # Mt Bruce, WA
                  fov={'ra': 4.2 * units.deg,
                       'dec': 4.2 * units.deg},
                  name='GOTO-S-4', min_elevation=15, **kwargs):
@@ -469,7 +473,8 @@ class GOTOS4(Telescope):
 
 class GOTOS8(Telescope):
     def __init__(self,
-                 location=EarthLocation(118.144, -22.608, 1200),  # Mt Bruce, WA
+                 location=EarthLocation(lon=118.144, lat=-22.608,
+                                        height=1200),  # Mt Bruce, WA
                  fov={'ra': 8.4 * units.deg,
                       'dec': 4.2 * units.deg},
                  name='GOTO-S-8', min_elevation=15, **kwargs):
@@ -479,7 +484,8 @@ class GOTOS8(Telescope):
 
 class GOTOLS4(Telescope):
     def __init__(self,
-                 location=EarthLocation(-70.7313, -29.2612, 2400),  # La Silla
+                 location=EarthLocation(lon=-70.7313, lat=-29.2612,
+                                        height=2400),  # La Silla
                  fov={'ra': 4.2 * units.deg,
                       'dec': 4.2 * units.deg},
                  name='GOTO-LS-4', min_elevation=15, **kwargs):
@@ -489,7 +495,8 @@ class GOTOLS4(Telescope):
 
 class GOTOLS8(Telescope):
     def __init__(self,
-                 location=EarthLocation(-70.7313, -29.2612, 2400),  # La Silla
+                 location=EarthLocation(lon=-70.7313, lat=-29.2612,
+                                        height=2400),  # La Silla
                  fov={'ra': 8.4 * units.deg,
                       'dec': 4.2 * units.deg},
                  name='GOTO-LS-8', min_elevation=15, **kwargs):
@@ -498,7 +505,8 @@ class GOTOLS8(Telescope):
 
 
 class VISTA(Telescope):
-    def __init__(self, location=EarthLocation(-70.3975, -24.6158, 2518),
+    def __init__(self, location=EarthLocation(lon=-70.3975, lat=-24.6158,
+                                              height=2518),
                  fov={'ra': 2.95 * units.deg,
                       'dec': 2.034 * units.deg},
                  name='VISTA', min_elevation=15, **kwargs):
