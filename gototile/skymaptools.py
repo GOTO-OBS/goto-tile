@@ -424,7 +424,7 @@ def calculate_tiling(skymap, telescopes, date=None,
                                                 allnight=(nightsky == 'all'))
     if catalog['path']:
         cattable = read_catalog(**catalog)
-        allskymap = map2catalog(allskymap, cattable)
+        allskymap, catsources = map2catalog(allskymap, cattable)
         if nightsky:
             indiceslist = []
             for telescope in telescopes:
@@ -432,11 +432,12 @@ def calculate_tiling(skymap, telescopes, date=None,
                     cattable, telescope.sidtimes,
                     telescope)
                 telescope.indices['catalog'] = indices
-                telescope.skymap = map2catalog(skymap, cattable[indices])
+                telescope.skymap, telescope.catsources = map2catalog(
+                    skymap, cattable[indices])
                 indiceslist.append(indices)
             indices = np.unique(np.hstack(indiceslist))
             cattable = cattable[indices]
-            newskymap = map2catalog(skymap, cattable)
+            newskymap, catsources = map2catalog(skymap, cattable)
         else:
             newskymap = allskymap.copy()
             for telescope in telescopes:
@@ -511,12 +512,13 @@ def calculate_tiling(skymap, telescopes, date=None,
             telescope = telescopes[index]
             tile = telescope.toptile
             prob = telescope.topprob
+            sources = telescope.topsources
             GWobs += prob
             center = telescope.topcenter
             if prob >= MINPROB:
                 pointings.append([center, prob, GWobs, prob/GWtot,
                                   GWobs/GWtot, telescope.name,
-                                  time, time-date, tile])
+                                  time, time-date, tile, sources])
                 obstilelist.append(tile)
                 obspixlist.append(telescope.toppixlist)
             # Blank out used pixels in all telescope skymaps
@@ -528,7 +530,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     pointings = QTable(rows=pointings,
                       names=['center', 'prob', 'cumprob', 'relprob',
                              'cumrelprob', 'telescope', 'time', 'dt',
-                             'tile'])
+                             'tile', 'sources'])
     return pointings, obstilelist, obspixlist, newskymap.skymap, allskymap.skymap
 
 
@@ -561,3 +563,9 @@ def ordertiles(telescopes):
         telescope.toptile = telescope.tiles[itop]
         telescope.toppixlist = telescope.pixlist[itop]
         telescope.topcenter = telescope.tilecenters[itop]
+        telescope.topsources = None
+        if hasattr(telescope, 'catsources'):
+            telescope.topsources = []
+            for pixel in telescope.pixlist[itop]:
+                sources = telescope.catsources[pixel]
+                telescope.topsources.extend(sources)
