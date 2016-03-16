@@ -15,6 +15,7 @@ from astropy import units
 import healpy
 import ephem
 from . import skymaptools as smt
+from .catalog import read_catalog
 try:
     stringtype = basestring  # Python 2
 except NameError:
@@ -128,9 +129,11 @@ class SkyMap(object):
                              telescope=telescope_names, trigger=self.objid,
                              formatted_date=formatted_date))
             else:
-                title = ("Skymap and {telescope} tiling for trigger {trigger}\n"
-                         "{formatted_data}".format(
-                             telescope_names, self.objid, formatted_date))
+                title = ("Skymap and {telescope} tiling "
+                         "for trigger {trigger}\n"
+                         "{formatted_date}".format(
+                             telescope=telescope_names, trigger=self.objid,
+                             formatted_date=formatted_date))
         if sun:
             sun = get_sun(date)
         if moon:
@@ -206,7 +209,7 @@ class SkyMap(object):
             #m.plot(x, y, color=color, linewidth=100 * pointing['prob'])
 
         if catalog['path']:
-            table = read_catalog()
+            table = read_catalog(**catalog)
 
             ras = table['ra']
             decs = table['dec']
