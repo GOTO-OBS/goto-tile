@@ -5,6 +5,7 @@ pyephem
 healpy
 git+https://github.com/matplotlib/basemap.git
 git+https://github.com/spacetelescope/sphere.git@1.0.4#egg=spherical_geometry
+PyYAML
 
 # Cartopy requires the PROJ4 library; on Ubuntu, this is the
 # libproj-dev package *and* proj-bin

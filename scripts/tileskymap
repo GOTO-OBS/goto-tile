@@ -23,6 +23,7 @@ from gototile.skymap import SkyMap
 from gototile.settings import NSIDE
 from gototile.telescope import (GOTON4, GOTON8, GOTOS4, GOTOS8,
                                 SuperWASPN, VISTA, GOTOLS4, GOTOLS8)
+from gototile.telescope import build_scope, read_config_file
 try:
     FileExistsError
 except NameError:
@@ -72,15 +73,8 @@ def parse_args():
                         default=[], action='append',
                         help=("Telescope to use. GOTO-4 (default), GOTO-8, "
                               "SuperWASP-North, VISTA."))
-    parser.add_argument('--site', nargs='*', action='append',
-                        help="Set the longitude, latitude and elevation."
-                        "Overrides the defaults from the 'scope' setting."
-                        "The site name can be specified as an optional "
-                        "fourth argument")
-    parser.add_argument('--fov', nargs='*', type=float, action='append',
-                        help="Set the width (RA) and height (dec) of the "
-                        "field of view, in degrees. Overrides the default "
-                        "from the 'scope' setting.")
+    parser.add_argument('-S', '--scopefile',
+                        help="YAML file with telescope configuration(s)")
     parser.add_argument('-c', '--catalog', nargs='?', const=True,
                         help="Use a catalog to convolve with; specify as an "
                         "astropy readable table format (default catalog: GWGC)")
@@ -133,11 +127,6 @@ def parse_args():
     args = parser.parse_args()
     if not len(args.scope):
         args.scope = ['g4']
-    for i, scope in enumerate(args.scope):
-        if args.site and len(args.site[i]) not in [0, 3, 4]:
-            parser.error("--site takes 0, 3 or 4 values")
-        if args.fov and len(args.fov[i]) not in [0, 2]:
-            parser.error('--fov takes 0 or 2 values')
     if args.jobs:
         args.jobs = int(args.jobs)
     if args.within:
@@ -223,22 +212,28 @@ def main(args):
             telescope = telclass()
             try:
                 telescope.makegrid(args.tiles)
-            except FileExistsError:
-                pass
+            except FileExistsError as exc:
+                logging.warning(str(exc))
+                logging.info("Skipping this grid.")
+                logging.info("Remove file if you want to recreate the grid")
         return
+
     telescopes = []
     for i, scope in enumerate(args.scope):
         telclass = telclasses[scope]
         telescope = telclass()
-        site = parse_site(args.site[i]) if args.site else None
-        fov = args.fov[i] if args.fov else None
-        if site or fov: #args.site[i] or args.fov[i]:
-            location = site if site else telescope.location
-            fov = fov if fov else telescope.fov
-            name = site.name if site and site.name else '_temporary_telescope'
-            telescope = telclass(location=location, fov=fov, name=name)
-            telescope.makegrid(args.tiles)
         telescopes.append(telescope)
+    if args.scopefile:
+        telconfigs = read_config_file(args.scopefile)
+        for config in telconfigs:
+            telescope = build_scope(config)
+            try:
+                telescope.makegrid(args.tiles)
+            except FileExistsError as exc:
+                logging.warning(str(exc))
+                logging.info("Skipping this grid.")
+                logging.info("Remove file if you want to recreate the grid")
+            telescopes.append(telescope)
 
     args.date = parse_date(args.date)
     objects = [parse_object(obj) for obj in args.object]

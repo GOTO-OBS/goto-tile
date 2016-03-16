@@ -6,6 +6,7 @@ import os
 import gzip
 import pickle
 import logging
+import yaml
 import numpy as np
 from astropy.coordinates import EarthLocation, Latitude, Longitude, get_sun
 from astropy.coordinates import AltAz, SkyCoord
@@ -317,7 +318,7 @@ class Telescope(object):
                   coverage=(0.05, 0.95), maxtiles=100, within=None,
                   tilespath=None, tileduration=None, njobs=1):
         if catalog is None:
-            catalog = {'path': None, 'key': None}        
+            catalog = {'path': None, 'key': None}
         tiles, pixlist = self.readtiles(tilespath)
         allskymap = skymap.copy()
         allnight = True if nightsky == 'all' else False
@@ -407,6 +408,22 @@ class Telescope(object):
         logging.info("Creating tiling database map %s", tilespath)
         tileallsky(tilespath, self.fov, NSIDE)
 
+
+def build_scope(config):
+    """Create a telescope instance from a configuration dict"""
+    location = EarthLocation(lon=config['longitude'], lat=config['latitude'],
+                             height=config['height'])
+    fov = {'ra': config['fov-ra'] * units.deg,
+           'dec': config['fov-dec'] * units.deg}
+    telescope = Telescope(location=location, fov=fov, name=config['short'],
+                          min_elevation=config.get('min_elevation', 15))
+    return telescope
+
+
+def read_config_file(filename):
+    with open(filename) as infile:
+        config = yaml.safe_load(infile)
+    return config
 
 
 # # # Pre-defined telescopes # # #
