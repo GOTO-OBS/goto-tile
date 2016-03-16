@@ -132,8 +132,6 @@ def parse_args():
     group.add_argument('-q', '--quiet', action='store_true',
                        help="Turn off warnings")
     args = parser.parse_args()
-    if not len(args.scope):
-        args.scope = ['g4']
     if args.jobs:
         args.jobs = int(args.jobs)
     if args.within:
@@ -255,6 +253,8 @@ def main(args):
                 logging.info("Skipping this grid.")
                 logging.info("Remove file if you want to recreate the grid")
             telescopes.append(telescope)
+    if not telescopes:
+        sys.exit("No telescopes given")
 
     args.date = parse_date(args.date)
     objects = [parse_object(obj) for obj in args.object]
