@@ -8,6 +8,10 @@ import sys
 import tempfile
 import datetime
 import logging
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
@@ -61,6 +65,9 @@ def parse_args():
 
     parser.add_argument("skymap", help="Skymap FITS file",)
     parser.add_argument('-o', '--output', help="Output file name")
+    parser.add_argument('--pickle',
+                        help="Write the pointing to a Python pickle file "
+                        "(useful for further processing)")
     parser.add_argument('--figure', help="Figure file name")
     parser.add_argument('--maxtiles', type=int, default=100,
                         help="Maximum number of tiles to return")
@@ -324,6 +331,9 @@ def main(args):
         table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
         table[['telescope', 'ra', 'dec', 'time', 'dt',
                'prob', 'cumprob']].write(args.latex, format='latex')
+    if args.pickle:
+        with open(args.pickle, 'wb') as outfile:
+            pickle.dump(pointings, outfile, protocol=2)
 
     if args.plot or args.geoplot:
         skymap.plot(args.figure, telescopes, date, pointings,
