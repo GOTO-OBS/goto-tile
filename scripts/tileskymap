@@ -7,9 +7,11 @@ import os
 import sys
 import tempfile
 import datetime
+import logging
 import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
+import astropy
 from astropy.time import Time, TimeDelta
 from astropy.coordinates import SkyCoord, EarthLocation, Angle
 from astropy import units
@@ -124,6 +126,11 @@ def parse_args():
                         help="Exposure time for a single tile (in seconds)")
     parser.add_argument('--latex',
                         help="Write LaTeX table of pointings")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-v', '--verbose', action='count', default=0,
+                       help="Verbose level")
+    group.add_argument('-q', '--quiet', action='store_true',
+                       help="Turn off warnings")
     args = parser.parse_args()
     if not len(args.scope):
         args.scope = ['g4']
@@ -196,7 +203,21 @@ def parse_site(site):
     return location
 
 
+def set_logging(verbose, quiet=False):
+    loglevel = ['WARNING', 'INFO', 'DEBUG'][verbose]
+    logging.basicConfig(level=loglevel,
+                        format='%(asctime)s [%(levelname)s]: %(message)s',
+                        datefmt='%Y-%m-%dT%H:%M:%S')
+    astropy.log.setLevel(loglevel)
+    if quiet:
+        logging.getLogger().setLevel(logging.ERROR)
+        astropy.log.setLevel('ERROR')
+        astropy.log.disable_warnings_logging()
+
+
 def main(args):
+    set_logging(args.verbose, args.quiet)
+
     telclasses = {
         'gn4': GOTON4,
         'gn8': GOTON8,
