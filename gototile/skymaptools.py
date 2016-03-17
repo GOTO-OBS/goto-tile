@@ -315,8 +315,12 @@ class VisibleMap(object):
 
 
 def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
+    maskedmap = skymap.copy()
+    maskedmap.skymap[:] = 0.0
     if njobs == -1:
         njobs = None
+    if not sidtimes:
+        return maskedmap, np.array([], dtype=np.int)
     skycoords = skymap.skycoords()
     ipix = np.arange(len(skymap.skymap))
     pool = multiprocessing.Pool(njobs)
@@ -327,8 +331,6 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     pool.join()
     indices = np.unique(np.hstack(seen))
 
-    maskedmap = skymap.copy()
-    maskedmap.skymap[:] = 0.0
     maskedmap.skymap[indices] = skymap.skymap[indices]
 
     return maskedmap, indices
@@ -466,7 +468,12 @@ def calculate_tiling(skymap, telescopes, date=None,
 
     GWtot = newskymap.skymap.sum()
     if GWtot < 1e-8:
-        return [], [], [], np.array([]), allskymap.skymap
+        pointings = QTable(names=['center', 'prob', 'cumprob', 'relprob',
+                                  'cumrelprob', 'telescope', 'time', 'dt',
+                                  'tile'],
+                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'S20',
+                                  Time, TimeDelta, sgp.SphericalPolygon])
+        return pointings, [], [], np.array([]), allskymap.skymap
 
     nside = skymap.nside
     pointings = []
