@@ -332,8 +332,8 @@ class Telescope(object):
             table = read_catalog(**catalog)
             if nightsky:
                 _, mask = visible_catalog(table , sidtimes, self)
-                newskymap = map2catalog(allskymap, table[mask])
-            allskymap = map2catalog(allskymap, table)
+                newskymap, _ = map2catalog(allskymap, table[mask])
+            allskymap, _ = map2catalog(allskymap, table)
             if not nightsky:
                 newskymap = allskymap.copy()
         elif nightsky:

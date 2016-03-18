@@ -8,6 +8,10 @@ import sys
 import tempfile
 import datetime
 import logging
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
@@ -61,6 +65,9 @@ def parse_args():
 
     parser.add_argument("skymap", help="Skymap FITS file",)
     parser.add_argument('-o', '--output', help="Output file name")
+    parser.add_argument('--pickle',
+                        help="Write the pointing to a Python pickle file "
+                        "(useful for further processing)")
     parser.add_argument('--figure', help="Figure file name")
     parser.add_argument('--maxtiles', type=int, default=100,
                         help="Maximum number of tiles to return")
@@ -132,8 +139,6 @@ def parse_args():
     group.add_argument('-q', '--quiet', action='store_true',
                        help="Turn off warnings")
     args = parser.parse_args()
-    if not len(args.scope):
-        args.scope = ['g4']
     if args.jobs:
         args.jobs = int(args.jobs)
     if args.within:
@@ -255,6 +260,8 @@ def main(args):
                 logging.info("Skipping this grid.")
                 logging.info("Remove file if you want to recreate the grid")
             telescopes.append(telescope)
+    if not telescopes:
+        sys.exit("No telescopes given")
 
     args.date = parse_date(args.date)
     objects = [parse_object(obj) for obj in args.object]
@@ -277,7 +284,12 @@ def main(args):
         (gwtot/allsky)*100.))
 
     print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
-          "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time")
+          "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
+          end=" ")
+    if len(pointings) and pointings[0]['sources']:
+        print("# catalog sources")
+    else:
+        print("")
     for pointing in pointings:
         print("{ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
               "{p[cumprob]:17.6f}  {p[relprob]:9.6f}  {p[cumrelprob]:9.6f}  "
@@ -286,7 +298,12 @@ def main(args):
                   p=pointing, ra=pointing['center'].ra.deg,
                   dec=pointing['center'].dec.deg,
                   coverage=pointing['cumprob']*100,
-                  dt=pointing['dt'].jd*24))
+                  dt=pointing['dt'].jd*24),
+              end=' ')
+        if pointing['sources']:
+            print("{:-8d}".format(len(pointing['sources'])))
+        else:
+            print("")
     if args.output:
         table = pointings[['prob', 'cumprob', 'telescope']].copy()
         table['prob'] = ["{:.5f}".format(100 * prob) for prob in table['prob']]
@@ -297,8 +314,11 @@ def main(args):
         table['time'] = [time.datetime.strftime('%Y-%m-%dT%H:%M:%S%z')
                          for time in pointings['time']]
         table['dt'] = ["{:.5f}".format(dt.jd) for dt in pointings['dt']]
-        table[['telescope', 'ra', 'dec', 'time', 'dt',
-               'prob', 'cumprob']].write(args.output, format='csv')
+        columns = ['telescope', 'ra', 'dec', 'time', 'dt', 'prob', 'cumprob']
+        if args.catalog['path']:
+            table['ncatsources'] = [len(sources) for sources in pointings['sources']]
+            columns.append('ncatsources')
+        table[columns].write(args.output, format='csv')
     if args.latex:  # Very similar to args.output, but with less
                     # precision (more human readable)
         table = pointings[['prob', 'cumprob', 'telescope']].copy()
@@ -311,6 +331,9 @@ def main(args):
         table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
         table[['telescope', 'ra', 'dec', 'time', 'dt',
                'prob', 'cumprob']].write(args.latex, format='latex')
+    if args.pickle:
+        with open(args.pickle, 'wb') as outfile:
+            pickle.dump(pointings, outfile, protocol=2)
 
     if args.plot or args.geoplot:
         skymap.plot(args.figure, telescopes, date, pointings,

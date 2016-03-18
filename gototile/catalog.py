@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
 
 import os.path
+from collections import defaultdict
 import numpy as np
 import healpy as hp
 from astropy.coordinates import SkyCoord, AltAz
@@ -35,11 +36,15 @@ def map2catalog(skymap, catalog, key='weight'):
 
     ts, ps = cel2sph_v(catalog['ra'], catalog['dec'])
     catalogpixels = hp.ang2pix(skymap.nside, ts, ps, nest=skymap.isnested)
+    sources = defaultdict(list)
 
     for i, weight in enumerate(catalog[key]):
         if weight:
-            weights[catalogpixels[i]] += weight
+            pixel = catalogpixels[i]
+            weights[pixel] += weight
+            # Store the catalog source
+            sources[pixel].append((i, catalog['ra'][i], catalog['dec'][i]))
     weightmap = skymap.copy()
     weightmap.skymap = weights * weightmap.skymap
 
-    return weightmap
+    return weightmap, sources
