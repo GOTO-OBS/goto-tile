@@ -277,12 +277,14 @@ def main(args):
         tilespath=args.tiles, njobs=args.jobs, tileduration=args.exptime)
     gwtot = tiledmap.sum()
     allsky = allskymap.sum()
-    print("Tiling map obtained for {}".format(date.datetime))
-    print("The total probability visible during the next "
-          "observing period is {:.3f}".format(gwtot))
-    print("This is {:5.2f}% of the original skymap".format(
-        (gwtot/allsky)*100.))
+    pointings.meta['comments'] = [
+        "Tiling map obtained for {}".format(date.datetime),
+        "The total probability visible during the next observing period is {:.3f}".format(gwtot),
+        "This is {:5.2f}% of the original skymap".format((gwtot/allsky)*100.)
+    ]
+    pointings.meta['command'] = " ".join(sys.argv)
 
+    print("\n".join(pointings.meta['comments']))
     print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
           "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
           end=" ")
@@ -318,7 +320,7 @@ def main(args):
         if args.catalog['path']:
             table['ncatsources'] = [len(sources) for sources in pointings['sources']]
             columns.append('ncatsources')
-        table[columns].write(args.output, format='csv')
+        table[columns].write(args.output, format='ascii.ecsv')
     if args.latex:  # Very similar to args.output, but with less
                     # precision (more human readable)
         table = pointings[['prob', 'cumprob', 'telescope']].copy()
