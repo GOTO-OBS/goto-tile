@@ -319,7 +319,7 @@ class Telescope(object):
                   tilespath=None, tileduration=None, njobs=1):
         if catalog is None:
             catalog = {'path': None, 'key': None}
-        tiles, pixlist = self.readtiles(tilespath)
+        tiles, pixlist, _ = self.readtiles(tilespath)
         allskymap = skymap.copy()
         allnight = True if nightsky == 'all' else False
         sidtimes = calc_siderealtimes(date, self.location, within=within,
