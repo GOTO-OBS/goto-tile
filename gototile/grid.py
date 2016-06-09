@@ -21,8 +21,8 @@ def tileallsky(filename, fov, nside):
     delra = fov['ra'].decompose(bases=[units.degree]).value / 2
     deldec = fov['dec'].decompose(bases=[units.degree]).value / 2
     north = np.arange(0.0, 90.0, deldec)
-    south = -north[:]
-    n2s = np.append(south[::-2], north)
+    south = -north[:0:-1]
+    n2s = np.append(south, north)
     e2w = np.arange(0.0, 360., delra)
 
     ras, decs = zip(*[(ra, dec) for ra, dec in it.product(e2w, n2s)])
