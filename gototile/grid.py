@@ -46,8 +46,8 @@ def tileallsky(filename, scopename, nside):
     delns, delew = sct.getscopeinfo(scopename)[:2]
 
     north = np.arange(0.0, 90.0, delns)
-    south = -1*north
-    n2s = np.append(south[::-2], north)
+    south = -north[:0:-1]
+    n2s = np.append(south, north)
     e2w = np.arange(0.0, 360., delew)
 
     tilelist = np.array([smt.findFoV(ra, dec, delns, delew) 
