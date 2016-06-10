@@ -16,6 +16,7 @@ import numpy as np
 import healpy as hp
 from .settings import SUNALTITUDE, TIMESTEP, ARC_PRECISION, COVERAGE, MINPROB
 from .catalog import visible_catalog, read_catalog, map2catalog
+from .math import xyz2radec
 
 
 PI_2 = np.pi / 2
@@ -471,9 +472,9 @@ def calculate_tiling(skymap, telescopes, date=None,
     if GWtot < 1e-8:
         pointings = QTable(names=['center', 'prob', 'cumprob', 'relprob',
                                   'cumrelprob', 'telescope', 'time', 'dt',
-                                  'tile'],
-                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'S20',
-                                  Time, TimeDelta, sgp.SphericalPolygon])
+                                  'tile', 'sources'],
+                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
+                                  Time, TimeDelta, np.ndarray, np.ndarray])
         return pointings, [], [], np.array([]), allskymap.skymap
 
     nside = skymap.nside
@@ -510,7 +511,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             index = indices[sortindices][0]
             indices = indices[sortindices][1:]
             telescope = telescopes[index]
-            tile = telescope.toptile
+            tile = xyz2radec(*telescope.toptile.T)
             prob = telescope.topprob
             sources = telescope.topsources
             GWobs += prob
@@ -527,10 +528,17 @@ def calculate_tiling(skymap, telescopes, date=None,
                 telescope.skymap.skymap[pixlist] = 0
         time += dt
 
-    pointings = QTable(rows=pointings,
-                      names=['center', 'prob', 'cumprob', 'relprob',
-                             'cumrelprob', 'telescope', 'time', 'dt',
-                             'tile', 'sources'])
+    # The `rows` parameter in the `QTable` initializer can't properly
+    # handle equal-sized numpy arrays that should be treated as a
+    # single object ('tile' and 'source'): it will attempt to expand
+    # the array. The list(zip(*pointings)) works around that.
+    pointings = QTable(list(zip(*pointings)),
+                       names=['center', 'prob', 'cumprob', 'relprob',
+                              'cumrelprob', 'telescope', 'time', 'dt',
+                              'tile', 'sources'],
+                       dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
+                              Time, TimeDelta, np.ndarray, np.ndarray])
+
     return pointings, obstilelist, obspixlist, newskymap.skymap, allskymap.skymap
 
 
@@ -563,9 +571,9 @@ def ordertiles(telescopes):
         telescope.toptile = telescope.tiles[itop]
         telescope.toppixlist = telescope.pixlist[itop]
         telescope.topcenter = telescope.tilecenters[itop]
-        telescope.topsources = None
+        telescope.topsources = []
         if hasattr(telescope, 'catsources'):
-            telescope.topsources = []
             for pixel in telescope.pixlist[itop]:
                 sources = telescope.catsources[pixel]
                 telescope.topsources.extend(sources)
+        telescope.topsources = np.asarray(telescope.topsources)

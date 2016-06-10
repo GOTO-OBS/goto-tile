@@ -12,6 +12,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+import numpy as np
 import healpy as hp
 import matplotlib
 matplotlib.use('Agg')
@@ -288,8 +289,9 @@ def main(args):
     print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
           "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
           end=" ")
-    if len(pointings) and pointings[0]['sources']:
-        print("# catalog sources")
+    if (len(pointings) and
+        np.any([len(sources) > 0 for sources in pointings['sources']])):
+        print("# of cat. srcs")
     else:
         print("")
     for pointing in pointings:
@@ -302,7 +304,7 @@ def main(args):
                   coverage=pointing['cumprob']*100,
                   dt=pointing['dt'].jd*24),
               end=' ')
-        if pointing['sources']:
+        if len(pointing['sources']):
             print("{:-8d}".format(len(pointing['sources'])))
         else:
             print("")
