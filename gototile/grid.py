@@ -88,6 +88,37 @@ def tileallsky(filename, fov, nside):
 
 
 
+def create_allsky_strips(rastep, decstep):
+    """Calculate strips along RA and stacked in declination to cover the
+    full sky
+
+    The step size in Right Ascension is adjusted with the declination,
+    by a factor of 1/cos(declination).
+
+    Parameters
+    ----------
+
+    rastep : float
+        Step size in Right Ascension, uncorrected for declination.
+    decstep : float
+        Step size in declination.
+
+    """
+
+    pole = 90 // decstep * decstep
+    decs = np.arange(-pole, pole+decstep/2, decstep)
+    alldecs = []
+    allras = []
+    for dec in decs:
+        ras = np.arange(0.0, 360., rastep/np.cos(dec*RAD))
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
+
+
 def tileallsky2(fov, nside, overlap=None, nested=True):
     """Create a grid across all sky and store in a file"""
     if overlap is None:
@@ -96,14 +127,12 @@ def tileallsky2(fov, nside, overlap=None, nested=True):
     for key in ('ra', 'dec'):
         overlap[key] = min(max(overlap[key], 0), 0.9)
         step[key] = fov[key] * (1-overlap[key])
-    pole = 90 // step['dec'] * step['dec']
-    n2s = np.arange(-pole, pole+step['dec']/2, step['dec'])
-    e2w = np.arange(0.0, 360., step['ra'])
 
-    ras, decs = zip(*[(ra, dec) for ra, dec in it.product(e2w, n2s)])
-    ras, decs = np.asarray(ras), np.asarray(decs)
+    ras, decs = create_allsky_strips(step['ra'], step['dec'])
+
     gridcoords = SkyCoord(ras, decs, unit=units.deg)
     tilelist = get_tile_vertices(ras, decs, step['ra'], step['dec'])
     pixlist = np.array([hp.query_polygon(nside, vertices, nest=nested)
                         for vertices in tilelist])
+
     return gridcoords, tilelist, pixlist
