@@ -18,7 +18,10 @@ from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
 
 
-def get_tile_vertices(ra, dec, delew, delns):
+def get_tile_vertices(coords, delew, delns):
+    ra = coords.ra.value
+    dec = coords.dec.value
+
     phiew = delew*RAD
     phins = delns*RAD
 
@@ -119,20 +122,21 @@ def create_allsky_strips(rastep, decstep):
     return allras, alldecs
 
 
-def tileallsky2(fov, nside, overlap=None, nested=True):
+def tileallsky2(fov, nside, overlap=None, gridcoords=None, nested=True):
     """Create a grid across all sky and store in a file"""
     if overlap is None:
         overlap = {'ra': 0.5, 'dec': 0.5}
     step = {}
     for key in ('ra', 'dec'):
         overlap[key] = min(max(overlap[key], 0), 0.9)
-        step[key] = fov[key] * (1-overlap[key])
+        step[key] = fov[key].value * (1-overlap[key])
 
     ras, decs = create_allsky_strips(step['ra'], step['dec'])
 
-    gridcoords = SkyCoord(ras, decs, unit=units.deg)
-    tilelist = get_tile_vertices(ras, decs, step['ra'], step['dec'])
+    if not gridcoords:
+        gridcoords = SkyCoord(ras, decs, unit=units.deg)
+    tilelist = get_tile_vertices(gridcoords, step['ra'], step['dec'])
     pixlist = np.array([hp.query_polygon(nside, vertices, nest=nested)
                         for vertices in tilelist])
 
-    return gridcoords, tilelist, pixlist
+    return tilelist, pixlist, gridcoords

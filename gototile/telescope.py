@@ -390,10 +390,14 @@ class Telescope(object):
             raise FileNotFoundError("no pre-made tiled grid file found")
         with gzip.GzipFile(tilespath, 'r') as infile:
             try:
-                tilelist, pixlist, centers = pickle.load(infile,  # Python 3
-                                                         encoding='latin1')
+                data = pickle.load(infile, encoding='latin1')  # Python 3
             except TypeError:
-                tilelist, pixlist, centers = pickle.load(infile)  # Python 2
+                data = pickle.load(infile)  # Python 2
+            # Allow for multiple 'nside' grids inside the file
+            if isinstance(data, dict):
+                tilelist, pixlist, centers = data[NSIDE]
+            else:
+                tilelist, pixlist, centers = data
             logging.debug("Read %s: %d tiles, %d pixels", tilespath,
                           len(tilelist), len(pixlist))
         return tilelist, pixlist, centers

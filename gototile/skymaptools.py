@@ -532,12 +532,19 @@ def calculate_tiling(skymap, telescopes, date=None,
     # handle equal-sized numpy arrays that should be treated as a
     # single object ('tile' and 'source'): it will attempt to expand
     # the array. The list(zip(*pointings)) works around that.
-    pointings = QTable(list(zip(*pointings)),
-                       names=['center', 'prob', 'cumprob', 'relprob',
-                              'cumrelprob', 'telescope', 'time', 'dt',
-                              'tile', 'sources'],
-                       dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
-                              Time, TimeDelta, np.ndarray, np.ndarray])
+    if len(pointings) == 0:
+        pointings = QTable(names=['center', 'prob', 'cumprob', 'relprob',
+                                  'cumrelprob', 'telescope', 'time', 'dt',
+                                  'tile', 'sources'],
+                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
+                                  Time, TimeDelta, np.ndarray, np.ndarray])
+    else:
+        pointings = QTable(list(zip(*pointings)),
+                           names=['center', 'prob', 'cumprob', 'relprob',
+                                  'cumrelprob', 'telescope', 'time', 'dt',
+                                  'tile', 'sources'],
+                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
+                                  Time, TimeDelta, np.ndarray, np.ndarray])
 
     return pointings, obstilelist, obspixlist, newskymap.skymap, allskymap.skymap
 
