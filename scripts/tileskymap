@@ -116,7 +116,7 @@ def parse_args():
     parser.add_argument('--makegrid-skip', action='store_true',
                         help="Skip existing grid files")
     parser.add_argument("--tiles", default='./tiles/', dest='tiles',
-                        help=("File or existing directory of pre-made "
+                        help=("File name or base file name of pre-made "
                               "fixed grid of tiles on the sky."))
     parser.add_argument("--object", nargs=3, action='append',
                         default=[], help="Overplot an object. "

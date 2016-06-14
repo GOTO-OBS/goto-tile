@@ -380,8 +380,13 @@ class Telescope(object):
         if tilespath is None:
             tilespath = TILESDIR
         if os.path.isdir(tilespath):
-            filename = "{}_nside{}_nested.pgz".format(self.name, NSIDE)
+            filename = "{}grid.pgz".format(self.name)
             tilespath = os.path.join(tilespath, filename)
+        elif not os.path.isfile(tilespath):
+            # Assume tilespath is a 'base' path
+            dirname, filename = os.path.split(tilespath)
+            filename = "{}_{}".format(self.name, filename)
+            tilespath = os.path.join(dirname, filename)
         return tilespath
 
     def readtiles(self, tilespath=None):
