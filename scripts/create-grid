@@ -194,7 +194,9 @@ def main():
         for telescope in args.telescopes:
             fov['ra'] = telescope.fov['ra']
             fov['dec'] = telescope.fov['dec']
-            filename = telescope.name + '_' + args.output
+            dirname, filename = os.path.split(args.output)
+            filename = telescope.name + '_' + filename
+            filename = os.path.join(dirname, filename)
 
             create_gridfile(args.nside, fov, overlap, filename, args.force,
                         pointings=pointings)
