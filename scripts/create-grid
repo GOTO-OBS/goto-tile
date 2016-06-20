@@ -78,10 +78,10 @@ def parse_args():
                         "telescope parameter.")
     parser.add_argument('--pointings',
                         help="Pointing file (rows of 'ra dec' in degrees)")
-    parser.add_argument('--ra-overlap', type=float, default=0.5,
+    parser.add_argument('--overlap-ra', type=float, default=0.5,
                         help="Amount of overlap between tiles along the RA. "
                         "Ignored when given a pointing file")
-    parser.add_argument('--dec-overlap', type=float, default=0.5,
+    parser.add_argument('--overlap-dec', type=float, default=0.5,
                         help="Amount of overlap between tiles along the "
                         "declination. Ignored when given a pointing file")
     parser.add_argument('--nside', action='append', type=int,
@@ -98,12 +98,12 @@ def parse_args():
         parser.error("fov-ra should be between 0 and 180")
     if args.fov_dec and not (0 < args.fov_dec <= 90):
         parser.error("fov-dec should be between 0 and 90")
-    if args.ra_overlap is not None:
-        if not (0 < args.ra_overlap <= 0.9):
-            parser.error("--ra-overlap should be between 0 and 0.9")
-    if args.dec_overlap is not None:
-        if not (0 < args.dec_overlap <= 0.9):
-            parser.error("--dec-overlap should be between 0 and 0.9")
+    if args.overlap_ra is not None:
+        if not (0 < args.overlap_ra <= 0.9):
+            parser.error("--overlap-ra should be between 0 and 0.9")
+    if args.overlap_dec is not None:
+        if not (0 < args.overlap_dec <= 0.9):
+            parser.error("--overlap-dec should be between 0 and 0.9")
     if args.nside is None:
         args.nside = [256]
     args.telescopes = []
@@ -189,7 +189,7 @@ def main():
                         datefmt='%Y-%m-%dT%H:%M:%S')
     fov = {'ra': args.fov_ra * units.degree if args.fov_ra else None,
            'dec': args.fov_dec * units.degree if args.fov_dec else None}
-    overlap = {'ra': args.ra_overlap, 'dec': args.dec_overlap}
+    overlap = {'ra': args.overlap_ra, 'dec': args.overlap_dec}
 
     if args.pointings:
         pointings = np.loadtxt(args.pointings)
