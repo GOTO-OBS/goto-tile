@@ -166,8 +166,8 @@ def create_gridfile(nside, fov, overlap, filename, force=False,
     logging.debug("Tiling for nside = %d", nside)
     tiles = tileallsky2(
             fov, nside, overlap=overlap, gridcoords=pointings, nested=True)
-
-    with gzip.GzipFile(filename, 'w') as fp:
+    logging.debug("Writing %s", filename)
+    with gzip.GzipFile(filename, 'w', compresslevel=5) as fp:
         pickle.dump(tiles, fp, protocol=2)
     logging.debug("Finished writing %s", filename)
 
