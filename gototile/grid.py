@@ -7,6 +7,7 @@ import itertools as it
 import gzip
 import os
 import tempfile
+import multiprocessing
 import numpy as np
 import healpy as hp
 from astropy.coordinates import SkyCoord
@@ -122,6 +123,14 @@ def create_allsky_strips(rastep, decstep):
     return allras, alldecs
 
 
+class PolygonQuery(object):
+    def __init__(self, nside, nested):
+        self.nside = nside
+        self.nested = nested
+    def __call__(self, vertices):
+        return hp.query_polygon(self.nside, vertices, nest=self.nested)
+
+
 def tileallsky2(fov, nside, overlap=None, gridcoords=None, nested=True):
     """Create a grid across all sky and store in a file"""
     if overlap is None:
@@ -136,7 +145,9 @@ def tileallsky2(fov, nside, overlap=None, gridcoords=None, nested=True):
     if not gridcoords:
         gridcoords = SkyCoord(ras, decs, unit=units.deg)
     tilelist = get_tile_vertices(gridcoords, step['ra'], step['dec'])
-    pixlist = np.array([hp.query_polygon(nside, vertices, nest=nested)
-                        for vertices in tilelist])
+    polygon_query = PolygonQuery(nside, nested)
+    pool = multiprocessing.Pool()
+    pixlist = pool.map(polygon_query, tilelist)
+    pixlist = np.array(pixlist)
 
     return tilelist, pixlist, gridcoords
