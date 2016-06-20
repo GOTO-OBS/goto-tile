@@ -380,12 +380,12 @@ class Telescope(object):
         if tilespath is None:
             tilespath = TILESDIR
         if os.path.isdir(tilespath):
-            filename = "{}grid.pgz".format(self.name)
+            filename = "{}_nside{}.pgz".format(self.name, NSIDE)
             tilespath = os.path.join(tilespath, filename)
         elif not os.path.isfile(tilespath):
             # Assume tilespath is a 'base' path
             dirname, filename = os.path.split(tilespath)
-            filename = "{}_{}".format(self.name, filename)
+            filename = "{}_nside{}_{}".format(self.name, NSIDE, filename)
             tilespath = os.path.join(dirname, filename)
         return tilespath
 
@@ -398,13 +398,17 @@ class Telescope(object):
                 data = pickle.load(infile, encoding='latin1')  # Python 3
             except TypeError:
                 data = pickle.load(infile)  # Python 2
-            # Allow for multiple 'nside' grids inside the file
-            if isinstance(data, dict):
-                tilelist, pixlist, centers = data[NSIDE]
-            else:
-                tilelist, pixlist, centers = data
-            logging.debug("Read %s: %d tiles, %d pixels", tilespath,
-                          len(tilelist), len(pixlist))
+        # Allow for multiple 'nside' grids inside the file
+        if isinstance(data, dict):
+            tilelist, pixlist, centers = data[NSIDE]
+        else:
+            tilelist, pixlist, centers = data
+        logging.debug("Read %s: %d tiles, %d pixels", tilespath,
+                      len(tilelist), len(pixlist))
+        self.tilelist = tilelist
+        self.pixlist = pixlist
+        self.gridcoords = centers
+
         return tilelist, pixlist, centers
 
     def makegrid(self, tilespath=None):

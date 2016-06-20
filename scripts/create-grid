@@ -123,13 +123,9 @@ def parse_args():
     return args
 
 
-def create_gridfile(nsides, fov, overlap, filename, force=False,
+def create_gridfile(nside, fov, overlap, filename, force=False,
                     pointings=None):
     """Create and write a file with a sky grid
-
-    The sky grid file contains a dict of grids: one grid for each
-    nside given in nsides. Note that only the pixel list will differ:
-    the tilelist and grid coordinates are the same for each grid.
 
     A set of pointings can be given as a SkyCoord array. When not
     given, the full sky is gridded.
@@ -141,14 +137,9 @@ def create_gridfile(nsides, fov, overlap, filename, force=False,
     Parameters
     ----------
 
-    nsides : int or list of ints
+    nside : int
 
-        One or more nside parameters for which to calculate the
-        HEALpix pixel lists for each tile.
-
-        Usual values are 128, 256 or 512. All three could be given as
-        [128, 256, 512].
-
+        HEALPix nside (resolution) parameter. Usual values are 128, 256 or 512.
 
     fov : dict with 'ra' and 'dec' keys
 
@@ -172,9 +163,8 @@ def create_gridfile(nsides, fov, overlap, filename, force=False,
     if not force and os.path.lexists(filename):
         sys.exit("{} already exists; not overwritten".format(filename))
 
-    tiles = {}
-    for nside in nsides:
-        tiles[nside] = tileallsky2(
+    logging.debug("Tiling for nside = %d", nside)
+    tiles = tileallsky2(
             fov, nside, overlap=overlap, gridcoords=pointings, nested=True)
 
     with gzip.GzipFile(filename, 'w') as fp:
@@ -197,19 +187,28 @@ def main():
     else:
         pointings = None
 
+    dirname, filename = os.path.split(args.output)
     if args.telescopes:
         for telescope in args.telescopes:
             fov['ra'] = telescope.fov['ra']
             fov['dec'] = telescope.fov['dec']
-            dirname, filename = os.path.split(args.output)
-            filename = telescope.name + '_' + filename
-            filename = os.path.join(dirname, filename)
+            for nside in args.nside:
+                pathname = "{}_nside{}_{}".format(telescope.name, nside,
+                                                  filename)
+                pathname = os.path.join(dirname, pathname)
 
-            create_gridfile(args.nside, fov, overlap, filename, args.force,
-                        pointings=pointings)
+                create_gridfile(nside, fov, overlap, pathname, args.force,
+                                pointings=pointings)
 
     else:
-        create_gridfile(args.nside, fov, overlap, args.output, args.force)
+        for nside in args.nside:
+            if len(args.nside) > 1:
+                pathname = "nside{}_{}".format(nside, filename)
+                pathname = os.path.join(dirname, pathname)
+            else:
+                pathname = args.output
+            create_gridfile(nside, fov, overlap, pathname, args.force,
+                            pointings=pointings)
 
 
 if __name__ == "__main__":
