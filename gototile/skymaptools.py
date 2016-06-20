@@ -489,14 +489,13 @@ def calculate_tiling(skymap, telescopes, date=None,
     endtime = date + within if within else date + units.year
     base_indices = np.arange(len(telescopes))
     ntiles = 0
+    nobs = 0
     while (GWobs <= coverage['max'] * GWtot and
            ntiles < maxtiles and
            time < endtime):
         # Filter out telescopes in daytime
         indices = np.array([i for i in base_indices[:]
                             if telescopes[i].is_night(time)])
-        if len(indices):
-            ntiles += 1
         # We rerun the tiling with a subset of telescopes until all
         # telescopes have calculated their optimal tiling
         while len(indices):
@@ -526,6 +525,9 @@ def calculate_tiling(skymap, telescopes, date=None,
             pixlist = telescope.toppixlist
             for telescope in telescopes:
                 telescope.skymap.skymap[pixlist] = 0
+        if len(obstilelist) > nobs:
+            nobs = len(obstilelist)
+            ntiles += 1
         time += dt
 
     # The `rows` parameter in the `QTable` initializer can't properly
