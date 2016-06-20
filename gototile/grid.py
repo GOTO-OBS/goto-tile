@@ -7,6 +7,7 @@ import itertools as it
 import gzip
 import os
 import tempfile
+import logging
 import multiprocessing
 import numpy as np
 import healpy as hp
@@ -144,7 +145,9 @@ def tileallsky2(fov, nside, overlap=None, gridcoords=None, nested=True):
 
     if not gridcoords:
         gridcoords = SkyCoord(ras, decs, unit=units.deg)
+    logging.debug("Calculating vertices for %d tiles", len(gridcoords))
     tilelist = get_tile_vertices(gridcoords, step['ra'], step['dec'])
+    logging.debug("Calculating HEALPix indices for tiles")
     polygon_query = PolygonQuery(nside, nested)
     pool = multiprocessing.Pool()
     pixlist = pool.map(polygon_query, tilelist)
