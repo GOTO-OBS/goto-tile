@@ -319,7 +319,7 @@ class Telescope(object):
                   tilespath=None, tileduration=None, njobs=1):
         if catalog is None:
             catalog = {'path': None, 'key': None}
-        tiles, pixlist = self.readtiles(tilespath)
+        tiles, pixlist, _ = self.readtiles(tilespath)
         allskymap = skymap.copy()
         allnight = True if nightsky == 'all' else False
         sidtimes = calc_siderealtimes(date, self.location, within=within,
@@ -380,8 +380,13 @@ class Telescope(object):
         if tilespath is None:
             tilespath = TILESDIR
         if os.path.isdir(tilespath):
-            filename = "{}_nside{}_nested.pgz".format(self.name, NSIDE)
+            filename = "{}_nside{}.pgz".format(self.name, NSIDE)
             tilespath = os.path.join(tilespath, filename)
+        elif not os.path.isfile(tilespath):
+            # Assume tilespath is a 'base' path
+            dirname, filename = os.path.split(tilespath)
+            filename = "{}_nside{}_{}".format(self.name, NSIDE, filename)
+            tilespath = os.path.join(dirname, filename)
         return tilespath
 
     def readtiles(self, tilespath=None):
@@ -390,12 +395,20 @@ class Telescope(object):
             raise FileNotFoundError("no pre-made tiled grid file found")
         with gzip.GzipFile(tilespath, 'r') as infile:
             try:
-                tilelist, pixlist, centers = pickle.load(infile,  # Python 3
-                                                         encoding='latin1')
+                data = pickle.load(infile, encoding='latin1')  # Python 3
             except TypeError:
-                tilelist, pixlist, centers = pickle.load(infile)  # Python 2
-            logging.debug("Read %s: %d tiles, %d pixels", tilespath,
-                          len(tilelist), len(pixlist))
+                data = pickle.load(infile)  # Python 2
+        # Allow for multiple 'nside' grids inside the file
+        if isinstance(data, dict):
+            tilelist, pixlist, centers = data[NSIDE]
+        else:
+            tilelist, pixlist, centers = data
+        logging.debug("Read %s: %d tiles, %d pixels", tilespath,
+                      len(tilelist), len(pixlist))
+        self.tilelist = tilelist
+        self.pixlist = pixlist
+        self.gridcoords = centers
+
         return tilelist, pixlist, centers
 
     def makegrid(self, tilespath=None):

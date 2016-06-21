@@ -51,7 +51,7 @@ def tilefiles(out, tiles, simpath):
         ras,decs,probs,tprobs,fprobs,ftprobs = np.genfromtxt(fname,
 													delimiter=',',unpack=True)
         fnametiles = fname.replace('txt','pgz')
-        tilelist,pixlist = grid.readtiles(fnametiles)
+        tilelist,pixlist,_ = grid.readtiles(fnametiles)
 
         if isinstance(probs,np.float64):
             visprob = ftprobs
