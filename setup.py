@@ -2,8 +2,6 @@
 
 from setuptools import setup
 from distutils.command.install import INSTALL_SCHEMES
-import os.path
-import glob
 
 
 # Not the best option to hack the distutils installation schemes, but
@@ -16,18 +14,18 @@ for scheme in INSTALL_SCHEMES.values():
     scheme['data'] = scheme['purelib']
 
 setup(
-    name='GOTO-tile',
-    version='0.1',
-    description=('Create a set of tiled observation pointings '
-                 'for GOTO for GW follow-up'),
-    author='Darren White, Evert Rol',
-    author_email='Darren.White@warwick.ac.uk, evert.rol@monash.edu',
-    url='http://goto-observatory.org',
-    scripts=['scripts/tileskymap','scripts/f2ytile','scripts/postmap'],
-    packages=['gototile'],
-    package_dir={'gototile': 'gototile'},
-    install_requires=['numpy', 'astropy', 'matplotlib', 'healpy',
-                      'spherical-geometry', 'pyephem', 'basemap'],
-    data_files=[('gototile', ['gototile/GWGCCatalog_I.txt',
-                              'gototile/cylon.csv']),],
+    name="gototile",
+    version="0.1",
+    description=("Create a set of tiled observation pointings to "
+                 "cover an extended sky area, for one or more telescopes"),
+    author="Darren White, Evert Rol",
+    author_email="Darren.White@warwick.ac.uk, evert.rol@monash.edu",
+    url="http://goto-observatory.org",
+    scripts=["scripts/tileskymap", "scripts/create-grid"],
+    packages=["gototile"],
+    package_dir={'gototile': "gototile"},
+    install_requires=["numpy", "astropy", "matplotlib", "healpy",
+                      "pyephem", "basemap"],
+    data_files=[('gototile', ["gototile/GWGC.csv",
+                              "gototile/cylon.csv"]),],
 )

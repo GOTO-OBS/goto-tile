@@ -2,11 +2,14 @@ from __future__ import division
 
 import os
 import itertools
+import logging
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.colors import colorConverter
+from matplotlib.colors import colorConverter, LinearSegmentedColormap
+from matplotlib import cm
+
 from mpl_toolkits.basemap import Basemap
 import astropy
 from astropy.time import Time
@@ -20,6 +23,16 @@ try:
     stringtype = basestring  # Python 2
 except NameError:
     stringtype = str  # Python 3
+
+
+def read_colormaps(name='cylon'):
+    """Read special color maps, such as 'cylon'"""
+    filename = os.path.join(os.path.dirname(__file__), name + '.csv')
+    data = np.loadtxt(filename, delimiter=',')
+    cmap = LinearSegmentedColormap.from_list(name, data)
+    cm.register_cmap(cmap=cmap)
+    cmap = LinearSegmentedColormap.from_list(name+'_r', data[::-1])
+    cm.register_cmap(cmap=cmap)
 
 
 class SkyMap(object):
@@ -50,7 +63,7 @@ class SkyMap(object):
 
     def _read_file(self, filename):
         skymap, header = healpy.read_map(filename, h=True,
-                                     verbose=False, nest=None)
+                                         verbose=False, nest=None)
         header = dict([(key.lower(), value) for key, value in header])
         header['file'] = filename
         if header['ordering'] not in ('NESTED', 'RING'):
@@ -115,6 +128,7 @@ class SkyMap(object):
              catcolor='#999999', dpi=300):
         """Plot the skymap in a Moll-Weide projection"""
 
+        read_colormaps()
         if catalog is None:
             catalog = {'path': None, 'key': None}
         if not title:
@@ -169,7 +183,8 @@ class SkyMap(object):
         npix = healpy.nside2npix(self.nside)
         ipix = np.arange(npix)
         thetas, phis = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
-        ras, decs = smt.sph2cel(thetas, phis-dlon)
+        ras = np.rad2deg(phis-dlon)%360
+        decs = np.rad2deg(np.pi/2 - thetas%np.pi)
         xmap, ymap = m(ras, decs)
         m.scatter(xmap, ymap, s=1, c=self.skymap,
                   cmap='cylon', alpha=0.5, linewidths=0, zorder=1)
@@ -182,8 +197,11 @@ class SkyMap(object):
         colors = dict([(telescope.name, color)
                        for telescope, color in zip(telescopes, colors)])
         # Plot FoVs
-        for pointing in pointings:
-            ra, dec = smt.getshape(pointing['tile'])
+        for i, pointing in enumerate(pointings):
+            # use pointings.tilelist[i] instead of pointing['tile']
+            # the latter has dtype 'object' (containg floats), the
+            # former 'float64'
+            ra, dec = smt.getshape(pointings.tilelist[i], steps=10)
             ra2 = ra - dlon / np.pi * 180
             x, y = m(ra2, dec)
             color = colors[pointing['telescope']]
@@ -209,18 +227,21 @@ class SkyMap(object):
             #m.plot(x, y, color=color, linewidth=100 * pointing['prob'])
 
         if catalog['path']:
+            logging.info("Reading catalog data for plot")
             table = read_catalog(**catalog)
 
             ras = table['ra']
             decs = table['dec']
 
             if nightsky:
-                sidtimes = []                    
+                sidtimes = []
                 for telescope in telescopes:
                     visras, visdecs = [], []
                     sidtimes.append(smt.calc_siderealtimes(date, telescope.location))
                 sidtimes = np.hstack(sidtimes)
                 radius = 75
+                logging.info("Calculating night sky coverage for %d "
+                             "points in time", len(sidtimes))
                 for st in sidtimes:
                     frame = AltAz(obstime=st, location=telescope.location)
                     radecs = SkyCoord(ra=ras*units.deg, dec=decs*units.deg)
@@ -230,6 +251,7 @@ class SkyMap(object):
                 xcat, ycat = m(np.array(visras) - (dlon/np.pi*180.0), visdecs)
             else:
                 xcat, ycat = m(np.array(ras) - (dlon/np.pi*180.0), decs)
+            logging.info("Overplotting catalog")
             m.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
                       zorder=2)
 

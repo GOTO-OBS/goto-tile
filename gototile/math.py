@@ -15,6 +15,11 @@ def xyz2radec(x, y, z):
     return np.array([l*DEG, b*DEG])
 
 
+def radec2xyz(ra, dec):
+    l, b = np.deg2rad(ra), np.deg2rad(dec)
+    return lb2xyz(l, b)
+
+
 def lb2xyz(l, b):
     x = np.cos(l) * np.cos(b)
     y = np.sin(l) * np.cos(b)
@@ -61,10 +66,3 @@ def intersect(x1, x2, y1, y2):
     sign[mask, ...] = -1
     t = t * sign
     return t
-
-
-
-class FileNotFoundError(IOError):
-    pass
-class FileExistsError(IOError):
-    pass

@@ -4,9 +4,4 @@ astropy
 pyephem
 healpy
 git+https://github.com/matplotlib/basemap.git
-git+https://github.com/spacetelescope/sphere.git
 PyYAML
-
-# Cartopy requires the PROJ4 library; on Ubuntu, this is the
-# libproj-dev package *and* proj-bin
-#cartopy

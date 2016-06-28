@@ -50,7 +50,7 @@ def main():
     options.minfrac = 0.0
     options.maxfrac = 0.95
     options.nightsky = True
-    options.galaxies = False
+    options.catalog = {'path': False, 'key': None}
     options.jobs = 6
     options.coverage = {'min': options.minfrac, 'max': options.maxfrac}
     options.outputfile = "4sitesaus_lapalma_fov8_bns-bbh-sims.pck"
@@ -95,17 +95,19 @@ def main():
                                  (date+within).datetime.strftime("%Y-%m-%dT%H:%M:%S"))
                 else:
                     logging.info("Calculating unconstrained tiling")
-                telescope.calculate_tiling(skymap, date=date,
-                                           coverage=options.coverage,
-                                           maxtiles=maxtiles,
-                                           within=within,
-                                           nightsky=options.nightsky, 
-                                           galaxies=options.galaxies,
-                                           visible=False,
-                                           tilespath=TILESPATH,
-                                           njobs=options.jobs,
-                                           tileduration=TILE_OBS_DUR)
-                pointings, tilelist, pixlist, tiledmap, allskymap = telescope.results_
+                pointings, tilelist, pixlist, tiledmap, allskymap = calculate_tiling(
+                    skymap,
+                    [telescope],
+                    date=date,
+                    coverage=options.coverage,
+                    maxtiles=maxtiles,
+                    within=within,
+                    nightsky=options.nightsky, 
+                    catalog=options.catalog,
+                    visible=False,
+                    tilespath=TILESPATH,
+                    njobs=options.jobs,
+                    tileduration=TILE_OBS_DUR)
                 result = {'map': mapfile}
                 if len(pointings) == 0:
                     result['coverage'] = 0

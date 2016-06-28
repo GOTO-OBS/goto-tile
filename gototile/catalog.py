@@ -3,7 +3,7 @@ from __future__ import absolute_import, division
 import os.path
 from collections import defaultdict
 import numpy as np
-import healpy as hp
+import healpy
 from astropy.coordinates import SkyCoord, AltAz
 from astropy import units
 from astropy.table import Table
@@ -31,11 +31,12 @@ def read_catalog(path, key=None):
 
 def map2catalog(skymap, catalog, key='weight'):
     """Return a copy of the skymap folded with the catalog"""
-    from .skymaptools import cel2sph_v
     weights = np.zeros(len(skymap.skymap))
 
-    ts, ps = cel2sph_v(catalog['ra'], catalog['dec'])
-    catalogpixels = hp.ang2pix(skymap.nside, ts, ps, nest=skymap.isnested)
+    phi = np.deg2rad(catalog['ra']%360)
+    theta = np.pi/2 - np.deg2rad(catalog['dec'])
+
+    catalogpixels = healpy.ang2pix(skymap.nside, theta, phi, nest=skymap.isnested)
     sources = defaultdict(list)
 
     for i, weight in enumerate(catalog[key]):
