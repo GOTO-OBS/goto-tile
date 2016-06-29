@@ -122,7 +122,11 @@ def parse_args():
     parser.add_argument('--sun', action='store_true',
                         help="Plot the Sun position")
     parser.add_argument('--moon', action='store_true',
-                        help="Plot the Moon position")
+                        help="Plot the Moon position and phase")
+    parser.add_argument('--plot-coverage', action='store_true',
+                        help="Plot % coverage as outline thickness")
+    parser.add_argument('--plot-delay', action='store_true',
+                        help="Plot delay as tile transparency")
     parser.add_argument('--within',
                         help="Only calculate when an area is observable within "
                         "the given amount of time. Default unit is seconds; "
@@ -339,11 +343,14 @@ def main(args):
             pickle.dump(pointings, outfile, protocol=2)
 
     if args.plot:
+        options = dict(sun=args.sun, moon=args.moon,
+                       coverage=args.plot_coverage,
+                       delay=args.plot_delay)
         skymap.plot(args.plot, telescopes, date, pointings,
                     geoplot=args.geoplot, catalog=args.catalog,
                     nightsky=args.nightsky,
                     title=args.title, objects=objects,
-                    sun=args.sun, moon=args.moon)
+                    options=options)
 
 
 if __name__ == '__main__':

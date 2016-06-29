@@ -124,13 +124,43 @@ class SkyMap(object):
 
     def plot(self, filename, telescopes, date, pointings,
              geoplot=False, catalog=None, nightsky=False,
-             title="", objects=None, sun=False, moon=False,
-             catcolor='#999999', dpi=300):
-        """Plot the skymap in a Moll-Weide projection"""
+             title="", objects=None,
+             catcolor='#999999', dpi=300, options=None):
+        """Plot the skymap in a Moll-Weide projection
+
+
+        Parameters
+        ----------
+
+        - options : dict
+
+            Various extra plotting options.
+
+            ``options`` takes various keys, each with a ``True`` or
+            ``False`` value. If a key does not exist in options, it
+            equals ``False``.
+
+            - moon : plot the moon position. The illumination is shown
+                  between black (new moon) and white (full moon). Note
+                  that the moon outline is always black.
+
+            - sun : plot the sun position
+
+            - coverage : show % probability covered by the thickness
+                  of the tile outline. 1 percent is the normal
+                  thickness.
+
+            - delay : show the delay time as transparency of the tile.
+                  0 hours is fully transparent, 24 hours is fully
+                  opaque.
+
+        """
 
         read_colormaps()
         if catalog is None:
             catalog = {'path': None, 'key': None}
+        if options is None:
+            options = {}
         if not title:
             formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
             telescope_names = ", ".join([telescope.name
@@ -148,9 +178,9 @@ class SkyMap(object):
                          "{formatted_date}".format(
                              telescope=telescope_names, trigger=self.objid,
                              formatted_date=formatted_date))
-        if sun:
-            sun = get_sun(date)
-        if moon:
+        sun = get_sun(date) if options.get('sun') else None
+        moon = None
+        if options.get('moon'):
             moon = ephem.Moon(date.iso)
             phase = moon.phase
             moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180,
@@ -205,26 +235,32 @@ class SkyMap(object):
             ra2 = ra - dlon / np.pi * 180
             x, y = m(ra2, dec)
             color = colors[pointing['telescope']]
-            alpha = 1 - pointing['dt'].jd / 0.5
-            alpha = max(0, min(1, alpha))
+            alpha = 0
+            if options.get('delay'):
+                # show delay time as transparency
+                alpha = pointing['dt'].jd
+                alpha = max(0, min(1, alpha))  # clip to 0 -- 1 range
             acolor = colorConverter.to_rgba(color, alpha=alpha)
+            linewidth = 1
+            if options.get('coverage'):
+                # show % coverage as outline thickness
+                linewidth = 100 * pointing['prob']
             if np.any(ra2 >= 180) and np.any(ra2 <= 180):
                 mask = ra2 > 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
-                          linewidth=100 * pointing['prob'], linestyle='solid',
+                          linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
                 mask = ra2 <= 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
-                          linewidth=100 * pointing['prob'], linestyle='solid',
+                          linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
             else:
                 axes.fill(x, y,
                           fill=True, facecolor=acolor,
-                          linewidth=100 * pointing['prob'], linestyle='solid',
+                          linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
-            #m.plot(x, y, color=color, linewidth=100 * pointing['prob'])
 
         if catalog['path']:
             logging.info("Reading catalog data for plot")
