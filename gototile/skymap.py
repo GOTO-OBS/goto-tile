@@ -2,11 +2,14 @@ from __future__ import division
 
 import os
 import itertools
+import logging
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.colors import colorConverter
+from matplotlib.colors import colorConverter, LinearSegmentedColormap
+from matplotlib import cm
+
 from mpl_toolkits.basemap import Basemap
 import astropy
 from astropy.time import Time
@@ -20,6 +23,16 @@ try:
     stringtype = basestring  # Python 2
 except NameError:
     stringtype = str  # Python 3
+
+
+def read_colormaps(name='cylon'):
+    """Read special color maps, such as 'cylon'"""
+    filename = os.path.join(os.path.dirname(__file__), name + '.csv')
+    data = np.loadtxt(filename, delimiter=',')
+    cmap = LinearSegmentedColormap.from_list(name, data)
+    cm.register_cmap(cmap=cmap)
+    cmap = LinearSegmentedColormap.from_list(name+'_r', data[::-1])
+    cm.register_cmap(cmap=cmap)
 
 
 class SkyMap(object):
@@ -50,7 +63,7 @@ class SkyMap(object):
 
     def _read_file(self, filename):
         skymap, header = healpy.read_map(filename, h=True,
-                                     verbose=False, nest=None)
+                                         verbose=False, nest=None)
         header = dict([(key.lower(), value) for key, value in header])
         header['file'] = filename
         if header['ordering'] not in ('NESTED', 'RING'):
@@ -111,12 +124,43 @@ class SkyMap(object):
 
     def plot(self, filename, telescopes, date, pointings,
              geoplot=False, catalog=None, nightsky=False,
-             title="", objects=None, sun=False, moon=False,
-             catcolor='#999999', dpi=300):
-        """Plot the skymap in a Moll-Weide projection"""
+             title="", objects=None,
+             catcolor='#999999', dpi=300, options=None):
+        """Plot the skymap in a Moll-Weide projection
 
+
+        Parameters
+        ----------
+
+        - options : dict
+
+            Various extra plotting options.
+
+            ``options`` takes various keys, each with a ``True`` or
+            ``False`` value. If a key does not exist in options, it
+            equals ``False``.
+
+            - moon : plot the moon position. The illumination is shown
+                  between black (new moon) and white (full moon). Note
+                  that the moon outline is always black.
+
+            - sun : plot the sun position
+
+            - coverage : show % probability covered by the thickness
+                  of the tile outline. 1 percent is the normal
+                  thickness.
+
+            - delay : show the delay time as transparency of the tile.
+                  0 hours is fully transparent, 24 hours is fully
+                  opaque.
+
+        """
+
+        read_colormaps()
         if catalog is None:
             catalog = {'path': None, 'key': None}
+        if options is None:
+            options = {}
         if not title:
             formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
             telescope_names = ", ".join([telescope.name
@@ -134,9 +178,9 @@ class SkyMap(object):
                          "{formatted_date}".format(
                              telescope=telescope_names, trigger=self.objid,
                              formatted_date=formatted_date))
-        if sun:
-            sun = get_sun(date)
-        if moon:
+        sun = get_sun(date) if options.get('sun') else None
+        moon = None
+        if options.get('moon'):
             moon = ephem.Moon(date.iso)
             phase = moon.phase
             moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180,
@@ -169,7 +213,8 @@ class SkyMap(object):
         npix = healpy.nside2npix(self.nside)
         ipix = np.arange(npix)
         thetas, phis = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
-        ras, decs = smt.sph2cel(thetas, phis-dlon)
+        ras = np.rad2deg(phis-dlon)%360
+        decs = np.rad2deg(np.pi/2 - thetas%np.pi)
         xmap, ymap = m(ras, decs)
         m.scatter(xmap, ymap, s=1, c=self.skymap,
                   cmap='cylon', alpha=0.5, linewidths=0, zorder=1)
@@ -182,45 +227,57 @@ class SkyMap(object):
         colors = dict([(telescope.name, color)
                        for telescope, color in zip(telescopes, colors)])
         # Plot FoVs
-        for pointing in pointings:
-            ra, dec = smt.getshape(pointing['tile'])
+        for i, pointing in enumerate(pointings):
+            # use pointings.tilelist[i] instead of pointing['tile']
+            # the latter has dtype 'object' (containg floats), the
+            # former 'float64'
+            ra, dec = smt.getshape(pointings.tilelist[i], steps=10)
             ra2 = ra - dlon / np.pi * 180
             x, y = m(ra2, dec)
             color = colors[pointing['telescope']]
-            alpha = 1 - pointing['dt'].jd / 0.5
-            alpha = max(0, min(1, alpha))
+            alpha = 0
+            if options.get('delay'):
+                # show delay time as transparency
+                alpha = pointing['dt'].jd
+                alpha = max(0, min(1, alpha))  # clip to 0 -- 1 range
             acolor = colorConverter.to_rgba(color, alpha=alpha)
+            linewidth = 1
+            if options.get('coverage'):
+                # show % coverage as outline thickness
+                linewidth = 100 * pointing['prob']
             if np.any(ra2 >= 180) and np.any(ra2 <= 180):
                 mask = ra2 > 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
-                          linewidth=100 * pointing['prob'], linestyle='solid',
+                          linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
                 mask = ra2 <= 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
-                          linewidth=100 * pointing['prob'], linestyle='solid',
+                          linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
             else:
                 axes.fill(x, y,
                           fill=True, facecolor=acolor,
-                          linewidth=100 * pointing['prob'], linestyle='solid',
+                          linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
-            #m.plot(x, y, color=color, linewidth=100 * pointing['prob'])
 
         if catalog['path']:
+            logging.info("Reading catalog data for plot")
             table = read_catalog(**catalog)
 
             ras = table['ra']
             decs = table['dec']
 
             if nightsky:
-                sidtimes = []                    
+                sidtimes = []
                 for telescope in telescopes:
                     visras, visdecs = [], []
                     sidtimes.append(smt.calc_siderealtimes(date, telescope.location))
                 sidtimes = np.hstack(sidtimes)
                 radius = 75
+                logging.info("Calculating night sky coverage for %d "
+                             "points in time", len(sidtimes))
                 for st in sidtimes:
                     frame = AltAz(obstime=st, location=telescope.location)
                     radecs = SkyCoord(ra=ras*units.deg, dec=decs*units.deg)
@@ -230,6 +287,7 @@ class SkyMap(object):
                 xcat, ycat = m(np.array(visras) - (dlon/np.pi*180.0), visdecs)
             else:
                 xcat, ycat = m(np.array(ras) - (dlon/np.pi*180.0), decs)
+            logging.info("Overplotting catalog")
             m.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
                       zorder=2)
 

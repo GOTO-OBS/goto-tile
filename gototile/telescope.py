@@ -10,21 +10,17 @@ import yaml
 import numpy as np
 from astropy.coordinates import EarthLocation, Latitude, Longitude, get_sun
 from astropy.coordinates import AltAz, SkyCoord
-from astropy.units import Quantity, UnitConversionError
+from astropy.units import Quantity
 from astropy import units
-from astropy.table import Table
-import healpy
-import ephem
 from .catalog import visible_catalog, read_catalog, map2catalog
 from .settings import NSIDE, TILESDIR, SUNALTITUDE, COVERAGE
 from .grid import tileallsky
-from .skymaptools import (calc_siderealtimes, get_visiblemap,
-                          filltiles, ordertiles, getvectors, sph2cel)
+from .skymaptools import calc_siderealtimes, get_visiblemap, getvectors
 
 try:  # Python 3
     FileNotFoundError
 except NameError:  # Python 2
-    from .utils import FileExistsError, FileNotFoundError
+    from .utils import FileNotFoundError
 
 
 class Telescope(object):
@@ -190,7 +186,6 @@ class Telescope(object):
         obscoords = coords.transform_to(frame)
         return obscoords.alt
 
-
     def is_visible(self, time, coords):
         """Return whether the skycoord are above the minimum altitude.
 
@@ -242,140 +237,6 @@ class Telescope(object):
         return obscoords.alt < SUNALTITUDE
 
 
-    def calculate_tiling(self, skymap, date=None,
-                         coverage=None, maxtiles=100, within=None,
-                         nightsky=False, catalog=None,
-                         tilespath=None, njobs=1, tileduration=None):
-
-        """Calculate the best tiling coverage of the probability skymap for a
-        given date.
-
-        Arguments
-
-        - skymap: skymap.SkyMap
-
-            A probability skymap instance.
-
-        - date: str, float or astropy.time.Time
-
-            The date for which to calculate the tiling. If a str, it
-            should be understood by astropy.time.Time. If a float, it
-            is interpreted as a Julian Day value.
-
-            If date is not given or None, the observation date from
-            the skymap or metadata is used instead.
-
-        - coverage: dict
-
-            Minimum and maximum fraction to cover. Keys are 'min' and
-            'max', values are between 0 and 1.
-
-        - maxtiles: int
-
-            Maximum number of tiles to calculate. Less tiles may be
-            calculated if the full coverage is reached before maxtiles
-            is reached.
-
-        - nightsky: bool, or 'all'
-
-            Take into account the current or next (upcoming) night.
-            Only calculate tiles that are inside the Earth's shadow.
-            Night here is astronomical night, but the Sun's minimum
-            altitude is configurable in the settings module.
-
-            If nigthsky equals 'all', all of the night sky is taken
-            into account, including tiles that have already set for
-            the current night.
-
-        - catalog: None or dict
-
-            Fold the probability sky map with a catalog. Specify a
-            dict containing 'path' and 'key' keys; the 'key' indicates
-            the column to weigh with. If set to `None`, use no
-            weighting (equivalent to folding with just the galaxy
-            density).
-
-        """
-
-        if coverage is None:
-            coverage = COVERAGE
-        date = skymap.header['date-det'] if date is None else date
-        pointings, tilelist, pixlist, tiledmap, allskymap = self.findtiles(
-            skymap, date, catalog=catalog, nightsky=nightsky,
-            coverage=coverage, maxtiles=maxtiles, within=within,
-            tilespath=tilespath, tileduration=tileduration,
-            njobs=njobs)
-        if not pointings:
-            pointings = None
-        pointings = Table(rows=pointings,
-                          names=('ra', 'dec', 'prob', 'cumprob',
-                                 'relprob', 'cumrelprob'))
-        pointings['telescope'] = self.name
-
-        self.results_ = (pointings, tilelist, pixlist, tiledmap, allskymap)
-
-    def findtiles(self, skymap, date, catalog=None, nightsky=False,
-                  coverage=(0.05, 0.95), maxtiles=100, within=None,
-                  tilespath=None, tileduration=None, njobs=1):
-        if catalog is None:
-            catalog = {'path': None, 'key': None}
-        tiles, pixlist, _ = self.readtiles(tilespath)
-        allskymap = skymap.copy()
-        allnight = True if nightsky == 'all' else False
-        sidtimes = calc_siderealtimes(date, self.location, within=within,
-                                      allnight=allnight)
-        if len(sidtimes) == 0:
-            return [], [], [], np.array([]), allskymap.skymap
-        if tileduration:
-            maxtiles = int((max(sidtimes) - min(sidtimes)) / tileduration)
-        if catalog['path']:
-            table = read_catalog(**catalog)
-            if nightsky:
-                _, mask = visible_catalog(table , sidtimes, self)
-                newskymap, _ = map2catalog(allskymap, table[mask])
-            allskymap, _ = map2catalog(allskymap, table)
-            if not nightsky:
-                newskymap = allskymap.copy()
-        elif nightsky:
-            newskymap, _ = get_visiblemap(skymap, sidtimes, self, njobs=njobs)
-        else:
-            newskymap = skymap.copy()
-
-        # get fractional percentage covered per pix
-        newskymap.skymap /= allskymap.skymap.sum()
-        # normalise so allskymap.sum() == 1
-        allskymap.skymap /= allskymap.skymap.sum()
-        GWtot = newskymap.skymap.sum()
-        if GWtot < 1e-8:
-            return [], [], [], np.array([]), allskymap.skymap
-        tileprobs = filltiles(newskymap.skymap, tiles, pixlist)
-
-        nside = skymap.nside
-        pointings = []
-        obstilelist = []
-        obspixlist = []
-        seenpix = []
-        usedmap = newskymap.copy()
-        GWobs = 0.0
-        otiles, opixs, oprobs, itiles = ordertiles(tiles, pixlist, tileprobs)
-        l = 0
-        while GWobs <= coverage['max']*GWtot and len(pointings) < maxtiles:
-            # first tile will be brightest, so blank out pixels of usedmap
-            usedmap.skymap[opixs[0]] = 0.0
-            seenpix.extend(opixs[0])
-            GWobs += oprobs[0]
-            _,center = getvectors(otiles[0])
-            sphpoints = healpy.vec2ang(center)
-            cra, cdec = sph2cel(sphpoints[0], sphpoints[1])
-
-            pointings.append([cra[0], cdec[0], oprobs[0], GWobs, oprobs[0]/GWtot,
-                              GWobs/GWtot])
-            obstilelist.append(otiles[0])
-            obspixlist.append(opixs[0])
-            oprobs = filltiles(usedmap.skymap, otiles, opixs)
-            otiles, opixs, oprobs, itiles = ordertiles(otiles, opixs, oprobs)
-        return pointings, obstilelist, obspixlist, newskymap.skymap, allskymap.skymap
-
     def gettilespath(self, tilespath=None):
         if tilespath is None:
             tilespath = TILESDIR
@@ -405,21 +266,10 @@ class Telescope(object):
             tilelist, pixlist, centers = data
         logging.debug("Read %s: %d tiles, %d pixels", tilespath,
                       len(tilelist), len(pixlist))
-        self.tilelist = tilelist
+        self.tiles = tilelist
         self.pixlist = pixlist
-        self.gridcoords = centers
-
+        self.tilecenters = centers
         return tilelist, pixlist, centers
-
-    def makegrid(self, tilespath=None):
-        tilespath = self.gettilespath(tilespath)
-        if os.path.isdir(tilespath):
-            filename = "{}_nside{}_nested.pgz".format(self.name, NSIDE)
-            tilespath = os.path.join(tilespath, filename)
-        if os.path.exists(tilespath):
-            raise FileExistsError("tile file {} already exists".format(tilespath))
-        logging.info("Creating tiling database map %s", tilespath)
-        tileallsky(tilespath, self.fov, NSIDE)
 
 
 def build_scope(config):

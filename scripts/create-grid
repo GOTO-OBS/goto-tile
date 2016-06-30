@@ -33,7 +33,7 @@ import inspect
 import numpy as np
 from astropy import units
 from astropy.coordinates import SkyCoord
-from gototile.grid import tileallsky2
+from gototile.grid import tileallsky
 import gototile.telescope
 
 
@@ -160,11 +160,14 @@ def create_gridfile(nside, fov, overlap, filename, force=False,
 
     """
 
+    if not filename.endswith('.pgz'):
+        filename += '.pgz'
+
     if not force and os.path.lexists(filename):
         sys.exit("{} already exists; not overwritten".format(filename))
 
     logging.debug("Tiling for nside = %d", nside)
-    tiles = tileallsky2(
+    tiles = tileallsky(
             fov, nside, overlap=overlap, gridcoords=pointings, nested=True)
     logging.debug("Writing %s", filename)
     with gzip.GzipFile(filename, 'w', compresslevel=5) as fp:

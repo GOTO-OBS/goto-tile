@@ -1,8 +1,5 @@
 from __future__ import absolute_import, division, print_function
 import os
-import spherical_geometry as sg
-import spherical_geometry.great_circle_arc as sggc
-import spherical_geometry.polygon as sgp
 import astropy.coordinates as acoord
 from astropy.coordinates import SkyCoord, AltAz, EarthLocation
 from astropy.time import Time, TimeDelta
@@ -13,209 +10,32 @@ import sys
 import math
 import multiprocessing
 import numpy as np
-import healpy as hp
-from .settings import SUNALTITUDE, TIMESTEP, ARC_PRECISION, COVERAGE, MINPROB
+from .settings import SUNALTITUDE, TIMESTEP, COVERAGE, MINPROB
 from .catalog import visible_catalog, read_catalog, map2catalog
-from .math import xyz2radec
+from . import math
 
 
-PI_2 = np.pi / 2
-PI2 = 2 * np.pi
+def getshape(tile, steps=50):
+    """Interpolate a tile with corners to a full shape to be drawn.
 
+    tile is a two dimensional array of [ra-array, dec-array] in degrees.
 
-def _convc2s_v(ra, dec):
-    p = ra * np.pi / 180
-    t = -dec * np.pi / 180 + PI_2
-    mask = p < 0
-    p[mask] = p[mask] + PI2
-    mask1 = t > np.pi
-    mask2 = t < 0
-    t[mask1] = PI2 - t[mask1]
-    t[mask2] = -t[mask2]
-    mask = mask1 | mask2
-    p[mask] = (p[mask] + np.pi) % PI2
-
-    return t, p
-
-
-def _convc2s(r,d):
-    p = r*np.pi/180
-    t = (-1*d*np.pi/180)+(np.pi/2.0)
-
-    pchange=False
-
-    if p<0.0:p+=2*np.pi
-
-    if t>np.pi:
-        t = np.pi-(t-np.pi)
-        pchange = True
-    elif t<0.0:
-        t = -1*t
-        pchange = True
-
-    if pchange == True: p=(p+np.pi)%(2*np.pi)
-
-    return t,p
-
-def _convs2c(t,p):
-    r = (p*(180/np.pi))
-    d = (t-np.pi/2.0)*-1*(180/np.pi) #spherical coords theta=0 at
-                                     #dec=90, and theta=180 at dec=-90
-
-    rachange=False
-
-    if r<0.0:r+=360.0
-
-    if d>90.0:
-        d = d%90.0
-        rachange = True
-    elif d<-90.0:
-        d  = -1*(d%90)
-        rachange = True
-
-    if rachange == True: r = (r+180.0)%360
-
-    return r,d
-
-def cel2sph_v(rs, ds):
-    if isinstance(rs,list) or isinstance(rs,np.ndarray):
-        if len(rs)!=len(ds):
-            raise ValueError("RA and Dec arrays must be same lengths")
-        ts, ps = _convc2s_v(np.asarray(rs), np.asarray(ds))
-    else:
-        ts, ps=_convc2s(rs, ds)
-
-    return ts,ps
-
-
-def sph2cel_v(rs, ds):
-    if isinstance(rs, list) or isinstance(rs, np.ndarray):
-        if len(rs) != len(ds):
-            raise ValueError("RA and Dec arrays must be same lengths")
-        ts, ps = _convs2c_v(np.asarray(rs), np.asarray(ds))
-    else:
-        ts, ps=_convs2c(rs, ds)
-
-    return ts,ps
-
-
-def cel2sph(rs,ds):
-    if isinstance(rs,list) or isinstance(rs,np.ndarray):
-        if len(rs)!=len(ds):
-            sys.exit("RA and Dec arrays must be same lengths")
-        elif len(rs)>1:
-            ts,ps=[],[]
-            for r,d in zip(rs,ds):
-                t,p=_convc2s(r,d)
-                ts.append(t)
-                ps.append(p)
-            ts=np.array(ts)
-            ps=np.array(ps)
-        else:ts,ps=_convs2c(rs,ds)
-    else: ts,ps=_convc2s(rs,ds)
-
-    return ts,ps
-
-
-def sph2cel(ts,ps):
-    if isinstance(ts,list) or isinstance(ts,np.ndarray):
-        if len(ts)!=len(ps):
-            sys.exit("Theta and phi arrays must be same lengths")
-        elif len(ts)>1:
-            rs,ds=[],[]
-            for t,p in zip(ts,ps):
-                r,d=_convs2c(t,p)
-                rs.append(r)
-                ds.append(d)
-            rs=np.array(rs)
-            ds=np.array(ds)
-        else:rs,ds=_convs2c(ts,ps)
-    else:
-        rs,ds=_convs2c(ts,ps)
-
-    return rs,ds
-
-
-def findedge(GC, delta):
-    for i, step in enumerate(GC):
-        if sggc.length(GC[0], step, degrees=True)>delta:
-            edge=step
-            break
-    return edge
-
-
-def getpoints(FoV): #Get lra/dec vertices for shape on sky
-
-    points = vars(vars(FoV)['_polygons'][0])['_points']
-    sphpoints = hp.vec2ang(points)
-
-
-    ra,dec = sph2cel(sphpoints[0],sphpoints[1])
-
-    return np.array(ra),np.array(dec)
-
-
-def find_tile(ra, dec, delra, deldec):
-
-    tc, pc = cel2sph(ra, dec)
-    # find vertices needed for drawing along great circles.
-    te, pe = cel2sph(ra+90.0, 0.0)
-    tw, pw = cel2sph(ra-90.0, 0.0)
-    tn, pn = cel2sph(ra, dec+90.0)
-    ts, ps = cel2sph(ra, dec-90.0)
-
-    center = hp.ang2vec(tc, pc)
-    npole = hp.ang2vec(tn, pn) # "poles" of GC from center (ie +/- 90
-                               # degrees at right angles)
-    spole = hp.ang2vec(ts, ps)
-    epole = hp.ang2vec(te, pe)
-    wpole = hp.ang2vec(tw, pw)
-
-    eastGC = sggc.interpolate(center, epole, steps=ARC_PRECISION)
-    westGC = sggc.interpolate(center, wpole, steps=ARC_PRECISION)
-
-    e = findedge(eastGC, delra)
-    w = findedge(westGC, delra)
-
-    # don't need to interpolate for stepping along RA great circle, so
-    # just do +/- step
-    dmin = dec - deldec
-    dmax = dec + deldec
-
-    tmax, pmax = cel2sph(ra, dmax)
-    tmin, pmin = cel2sph(ra, dmin)
-
-    n = hp.ang2vec(tmax, pmax)
-    s = hp.ang2vec(tmin, pmin)
-
-    nw = sggc.intersection(npole, w, wpole, n)
-    ne = sggc.intersection(npole, e, epole, n)
-    sw = sggc.intersection(spole, w, wpole, s)
-    se = sggc.intersection(spole, e, epole, s)
-    fov = sgp.SphericalPolygon([nw,ne,se,sw,nw], inside=center)
-
-    return fov, center
-    #return Tile(fov, center)
-
-
-def getshape(FoV): #Get points that allow shape to be drawn on sky
-                   #using plot/scatter points
-
-    points = vars(vars(FoV)['_polygons'][0])['_points']
-    ras, decs = [],[]
-    for i,A in enumerate(points[:-1]):
-        B=points[i+1]
-
-        ipoints = sggc.interpolate(A,B,steps=100)
-
-        sphpoints = hp.vec2ang(ipoints)
-
-        ra,dec = sph2cel(sphpoints[0],sphpoints[1])
-
-        ras.extend(ra)
-        decs.extend(dec)
-
-    return np.array(ras),np.array(decs)
+    """
+    # Code adopted from spherical_geometry.great_circle_arc
+    
+    x, y, z = math.radec2xyz(tile[0], tile[1])
+    xyz = np.array(math.radec2xyz(tile[0], tile[1])).T
+    points = []
+    for corner1, corner2 in zip(xyz, np.roll(xyz, 1, axis=0)):
+        # Could retrieve the lengths from the telescope info
+        length = np.arccos(np.clip(math.dot(corner1, corner2), -1, 1))
+        offsets = np.linspace(0, 1, steps, endpoint=True).reshape((steps, 1))
+        if length > 0:
+            offsets = np.sin(offsets * length) / np.sin(length)
+        point = offsets[::-1] * corner1 + offsets * corner2
+        points.extend(offsets[::-1] * corner2 + offsets * corner1)
+    ra, dec = math.xyz2radec(*np.asarray(points).T)
+    return ra, dec
 
 
 def getvectors(tile):
@@ -390,21 +210,6 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
     return maskedmap
 
 
-def calc_tilecenter(tile):
-    """Return the tile center
-
-    Returns
-
-    - astropy.coordinates.SkyCoord
-
-    """
-
-    _, center = getvectors(tile)
-    sphpoints = hp.vec2ang(center)
-    cra, cdec = sph2cel(sphpoints[0], sphpoints[1])
-    return SkyCoord(cra[0] * units.deg, cdec[0] * units.deg)
-
-
 def calculate_tiling(skymap, telescopes, date=None,
                      coverage=None, maxtiles=100, within=None,
                      nightsky=False, catalog=None,
@@ -419,10 +224,10 @@ def calculate_tiling(skymap, telescopes, date=None,
     tiles, pixlist, sidtimes = {}, {}, {}
     for telescope in telescopes:
         telescope.indices = {}
-        telescope.tiles, telescope.pixlist, telescope.tilecenters = telescope.readtiles(tilespath)
-        telescope.sidtimes = calc_siderealtimes(date, telescope.location,
-                                                within=within,
-                                                allnight=(nightsky == 'all'))
+        telescope.readtiles(tilespath)        
+        telescope.sidtimes = calc_siderealtimes(
+            date, telescope.location, within=within,
+            allnight=(nightsky == 'all'))
     if catalog['path']:
         cattable = read_catalog(**catalog)
         allskymap, catsources = map2catalog(allskymap, cattable)
@@ -475,7 +280,10 @@ def calculate_tiling(skymap, telescopes, date=None,
                                   'tile', 'sources'],
                            dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
                                   Time, TimeDelta, np.ndarray, np.ndarray])
-        return pointings, [], [], np.array([]), allskymap.skymap
+        pointings.tilelist = np.array([], dtype=np.float)
+        pointings.pixellist = obspixlist([], dtype=np.ndarray)
+
+        return pointings, np.array([]), allskymap.skymap
 
     nside = skymap.nside
     pointings = []
@@ -510,7 +318,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             index = indices[sortindices][0]
             indices = indices[sortindices][1:]
             telescope = telescopes[index]
-            tile = xyz2radec(*telescope.toptile.T)
+            tile = math.xyz2radec(*telescope.toptile.T)
             prob = telescope.topprob
             sources = telescope.topsources
             GWobs += prob
@@ -547,8 +355,13 @@ def calculate_tiling(skymap, telescopes, date=None,
                                   'tile', 'sources'],
                            dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
                                   Time, TimeDelta, np.ndarray, np.ndarray])
+    # Add the obstilelist and obspixelist separately
+    # Note that individual tiles inside the table are preserved as
+    # type 'object', not as type 'float64'
+    pointings.tilelist = obstilelist
+    pointings.pixellist = obspixlist
 
-    return pointings, obstilelist, obspixlist, newskymap.skymap, allskymap.skymap
+    return pointings, newskymap.skymap, allskymap.skymap
 
 
 # NB: the telescope instances are modified in-place, so we don't

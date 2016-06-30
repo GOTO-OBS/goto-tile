@@ -21,10 +21,7 @@ from astropy.time import Time, TimeDelta
 from astropy.coordinates import SkyCoord, EarthLocation, Angle
 from astropy import units
 import gototile
-from gototile import fits
 from gototile import skymaptools as smt
-from gototile import scopetools as sct
-from gototile import plottools as pt
 from gototile import grid
 from gototile.skymap import SkyMap
 from gototile.settings import NSIDE
@@ -34,7 +31,7 @@ from gototile.telescope import build_scope, read_config_file
 try:
     FileExistsError
 except NameError:
-    from gototile.utils import FileExistsError, FileNotFoundError
+    from gototile.utils import FileExistsError
 
 
 GWGC_PATH = os.path.join(os.path.dirname(gototile.__file__), 'GWGC.csv')
@@ -69,7 +66,7 @@ def parse_args():
     parser.add_argument('--pickle',
                         help="Write the pointing to a Python pickle file "
                         "(useful for further processing)")
-    parser.add_argument('--figure', help="Figure file name")
+    #parser.add_argument('--figure', help="Figure file name")
     parser.add_argument('--maxtiles', type=int, default=100,
                         help="Maximum number of tiles to return")
     parser.add_argument('--maxfrac', type=float, default=0.95,
@@ -105,10 +102,11 @@ def parse_args():
     parser.add_argument('-j', '--jobs', nargs='?', default=1,
                         help="Number of processes. If specified without a value, "
                         "use all available processes (cores).")
-    parser.add_argument("--geoplot", action="store_true", default=False,
-                        help="Plot in geographic coordinates, (lat, lon)")
-    parser.add_argument("--plot", action="store_true",
-                        help="Plot in RA-Dec")
+    parser.add_argument("--geoplot", action='store_true',
+                        help="Plot in geographic coordinates (lat, lon), "
+                        "instead of the default (RA, Dec)")
+    parser.add_argument("--plot", nargs='?', default=True,
+                        help="Plot in RA-Dec. Optional output file name")
     parser.add_argument("--title", help="Use suppied title in skymap plot.")
     parser.add_argument("--makegrid", action="store_true",
                         help=("Create fixed grid of tiles on sky. "
@@ -124,7 +122,11 @@ def parse_args():
     parser.add_argument('--sun', action='store_true',
                         help="Plot the Sun position")
     parser.add_argument('--moon', action='store_true',
-                        help="Plot the Moon position")
+                        help="Plot the Moon position and phase")
+    parser.add_argument('--plot-coverage', action='store_true',
+                        help="Plot % coverage as outline thickness")
+    parser.add_argument('--plot-delay', action='store_true',
+                        help="Plot delay as tile transparency")
     parser.add_argument('--within',
                         help="Only calculate when an area is observable within "
                         "the given amount of time. Default unit is seconds; "
@@ -161,10 +163,11 @@ def parse_args():
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
     if args.catalog is True:
         args.catalog = GWGC_PATH
-        args.catalog_weight_key = 'weight'
+        if not args.catalog_weight_key:
+            args.catalog_weight_key = 'weight'
     args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}
-    if not args.figure:
-        args.figure = os.path.splitext(args.skymap)[0] + '.png'
+    if args.plot is True:
+        args.plot = os.path.splitext(args.skymap)[0] + '.png'
     return args
 
 
@@ -271,7 +274,7 @@ def main(args):
     skymap.regrade(nside=NSIDE)
     date = skymap.header['date-det'] if args.date is None else args.date
 
-    pointings, _, _, tiledmap, allskymap = smt.calculate_tiling(
+    pointings, tiledmap, allskymap = smt.calculate_tiling(
         skymap, telescopes, date=date, coverage=args.coverage,
         maxtiles=args.maxtiles, within=args.within,
         nightsky=args.nightsky, catalog=args.catalog,
@@ -339,12 +342,15 @@ def main(args):
         with open(args.pickle, 'wb') as outfile:
             pickle.dump(pointings, outfile, protocol=2)
 
-    if args.plot or args.geoplot:
-        skymap.plot(args.figure, telescopes, date, pointings,
+    if args.plot:
+        options = dict(sun=args.sun, moon=args.moon,
+                       coverage=args.plot_coverage,
+                       delay=args.plot_delay)
+        skymap.plot(args.plot, telescopes, date, pointings,
                     geoplot=args.geoplot, catalog=args.catalog,
                     nightsky=args.nightsky,
                     title=args.title, objects=objects,
-                    sun=args.sun, moon=args.moon)
+                    options=options)
 
 
 if __name__ == '__main__':
