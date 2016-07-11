@@ -124,7 +124,7 @@ def parse_args():
     parser.add_argument('--moon', action='store_true',
                         help="Plot the Moon position and phase")
     parser.add_argument('--plot-coverage', action='store_true',
-                        help="Plot % coverage as outline thickness")
+                        help="Plot %% coverage as outline thickness")
     parser.add_argument('--plot-delay', action='store_true',
                         help="Plot delay as tile transparency")
     parser.add_argument('--within',
