@@ -22,7 +22,7 @@ def getshape(tile, steps=50):
 
     """
     # Code adopted from spherical_geometry.great_circle_arc
-    
+
     x, y, z = math.radec2xyz(tile[0], tile[1])
     xyz = np.array(math.radec2xyz(tile[0], tile[1])).T
     points = []
@@ -224,7 +224,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     tiles, pixlist, sidtimes = {}, {}, {}
     for telescope in telescopes:
         telescope.indices = {}
-        telescope.readtiles(tilespath)        
+        telescope.readtiles(tilespath)
         telescope.sidtimes = calc_siderealtimes(
             date, telescope.location, within=within,
             allnight=(nightsky == 'all'))
@@ -281,7 +281,7 @@ def calculate_tiling(skymap, telescopes, date=None,
                            dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
                                   Time, TimeDelta, np.ndarray, np.ndarray])
         pointings.tilelist = np.array([], dtype=np.float)
-        pointings.pixellist = obspixlist([], dtype=np.ndarray)
+        pointings.pixellist = np.array([], dtype=np.ndarray)
 
         return pointings, np.array([]), allskymap.skymap
 

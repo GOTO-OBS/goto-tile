@@ -47,19 +47,26 @@ class SkyMap(object):
     def __init__(self, skymap, header=None, **kwargs):
         if isinstance(skymap, stringtype):
             skymap, header = self._read_file(skymap)
+        elif header is None:
+            header = {}
         elif not isinstance(header, dict):
             raise TypeError("header should be a dict")
-        self.object = header['object']
-        self.order = header['order']
-        self.nside = header['nside']
-        self.isnested = header['nested']
+        self.object = header.get('object')
+        self.order = header.get('order')
+        self.nside = header.get('nside')
+        self.isnested = header.get('nested')
         self.skymap = skymap
         self.header = header
-        self.objid = header['objid']
+        self.objid = header.get('objid')
 
     def copy(self):
-        return SkyMap(skymap=self.skymap.copy(),
-                      header=self.header.copy())
+        newmap = SkyMap(skymap=self.skymap.copy())
+        newmap.object = self.object
+        newmap.order = self.order
+        newmap.isnested = self.isnested
+        newmap.nside = self.nside
+        newmap.objid = self.objid
+        return newmap
 
     def _read_file(self, filename):
         skymap, header = healpy.read_map(filename, h=True,
@@ -105,7 +112,6 @@ class SkyMap(object):
                                       power=power, pess=pess, dtype=dtype)
         self.nside = nside
         self.order = order
-
 
     def skycoords(self):
         """Return the sky coordinates (RA, Dec) for the current map.
@@ -245,13 +251,13 @@ class SkyMap(object):
             if options.get('coverage'):
                 # show % coverage as outline thickness
                 linewidth = 100 * pointing['prob']
-            if np.any(ra2 >= 180) and np.any(ra2 <= 180):
-                mask = ra2 > 180
+            if np.any(ra2+180 >= 180) and np.any(ra2+180 <= 180):
+                mask = ra2+180 > 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
-                mask = ra2 <= 180
+                mask = ra2+180 <= 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
