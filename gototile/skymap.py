@@ -88,12 +88,12 @@ class SkyMap(object):
         header['objid'] = objid.split(':')[-1]
         header['url'] = header.get('referenc', '')
 
+        header['mjd'] = astropy.time.Time.now().mjd
+        header['date'] = astropy.time.Time(float(header['mjd']), format='mjd')
         header['mjddet'] = header.get(
             'mjd-obs', astropy.time.Time(header['date']).mjd)
-        header['mjd'] = astropy.time.Time.now().mjd
-        header['date-det'] = astropy.time.Time(header['mjddet'],
-                                                 format='mjd')
-        header['date'] = astropy.time.Time(header['mjd'], format='mjd')
+        header['date-det'] = astropy.time.Time(float(header['mjddet']),
+                                               format='mjd')
 
         header['nside'] = header.get('nside', healpy.npix2nside(len(skymap)))
 
