@@ -135,7 +135,8 @@ class SkyMap(object):
     def plot(self, filename, telescopes, date, pointings,
              geoplot=False, catalog=None, nightsky=False,
              title="", objects=None,
-             catcolor='#999999', dpi=300, options=None):
+             catcolor='#999999', dpi=300, options=None,
+             axes=None):
         """Plot the skymap in a Moll-Weide projection
 
 
@@ -197,8 +198,9 @@ class SkyMap(object):
                             unit=units.degree)
             moon.phase = phase/100
 
-        figure = Figure()
-        axes = figure.add_subplot(1, 1, 1)
+        if axes is None:
+            figure = Figure()
+            axes = figure.add_subplot(1, 1, 1)
         m = Basemap(projection='moll', resolution='c', lon_0=0.0, ax=axes)
         m.drawmeridians(np.arange(0, 360, 30), linewidth=0.25)
         m.drawparallels(np.arange(-90, 90, 30), linewidth=0.25, labels=[1,0,0,0])
@@ -322,5 +324,6 @@ class SkyMap(object):
                    markerfacecolor=(phase, phase, phase, 0.5))
         axes.set_title(title, y=1.05)
 
-        canvas = FigureCanvas(figure)
-        canvas.print_figure(filename, dpi=dpi)
+        if filename:
+            canvas = FigureCanvas(figure)
+            canvas.print_figure(filename, dpi=dpi)
