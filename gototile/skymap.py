@@ -210,7 +210,7 @@ class SkyMap(object):
             st = t.sidereal_time('mean')
             dlon = st.radian
             m.drawcoastlines(linewidth=0.25)
-            m.nightshade(date=date.datetime)
+            m.nightshade(date=date.datetime, ax=axes)
             longs, lats = zip(*[(telescope.location.longitude.deg,
                                telescope.location.latitude.deg)
                               for telescope in telescopes])
