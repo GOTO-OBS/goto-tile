@@ -21,6 +21,7 @@ try:
     FileExistsError
 except NameError:
     from .utils import FileExistsError
+from .utils import pointings_to_text
 from .log import set_logging
 from .parser import parse_args, parse_date, parse_object
 
@@ -85,25 +86,8 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
             print("")
 
     if output.get('text'):
-        table = pointings[['prob', 'cumprob', 'telescope']].copy()
-        table['prob'] = ["{:.5f}".format(100 * prob)
-                         for prob in table['prob']]
-        table['cumprob'] = ["{:.5f}".format(100*prob)
-                            for prob in  table['cumprob']]
-        table['ra'] = ["{:.5f}".format(center.ra.deg)
-                       for center in pointings['center']]
-        table['dec'] = ["{:.5f}".format(center.dec.deg)
-                        for center in pointings['center']]
-        # %z was added in Python 3.3, and %Z is deprecated
-        table['time'] = [time.datetime.strftime('%Y-%m-%dT%H:%M:%S%z')
-                         for time in pointings['time']]
-        table['dt'] = ["{:.5f}".format(dt.jd) for dt in pointings['dt']]
-        columns = ['telescope', 'ra', 'dec', 'time', 'dt', 'prob', 'cumprob']
-        if catalog['path']:
-            table['ncatsources'] = [len(sources)
-                                    for sources in pointings['sources']]
-            columns.append('ncatsources')
-        table[columns].write(output['text'], format='ascii.ecsv')
+        table = pointings_to_text(pointings, catalog=catalog)
+        table.write(output['text'], format='ascii.ecsv')
 
     if output.get('latex'):  # Very similar to output, but with less
                              # precision (more human readable when rendered)
