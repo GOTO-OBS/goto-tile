@@ -224,7 +224,10 @@ def calculate_tiling(skymap, telescopes, date=None,
     tiles, pixlist, sidtimes = {}, {}, {}
     for telescope in telescopes:
         telescope.indices = {}
-        telescope.readtiles(tilespath)
+        if isinstance(tilespath, dict):
+            telescope.readtiles(tilespath[telescope])
+        else:
+            telescope.readtiles(tilespath)
         telescope.sidtimes = calc_siderealtimes(
             date, telescope.location, within=within,
             allnight=(nightsky == 'all'))
