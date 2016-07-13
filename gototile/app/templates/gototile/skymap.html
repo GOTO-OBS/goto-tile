@@ -1,0 +1,82 @@
+{% extends "gototile/base.html" %}
+{% load staticfiles %}
+{% block stylesheets %}
+{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static 'gototile/css/skymap.css' %}">
+{% endblock stylesheets %}
+{% block scripts %}
+{{ block.super }}
+<script src="{% static 'gototile/js/skymap.js' %}"></script>
+{% endblock scripts %}
+{% block body %}{{ block.super }}
+<main>
+
+{% if image %}
+<img alt="Tiled skymap" src="data:image/png;base64,{{ image }}" width="640" />
+{% endif %}
+{% if pointings %}
+<h3>Pointings</h3>
+<table>
+<thead>
+<tr><th>RA</th><th>Dec</th><th>Tile probability</th><th>Total covered probability</th></tr>
+</thead>
+<tbody>
+{% for pointing in pointings %}
+<tr>
+<td>{{ pointing.ra }}</td>
+<td>{{ pointing.dec }}</td>
+<td>{{ pointing.prob }}</td>
+<td>{{ pointing.cumprob }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+
+
+{{ form.non_field_errors }}
+<hr>
+<form enctype="multipart/form-data" method="post" action=".">{% csrf_token %}
+<div>
+{{ form.non_field.errors }}
+</div>
+<table class="form">
+<tbody>
+<tr>
+<th>{{ form.skymap.label_tag }}</th>
+<td colspan="3">{{ form.skymap.errors }}{{ form.skymap }}</td>
+</tr>
+
+<tr><th rowspan="5">{{ form.telescope.label_tag }}</th>
+<td colspan="3">{{ form.telescope.errors }}{{ form.telescope }}</td></tr>
+<tr><td colspan="3">{{ form.site.errors }}{{ form.site }} {{ form.site.label_tag }}</td></tr><tr><td></td><td colspan="2">{{ form.site.help_text }}</td></tr>
+<tr>
+<td colspan="3">{{ form.fov.errors }}{{ form.fov }} {{ form.fov.label_tag }}</td></tr><tr><td></td><td colspan="2">{{ form.fov.help_text }}</td></tr>
+
+<tr><th rowspan="3">{{ form.date.label_tag }}</th><td colspan="3">{{ form.fraction.errors }}{{ form.date }}</td></tr>
+<tr><td colspan="3"><span class="datevaluespan">{{ form.datevalue.errors }}{{ form.datevalue }}</span></td></tr><tr><td></td><td colspan="2"><span class="datevaluespan">{{ form.datevalue.help_text }}</span></td></tr>
+
+<tr><th>{{ form.fraction.label_tag }}</th><td>{{ form.fraction.errors }}
+{{ form.fraction }}</td><td colspan="2">{{ form.fraction.help_text }}</td></tr>
+<tr><th>{{ form.maxtiles.label_tag }}</th><td>{{ form.maxtiles.errors }}
+{{ form.maxtiles }}</td><td colspan="2">{{ form.maxtiles.help_text }}</td></tr>
+
+<tr><th rowspan="2">{{ form.title.label_tag }}</th><td colspan="3">{{ form.title.errors }}{{ form.title }}</td></tr>
+<tr><td></td><td colspan="2">{{ form.title.help_text }}</td></tr>
+
+<tr><th>{{ form.nightsky }}</th><td colspan="3">{{ form.nightsky.errors }}{{ form.nightsky.help_text }}</td></tr>
+<tr><th>{{ form.catalog }}</th><td colspan="3">{{ form.catalog.errors }}{{ form.catalog.help_text }}</td></tr>
+<tr><th>{{ form.geoplot }}</th><td colspan="3">{{ form.geoplot.errors }}{{ form.geoplot.help_text }}</td></tr>
+<tr><th>{{ form.sun }}</th><td colspan="3">{{ form.sun.errors }}{{ form.sun.help_text }}</td></tr>
+<tr><th>{{ form.moon }}</th><td colspan="3">{{ form.moon.errors }}{{ form.moon.help_text }}</td></tr>
+
+<tr><th rowspan="2">{{ form.objects.label_tag }}</th><td colspan="3">{{ form.objects.errors }}{{ form.objects }}</td></tr><tr><td></td><td colspan="2">{{ form.objects.help_text }}</td></tr>
+
+</tbody>
+</table>
+
+<input type="submit" value="Create tiled skymap">
+</form>
+
+</main>
+{% endblock body %}

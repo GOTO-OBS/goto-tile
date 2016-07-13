@@ -1,0 +1,21 @@
+form table th, td {
+	vertical-align: top;
+	padding-top: 0.3em;
+	padding-bottom: 0.3em;
+}
+form table th {
+	text-align: right;
+}
+form table input[type="number"] {
+	width: 5em;
+}
+ul.errorlist {
+	margin: 0;
+	padding: 0;
+}
+ul.errorlist li {
+	list-style: none;
+	padding-left: 0;
+	margin-left: 0;
+	color: red;
+}
