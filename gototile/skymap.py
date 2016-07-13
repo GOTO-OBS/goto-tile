@@ -56,7 +56,7 @@ class SkyMap(object):
         self.nside = header.get('nside')
         self.isnested = header.get('nested')
         if not self.order:
-            self.order = 'NESTED' if self.isnested else 'RINGED'
+            self.order = 'NESTED' if self.isnested else 'RING'
         self.skymap = skymap
         self.objid = header.get('objid')
         self.header = header
@@ -98,7 +98,6 @@ class SkyMap(object):
                                                format='mjd')
 
         header['nside'] = header.get('nside', healpy.npix2nside(len(skymap)))
-
         return skymap, header
 
     def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
@@ -116,6 +115,7 @@ class SkyMap(object):
                                       power=power, pess=pess, dtype=dtype)
         self.nside = nside
         self.order = order
+        self.isnested = order == 'NESTED'
 
     def skycoords(self):
         """Return the sky coordinates (RA, Dec) for the current map.
