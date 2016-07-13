@@ -101,7 +101,7 @@ class SkyMap(object):
 
         return skymap, header
 
-    def regrade(self, nside=None, order=None, power=None, pess=False,
+    def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
                 dtype=None):
         """Up- or downgrade the skymap resolution.
 
@@ -109,6 +109,8 @@ class SkyMap(object):
 
         """
 
+        if nside == self.nside and order == self.order:
+            return
         self.skymap = healpy.ud_grade(self.skymap, nside_out=nside,
                                       order_in=self.order, order_out=order,
                                       power=power, pess=pess, dtype=dtype)
