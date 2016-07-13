@@ -55,9 +55,11 @@ class SkyMap(object):
         self.order = header.get('order')
         self.nside = header.get('nside')
         self.isnested = header.get('nested')
+        if not self.order:
+            self.order = 'NESTED' if self.isnested else 'RINGED'
         self.skymap = skymap
-        self.header = header
         self.objid = header.get('objid')
+        self.header = header
 
     def copy(self):
         newmap = SkyMap(skymap=self.skymap.copy())
