@@ -320,7 +320,7 @@ class SkyMap(object):
             x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180), moon.dec.value)
             m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
                    markerfacecolor=(phase, phase, phase, 0.5))
-        axes.set_title(title)
+        axes.set_title(title, y=1.05)
 
         canvas = FigureCanvas(figure)
         canvas.print_figure(filename, dpi=dpi)
