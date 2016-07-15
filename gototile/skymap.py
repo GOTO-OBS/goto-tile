@@ -47,19 +47,28 @@ class SkyMap(object):
     def __init__(self, skymap, header=None, **kwargs):
         if isinstance(skymap, stringtype):
             skymap, header = self._read_file(skymap)
+        elif header is None:
+            header = {}
         elif not isinstance(header, dict):
             raise TypeError("header should be a dict")
-        self.object = header['object']
-        self.order = header['order']
-        self.nside = header['nside']
-        self.isnested = header['nested']
+        self.object = header.get('object')
+        self.order = header.get('order')
+        self.nside = header.get('nside')
+        self.isnested = header.get('nested')
+        if not self.order:
+            self.order = 'NESTED' if self.isnested else 'RING'
         self.skymap = skymap
+        self.objid = header.get('objid')
         self.header = header
-        self.objid = header['objid']
 
     def copy(self):
-        return SkyMap(skymap=self.skymap.copy(),
-                      header=self.header.copy())
+        newmap = SkyMap(skymap=self.skymap.copy())
+        newmap.object = self.object
+        newmap.order = self.order
+        newmap.isnested = self.isnested
+        newmap.nside = self.nside
+        newmap.objid = self.objid
+        return newmap
 
     def _read_file(self, filename):
         skymap, header = healpy.read_map(filename, h=True,
@@ -81,18 +90,17 @@ class SkyMap(object):
         header['objid'] = objid.split(':')[-1]
         header['url'] = header.get('referenc', '')
 
+        header['mjd'] = astropy.time.Time.now().mjd
+        header['date'] = astropy.time.Time(float(header['mjd']), format='mjd')
         header['mjddet'] = header.get(
             'mjd-obs', astropy.time.Time(header['date']).mjd)
-        header['mjd'] = astropy.time.Time.now().mjd
-        header['date-det'] = astropy.time.Time(header['mjddet'],
-                                                 format='mjd')
-        header['date'] = astropy.time.Time(header['mjd'], format='mjd')
+        header['date-det'] = astropy.time.Time(float(header['mjddet']),
+                                               format='mjd')
 
         header['nside'] = header.get('nside', healpy.npix2nside(len(skymap)))
-
         return skymap, header
 
-    def regrade(self, nside=None, order=None, power=None, pess=False,
+    def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
                 dtype=None):
         """Up- or downgrade the skymap resolution.
 
@@ -100,12 +108,14 @@ class SkyMap(object):
 
         """
 
+        if nside == self.nside and order == self.order:
+            return
         self.skymap = healpy.ud_grade(self.skymap, nside_out=nside,
                                       order_in=self.order, order_out=order,
                                       power=power, pess=pess, dtype=dtype)
         self.nside = nside
         self.order = order
-
+        self.isnested = order == 'NESTED'
 
     def skycoords(self):
         """Return the sky coordinates (RA, Dec) for the current map.
@@ -125,7 +135,8 @@ class SkyMap(object):
     def plot(self, filename, telescopes, date, pointings,
              geoplot=False, catalog=None, nightsky=False,
              title="", objects=None,
-             catcolor='#999999', dpi=300, options=None):
+             catcolor='#999999', dpi=300, options=None,
+             axes=None):
         """Plot the skymap in a Moll-Weide projection
 
 
@@ -187,8 +198,9 @@ class SkyMap(object):
                             unit=units.degree)
             moon.phase = phase/100
 
-        figure = Figure()
-        axes = figure.add_subplot(1, 1, 1)
+        if axes is None:
+            figure = Figure()
+            axes = figure.add_subplot(1, 1, 1)
         m = Basemap(projection='moll', resolution='c', lon_0=0.0, ax=axes)
         m.drawmeridians(np.arange(0, 360, 30), linewidth=0.25)
         m.drawparallels(np.arange(-90, 90, 30), linewidth=0.25, labels=[1,0,0,0])
@@ -200,7 +212,7 @@ class SkyMap(object):
             st = t.sidereal_time('mean')
             dlon = st.radian
             m.drawcoastlines(linewidth=0.25)
-            m.nightshade(date=date.datetime)
+            m.nightshade(date=date.datetime, ax=axes)
             longs, lats = zip(*[(telescope.location.longitude.deg,
                                telescope.location.latitude.deg)
                               for telescope in telescopes])
@@ -245,13 +257,13 @@ class SkyMap(object):
             if options.get('coverage'):
                 # show % coverage as outline thickness
                 linewidth = 100 * pointing['prob']
-            if np.any(ra2 >= 180) and np.any(ra2 <= 180):
-                mask = ra2 > 180
+            if np.any(ra2+180 >= 180) and np.any(ra2+180 <= 180):
+                mask = ra2+180 > 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
                           edgecolor='black')
-                mask = ra2 <= 180
+                mask = ra2+180 <= 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
@@ -310,7 +322,8 @@ class SkyMap(object):
             x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180), moon.dec.value)
             m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
                    markerfacecolor=(phase, phase, phase, 0.5))
-        axes.set_title(title)
+        axes.set_title(title, y=1.05)
 
-        canvas = FigureCanvas(figure)
-        canvas.print_figure(filename, dpi=dpi)
+        if filename:
+            canvas = FigureCanvas(figure)
+            canvas.print_figure(filename, dpi=dpi)
