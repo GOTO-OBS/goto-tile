@@ -130,7 +130,7 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
                        coverage=plotoptions.get('coverage'),
                        delay=plotoptions.get('delay'))
         skymap.plot(plotoptions['output'], telescopes, date, pointings,
-                    geoplot=plotoptions['geo'], catalog=catalog,
+                    geoplot=plotoptions.get('geo'), catalog=catalog,
                     nightsky=nightsky,
                     title=plotoptions.get('title'),
                     objects=plotoptions.get('objects'),
