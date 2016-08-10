@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import astropy
+from astropy.time import Time
 from .skymaptools import calculate_tiling
 from .skymap import SkyMap
 from .settings import NSIDE
@@ -69,6 +70,10 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         "This is {:5.2f}% of the original skymap".format((gwtot/allsky)*100.)
     ]
     pointings.meta['command'] = command
+    pointings.meta['time-created'] = Time.now().datetime.strftime(
+        "%Y-%m-%dT%H:%M:%S")
+    pointings.meta['time-planning'] = date.datetime.strftime(
+        "%Y-%m-%dT%H:%M:%S")
 
     print("\n".join(pointings.meta['comments']))
     print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
