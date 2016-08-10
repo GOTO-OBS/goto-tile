@@ -75,30 +75,6 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
     pointings.meta['time-planning'] = date.datetime.strftime(
         "%Y-%m-%dT%H:%M:%S")
 
-    print("\n".join(pointings.meta['comments']))
-    print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
-          "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
-          end=" ")
-    if (len(pointings) and
-        np.any([len(sources) > 0 for sources in pointings['sources']])):
-        print("# of cat. srcs")
-    else:
-        print("")
-    for pointing in pointings:
-        print("{ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
-              "{p[cumprob]:17.6f}  {p[relprob]:9.6f}  {p[cumrelprob]:9.6f}  "
-              "{coverage:12.2f}  {p[telescope]:>9s}  "
-              "{dt:10.2f} {p[time].datetime:%Y-%m-%d %H:%M} UT".format(
-                  p=pointing, ra=pointing['center'].ra.deg,
-                  dec=pointing['center'].dec.deg,
-                  coverage=pointing['cumprob']*100,
-                  dt=pointing['dt'].jd*24),
-              end=' ')
-        if len(pointing['sources']):
-            print("{:-8d}".format(len(pointing['sources'])))
-        else:
-            print("")
-
     if outputoptions.get('text'):
         table = pointings_to_text(pointings, catalog=catalog)
         table.write(outputoptions['text'], format='ascii.ecsv')
@@ -139,6 +115,32 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
     return pointings
 
 
+def print_pointings(pointings):
+    print("\n".join(pointings.meta['comments']))
+    print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
+          "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
+          end=" ")
+    if (len(pointings) and
+        np.any([len(sources) > 0 for sources in pointings['sources']])):
+        print("# of cat. srcs")
+    else:
+        print("")
+    for pointing in pointings:
+        print("{ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
+              "{p[cumprob]:17.6f}  {p[relprob]:9.6f}  {p[cumrelprob]:9.6f}  "
+              "{coverage:12.2f}  {p[telescope]:>9s}  "
+              "{dt:10.2f} {p[time].datetime:%Y-%m-%d %H:%M} UT".format(
+                  p=pointing, ra=pointing['center'].ra.deg,
+                  dec=pointing['center'].dec.deg,
+                  coverage=pointing['cumprob']*100,
+                  dt=pointing['dt'].jd*24),
+              end=' ')
+        if len(pointing['sources']):
+            print("{:-8d}".format(len(pointing['sources'])))
+        else:
+            print("")
+
+
 def main(args=None):
     args = parse_args(args=args)
     set_logging(args.verbose, args.quiet)
@@ -157,7 +159,7 @@ def main(args=None):
                    'coverage': args.plot_coverage,
                    'delay': args.plot_delay}
 
-    run(args.skymap, args.scope, date=date,
+    pointings = run(args.skymap, args.scope, date=date,
         coverage=args.coverage,
         maxtiles=args.maxtiles, within=args.within,
         nightsky=args.nightsky, catalog=args.catalog,
@@ -165,3 +167,5 @@ def main(args=None):
         command=command,
         outputoptions=outputoptions,
         plotoptions=plotoptions)
+
+    print_pointings(pointings)
