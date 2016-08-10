@@ -131,6 +131,8 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
                     objects=plotoptions.get('objects'),
                     options=options)
 
+    return pointings
+
 
 def main(args=None):
     args = parse_args(args=args)
