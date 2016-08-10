@@ -71,8 +71,16 @@ class SkyMap(object):
         return newmap
 
     def _read_file(self, filename):
-        skymap, header = healpy.read_map(filename, h=True,
-                                         verbose=False, nest=None)
+        info = healpy.read_map(filename, h=True, field=None,
+                               verbose=False, nest=None)
+        try:
+            skymap, distmu, distsigma, distnorm, header = info
+        except ValueError as exc:
+            if "not enough values to unpack" in str(exc):
+                # assume an older map without distance information
+                skymap, header = info
+            else:
+                raise
         header = dict([(key.lower(), value) for key, value in header])
         header['file'] = filename
         if header['ordering'] not in ('NESTED', 'RING'):
