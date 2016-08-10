@@ -30,16 +30,17 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         coverage=None, maxtiles=100, within=None,
         nightsky=False, catalog=None, tilespath='./tiles',
         njobs=1, tileduration=None,
-        command='', output=None, plot=None):
+        command='',
+        outputoptions=None, plotoptions=None):
 
     if coverage is None:
         coverage = {'min': 0.05, 'max': 0.95}
     if catalog is None:
         catalog = {'path': None, 'key': None}
-    if output is None:
-        output = {}
-    if plot is None:
-        plot = {}
+    if outputoptions is None:
+        outputoptions = {}
+    if plotoptions is None:
+        plotoptions = {}
 
     if not isinstance(skymap, SkyMap):
         skymap = SkyMap(skymap)
@@ -86,11 +87,11 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         else:
             print("")
 
-    if output.get('text'):
+    if outputoptions.get('text'):
         table = pointings_to_text(pointings, catalog=catalog)
-        table.write(output['text'], format='ascii.ecsv')
+        table.write(outputoptions['text'], format='ascii.ecsv')
 
-    if output.get('latex'):  # Very similar to output, but with less
+    if outputoptions.get('latex'):  # Very similar to output, but with less
                              # precision (more human readable when rendered)
         table = pointings[['prob', 'cumprob', 'telescope']].copy()
         table['prob'] = ["{:.2f}".format(100 * prob)
@@ -105,20 +106,22 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
                          for time in pointings['time']]
         table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
         table[['telescope', 'ra', 'dec', 'time', 'dt',
-               'prob', 'cumprob']].write(output['latex'], format='latex')
+               'prob', 'cumprob']].write(outputoptions['latex'], format='latex')
 
-    if output.get('pickle'):  # For re-use within Python
-        with open(output['pickle'], 'wb') as outfile:
+    if outputoptions.get('pickle'):  # For re-use within Python
+        with open(outputoptions['pickle'], 'wb') as outfile:
             pickle.dump(pointings, outfile, protocol=2)
 
-    if plot.get('output'):
-        options = dict(sun=plot.get('sun'), moon=plot.get('moon'),
-                       coverage=plot.get('coverage'),
-                       delay=plot.get('delay'))
-        skymap.plot(plot['output'], telescopes, date, pointings,
-                    geoplot=plot['geo'], catalog=catalog,
+    if plotoptions.get('output'):
+        options = dict(sun=plotoptions.get('sun'),
+                       moon=plotoptions.get('moon'),
+                       coverage=plotoptions.get('coverage'),
+                       delay=plotoptions.get('delay'))
+        skymap.plot(plotoptions['output'], telescopes, date, pointings,
+                    geoplot=plotoptions['geo'], catalog=catalog,
                     nightsky=nightsky,
-                    title=plot.get('title'), objects=plot.get('objects'),
+                    title=plotoptions.get('title'),
+                    objects=plotoptions.get('objects'),
                     options=options)
 
 
@@ -158,15 +161,17 @@ def main(args=None):
 
     date = parse_date(args.date)
     command = " ".join(sys.argv)
-    output = {'text': args.output, 'latex': args.latex, 'pickle': args.pickle}
-    plot = {'output': args.plot,
-            'geo': args.geoplot,
-            'title': args.title,
-            'sun': args.sun,
-            'moon': args.moon,
-            'objects': [parse_object(obj) for obj in args.object],
-            'coverage': args.plot_coverage,
-            'delay': args.plot_delay}
+    outputoptions = {'text': args.output,
+                     'latex': args.latex,
+                     'pickle': args.pickle}
+    plotoptions = {'output': args.plot,
+                   'geo': args.geoplot,
+                   'title': args.title,
+                   'sun': args.sun,
+                   'moon': args.moon,
+                   'objects': [parse_object(obj) for obj in args.object],
+                   'coverage': args.plot_coverage,
+                   'delay': args.plot_delay}
 
     run(args.skymap, telescopes, date=date,
         coverage=args.coverage,
@@ -174,4 +179,5 @@ def main(args=None):
         nightsky=args.nightsky, catalog=args.catalog,
         tilespath=args.tiles, njobs=args.njobs,
         tileduration=args.exptime, command=command,
-        output=output, plot=plot)
+        outputoptions=outputoptions,
+        plotoptions=plotoptions)
