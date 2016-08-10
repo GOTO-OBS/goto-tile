@@ -41,7 +41,8 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
     if plot is None:
         plot = {}
 
-    skymap = SkyMap(skymap)
+    if not isinstance(skymap, SkyMap):
+        skymap = SkyMap(skymap)
     skymap.regrade(nside=nside)
     date = skymap.header['date-det'] if date is None else date
 
