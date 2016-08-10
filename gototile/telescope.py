@@ -261,7 +261,11 @@ class Telescope(object):
             if os.path.splitext(tilespath)[0] == tilespath:
                 tilespath += ".pgz"
             if not os.path.isfile(tilespath):
-                raise FileNotFoundError("no pre-made tiled grid file found")
+                # Create one in-memory
+                data = tileallsky(self.fov, NSIDE, overlap=0.5)
+                self.tiles, self.pixlist, self.tilecenters = data
+                return self.tiles, self.pixlist, self.tilecenters
+
         with gzip.GzipFile(tilespath, 'r') as infile:
             try:
                 data = pickle.load(infile, encoding='latin1')  # Python 3

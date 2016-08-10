@@ -111,6 +111,8 @@ def tileallsky(fov, nside, overlap=None, gridcoords=None, nested=True):
     """Create a grid across all sky and store in a file"""
     if overlap is None:
         overlap = {'ra': 0.5, 'dec': 0.5}
+    if isinstance(overlap, (int, float)):
+        overlap = {'ra': overlap, 'dec': overlap}
     step = {}
     for key in ('ra', 'dec'):
         overlap[key] = min(max(overlap[key], 0), 0.9)
