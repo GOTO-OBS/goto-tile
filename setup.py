@@ -15,7 +15,7 @@ for scheme in INSTALL_SCHEMES.values():
 
 setup(
     name="gototile",
-    version="0.1",
+    version="0.2",
     description=("Create a set of tiled observation pointings to "
                  "cover an extended sky area, for one or more telescopes"),
     author="Darren White, Evert Rol",
