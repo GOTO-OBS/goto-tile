@@ -14,16 +14,15 @@ import astropy
 from .skymaptools import calculate_tiling
 from .skymap import SkyMap
 from .settings import NSIDE
-from .telescope import (GOTON4, GOTON8, GOTOS4, GOTOS8,
-                                SuperWASPN, VISTA, GOTOLS4, GOTOLS8)
+from . import telescope as telmodule
 from .telescope import build_scope, read_config_file
+from .utils import pointings_to_text
+from .log import set_logging
+from .parser import parse_args, parse_date, parse_object
 try:
     FileExistsError
 except NameError:
     from .utils import FileExistsError
-from .utils import pointings_to_text
-from .log import set_logging
-from .parser import parse_args, parse_date, parse_object
 
 
 def run(skymap, telescopes, nside=NSIDE, date=None,
@@ -129,36 +128,6 @@ def main(args=None):
     args = parse_args(args=args)
     set_logging(args.verbose, args.quiet)
 
-    telclasses = {
-        'gn4': GOTON4,
-        'gn8': GOTON8,
-        'gs4': GOTOS4,
-        'gs8': GOTOS8,
-        'gls4': GOTOLS4,
-        'gls8': GOTOLS8,
-        'swn': SuperWASPN,
-        'vista': VISTA
-    }
-
-    telescopes = []
-    for scope in args.scope:
-        telclass = telclasses[scope]
-        telescope = telclass()
-        telescopes.append(telescope)
-    if args.scopefile:
-        telconfigs = read_config_file(args.scopefile)
-        for config in telconfigs:
-            telescope = build_scope(config)
-            try:
-                telescope.makegrid(args.tiles)
-            except FileExistsError as exc:
-                logging.warning(str(exc))
-                logging.info("Skipping this grid.")
-                logging.info("Remove file if you want to recreate the grid")
-            telescopes.append(telescope)
-    if not telescopes:
-        sys.exit("No telescopes given")
-
     date = parse_date(args.date)
     command = " ".join(sys.argv)
     outputoptions = {'text': args.output,
@@ -173,7 +142,7 @@ def main(args=None):
                    'coverage': args.plot_coverage,
                    'delay': args.plot_delay}
 
-    run(args.skymap, telescopes, date=date,
+    run(args.skymap, args.scope, date=date,
         coverage=args.coverage,
         maxtiles=args.maxtiles, within=args.within,
         nightsky=args.nightsky, catalog=args.catalog,

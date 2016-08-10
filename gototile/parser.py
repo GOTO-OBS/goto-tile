@@ -33,7 +33,7 @@ def parse_args(args=None):
                         "attempt tiling")
     parser.add_argument('-s', '--scope',
                         choices=['gn4', 'gn8', 'gs4', 'gs8', 'gls4', 'gls8',
-                                 'swn','vista'],
+                                 'swasp','vista'],
                         default=[], action='append',
                         help=("Telescope to use. GOTO-4 (default), GOTO-8, "
                               "SuperWASP-North, VISTA."))
@@ -101,8 +101,34 @@ def parse_args(args=None):
     args = parser.parse_args(args=args)
     if args.njobs:
         args.njobs = int(args.njobs)
+
     if args.nightsky is None:
         args.nightsky = False
+
+    # Map args.scope option to actual class names
+    telclasses = {
+        'gn4': 'GOTON4',
+        'gn8': 'GOTON8',
+        'gs4': 'GOTOS4',
+        'gs8': 'GOTOS8',
+        'gls4': 'GOTOLS4',
+        'gls8': 'GOTOLS8',
+        'swasp': 'SuperWASPN',
+        'vista': 'VISTA',
+    }
+    telescopes = []
+    for scope in args.scope:
+        telescopes.append(telclasses[scope])
+    args.scope = telescopes
+
+    if args.scopefile:
+        telconfigs = read_config_file(args.scopefile)
+        for config in telconfigs:
+            telescope = build_scope(config)
+            args.scope.append(telescope)
+    if not args.scope:
+        sys.exit("No telescopes given")
+
     if args.within:
         try:
             val = float(args.within) * units.second
@@ -119,14 +145,18 @@ def parse_args(args=None):
             else:
                 raise
         args.within = TimeDelta(val)
+
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
+
     if args.catalog is True:
         args.catalog = GWGC_PATH
         if not args.catalog_weight_key:
             args.catalog_weight_key = 'weight'
     args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}
+
     if args.plot is True:
         args.plot = os.path.splitext(args.skymap)[0] + '.png'
+
     return args
 
 
