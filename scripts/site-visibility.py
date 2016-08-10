@@ -106,8 +106,7 @@ def main():
                     catalog=options.catalog,
                     visible=False,
                     tilespath=TILESPATH,
-                    njobs=options.jobs,
-                    tileduration=TILE_OBS_DUR)
+                    njobs=options.jobs)
                 result = {'map': mapfile}
                 if len(pointings) == 0:
                     result['coverage'] = 0

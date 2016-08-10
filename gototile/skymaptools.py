@@ -213,7 +213,7 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
 def calculate_tiling(skymap, telescopes, date=None,
                      coverage=None, maxtiles=100, within=None,
                      nightsky=False, catalog=None,
-                     tilespath=None, njobs=1, tileduration=None):
+                     tilespath=None, njobs=1):
     if coverage is None:
         coverage = COVERAGE
     if catalog is None:

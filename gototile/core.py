@@ -28,8 +28,7 @@ except NameError:
 def run(skymap, telescopes, nside=NSIDE, date=None,
         coverage=None, maxtiles=100, within=None,
         nightsky=False, catalog=None, tilespath='./tiles',
-        njobs=1, tileduration=None,
-        command='',
+        njobs=1, command='',
         outputoptions=None, plotoptions=None):
 
     if coverage is None:
@@ -41,16 +40,25 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
     if plotoptions is None:
         plotoptions = {}
 
+    # Replace telescope classes or class names with their instances
+    for i, telescope in enumerate(telescopes):
+        if isinstance(telescope, type):
+            telescopes[i] = telescope()
+        elif isinstance(telescope, str):
+            telclass = getattr(telmodule, telescope)
+            telescopes[i] = telclass()
+
     if not isinstance(skymap, SkyMap):
         skymap = SkyMap(skymap)
     skymap.regrade(nside=nside)
+
     date = skymap.header['date-det'] if date is None else date
 
     pointings, tiledmap, allskymap = calculate_tiling(
         skymap, telescopes, date=date, coverage=coverage,
         maxtiles=maxtiles, within=within,
         nightsky=nightsky, catalog=catalog,
-        tilespath=tilespath, njobs=njobs, tileduration=tileduration)
+        tilespath=tilespath, njobs=njobs)
 
     gwtot = tiledmap.sum()
     allsky = allskymap.sum()
@@ -147,6 +155,6 @@ def main(args=None):
         maxtiles=args.maxtiles, within=args.within,
         nightsky=args.nightsky, catalog=args.catalog,
         tilespath=args.tiles, njobs=args.njobs,
-        tileduration=args.exptime, command=command,
+        command=command,
         outputoptions=outputoptions,
         plotoptions=plotoptions)

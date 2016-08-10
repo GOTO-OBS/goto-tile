@@ -91,8 +91,6 @@ def parse_args(args=None):
                         "the given amount of time. Default unit is seconds; "
                         "Optionally append a 'd' (day) 'h' (hour), "
                         "'m' (minute) or 's' (second)")
-    parser.add_argument('--exptime', type=float,
-                        help="Exposure time for a single tile (in seconds)")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--verbose', action='count', default=0,
                        help="Verbose level")
