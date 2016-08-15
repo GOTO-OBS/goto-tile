@@ -11,45 +11,55 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import astropy
+from astropy.time import Time
 from .skymaptools import calculate_tiling
 from .skymap import SkyMap
 from .settings import NSIDE
-from .telescope import (GOTON4, GOTON8, GOTOS4, GOTOS8,
-                                SuperWASPN, VISTA, GOTOLS4, GOTOLS8)
+from . import telescope as telmodule
 from .telescope import build_scope, read_config_file
+from .utils import pointings_to_text
+from .log import set_logging
+from .parser import parse_args, parse_date, parse_object
 try:
     FileExistsError
 except NameError:
     from .utils import FileExistsError
-from .utils import pointings_to_text
-from .log import set_logging
-from .parser import parse_args, parse_date, parse_object
 
 
 def run(skymap, telescopes, nside=NSIDE, date=None,
         coverage=None, maxtiles=100, within=None,
         nightsky=False, catalog=None, tilespath='./tiles',
-        njobs=1, tileduration=None,
-        command='', output=None, plot=None):
+        njobs=1, command='',
+        outputoptions=None, plotoptions=None):
 
     if coverage is None:
         coverage = {'min': 0.05, 'max': 0.95}
     if catalog is None:
         catalog = {'path': None, 'key': None}
-    if output is None:
-        output = {}
-    if plot is None:
-        plot = {}
+    if outputoptions is None:
+        outputoptions = {}
+    if plotoptions is None:
+        plotoptions = {}
 
-    skymap = SkyMap(skymap)
+    # Replace telescope classes or class names with their instances
+    for i, telescope in enumerate(telescopes):
+        if isinstance(telescope, type):
+            telescopes[i] = telescope()
+        elif isinstance(telescope, str):
+            telclass = getattr(telmodule, telescope)
+            telescopes[i] = telclass()
+
+    if not isinstance(skymap, SkyMap):
+        skymap = SkyMap(skymap)
     skymap.regrade(nside=nside)
+
     date = skymap.header['date-det'] if date is None else date
 
     pointings, tiledmap, allskymap = calculate_tiling(
         skymap, telescopes, date=date, coverage=coverage,
         maxtiles=maxtiles, within=within,
         nightsky=nightsky, catalog=catalog,
-        tilespath=tilespath, njobs=njobs, tileduration=tileduration)
+        tilespath=tilespath, njobs=njobs)
 
     gwtot = tiledmap.sum()
     allsky = allskymap.sum()
@@ -60,7 +70,52 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         "This is {:5.2f}% of the original skymap".format((gwtot/allsky)*100.)
     ]
     pointings.meta['command'] = command
+    pointings.meta['time-created'] = Time.now().datetime.strftime(
+        "%Y-%m-%dT%H:%M:%S")
+    pointings.meta['time-planning'] = date.datetime.strftime(
+        "%Y-%m-%dT%H:%M:%S")
 
+    if outputoptions.get('text'):
+        table = pointings_to_text(pointings, catalog=catalog)
+        table.write(outputoptions['text'], format='ascii.ecsv')
+
+    if outputoptions.get('latex'):  # Very similar to output, but with less
+                             # precision (more human readable when rendered)
+        table = pointings[['prob', 'cumprob', 'telescope']].copy()
+        table['prob'] = ["{:.2f}".format(100 * prob)
+                         for prob in table['prob']]
+        table['cumprob'] = ["{:.2f}".format(100*prob)
+                            for prob in  table['cumprob']]
+        table['ra'] = ["{:.2f}".format(center.ra.deg)
+                       for center in pointings['center']]
+        table['dec'] = ["{:.2f}".format(center.dec.deg)
+                        for center in pointings['center']]
+        table['time'] = [time.datetime.strftime('%Y-%m-%d %H:%M')
+                         for time in pointings['time']]
+        table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
+        table[['telescope', 'ra', 'dec', 'time', 'dt',
+               'prob', 'cumprob']].write(outputoptions['latex'], format='latex')
+
+    if outputoptions.get('pickle'):  # For re-use within Python
+        with open(outputoptions['pickle'], 'wb') as outfile:
+            pickle.dump(pointings, outfile, protocol=2)
+
+    if plotoptions.get('output'):
+        options = dict(sun=plotoptions.get('sun'),
+                       moon=plotoptions.get('moon'),
+                       coverage=plotoptions.get('coverage'),
+                       delay=plotoptions.get('delay'))
+        skymap.plot(plotoptions['output'], telescopes, date, pointings,
+                    geoplot=plotoptions.get('geo'), catalog=catalog,
+                    nightsky=nightsky,
+                    title=plotoptions.get('title'),
+                    objects=plotoptions.get('objects'),
+                    options=options)
+
+    return pointings
+
+
+def print_pointings(pointings):
     print("\n".join(pointings.meta['comments']))
     print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
           "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
@@ -85,92 +140,32 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         else:
             print("")
 
-    if output.get('text'):
-        table = pointings_to_text(pointings, catalog=catalog)
-        table.write(output['text'], format='ascii.ecsv')
-
-    if output.get('latex'):  # Very similar to output, but with less
-                             # precision (more human readable when rendered)
-        table = pointings[['prob', 'cumprob', 'telescope']].copy()
-        table['prob'] = ["{:.2f}".format(100 * prob)
-                         for prob in table['prob']]
-        table['cumprob'] = ["{:.2f}".format(100*prob)
-                            for prob in  table['cumprob']]
-        table['ra'] = ["{:.2f}".format(center.ra.deg)
-                       for center in pointings['center']]
-        table['dec'] = ["{:.2f}".format(center.dec.deg)
-                        for center in pointings['center']]
-        table['time'] = [time.datetime.strftime('%Y-%m-%d %H:%M')
-                         for time in pointings['time']]
-        table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
-        table[['telescope', 'ra', 'dec', 'time', 'dt',
-               'prob', 'cumprob']].write(output['latex'], format='latex')
-
-    if output.get('pickle'):  # For re-use within Python
-        with open(output['pickle'], 'wb') as outfile:
-            pickle.dump(pointings, outfile, protocol=2)
-
-    if plot.get('output'):
-        options = dict(sun=plot.get('sun'), moon=plot.get('moon'),
-                       coverage=plot.get('coverage'),
-                       delay=plot.get('delay'))
-        skymap.plot(plot['output'], telescopes, date, pointings,
-                    geoplot=plot['geo'], catalog=catalog,
-                    nightsky=nightsky,
-                    title=plot.get('title'), objects=plot.get('objects'),
-                    options=options)
-
 
 def main(args=None):
     args = parse_args(args=args)
     set_logging(args.verbose, args.quiet)
 
-    telclasses = {
-        'gn4': GOTON4,
-        'gn8': GOTON8,
-        'gs4': GOTOS4,
-        'gs8': GOTOS8,
-        'gls4': GOTOLS4,
-        'gls8': GOTOLS8,
-        'swn': SuperWASPN,
-        'vista': VISTA
-    }
-
-    telescopes = []
-    for scope in args.scope:
-        telclass = telclasses[scope]
-        telescope = telclass()
-        telescopes.append(telescope)
-    if args.scopefile:
-        telconfigs = read_config_file(args.scopefile)
-        for config in telconfigs:
-            telescope = build_scope(config)
-            try:
-                telescope.makegrid(args.tiles)
-            except FileExistsError as exc:
-                logging.warning(str(exc))
-                logging.info("Skipping this grid.")
-                logging.info("Remove file if you want to recreate the grid")
-            telescopes.append(telescope)
-    if not telescopes:
-        sys.exit("No telescopes given")
-
     date = parse_date(args.date)
     command = " ".join(sys.argv)
-    output = {'text': args.output, 'latex': args.latex, 'pickle': args.pickle}
-    plot = {'output': args.plot,
-            'geo': args.geoplot,
-            'title': args.title,
-            'sun': args.sun,
-            'moon': args.moon,
-            'objects': [parse_object(obj) for obj in args.object],
-            'coverage': args.plot_coverage,
-            'delay': args.plot_delay}
+    outputoptions = {'text': args.output,
+                     'latex': args.latex,
+                     'pickle': args.pickle}
+    plotoptions = {'output': args.plot,
+                   'geo': args.geoplot,
+                   'title': args.title,
+                   'sun': args.sun,
+                   'moon': args.moon,
+                   'objects': [parse_object(obj) for obj in args.object],
+                   'coverage': args.plot_coverage,
+                   'delay': args.plot_delay}
 
-    run(args.skymap, telescopes, date=date,
+    pointings = run(args.skymap, args.scope, date=date,
         coverage=args.coverage,
         maxtiles=args.maxtiles, within=args.within,
         nightsky=args.nightsky, catalog=args.catalog,
         tilespath=args.tiles, njobs=args.njobs,
-        tileduration=args.exptime, command=command,
-        output=output, plot=plot)
+        command=command,
+        outputoptions=outputoptions,
+        plotoptions=plotoptions)
+
+    print_pointings(pointings)

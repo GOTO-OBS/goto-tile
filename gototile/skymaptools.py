@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 import os
+import logging
 import astropy.coordinates as acoord
 from astropy.coordinates import SkyCoord, AltAz, EarthLocation
 from astropy.time import Time, TimeDelta
@@ -74,6 +75,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
 
 
     """
+    logging.info("Calculating sideral times for {}".format(location))
     obs = ephem.Observer()
     obs.pressure = 0
     obs.horizon = str(SUNALTITUDE.value)
@@ -136,6 +138,7 @@ class VisibleMap(object):
 
 
 def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
+    logging.info("Calculating the visible (night-sky) map")
     maskedmap = skymap.copy()
     maskedmap.skymap[:] = 0.0
     if njobs == -1:
@@ -152,6 +155,8 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     pool.join()
     indices = np.unique(np.hstack(seen))
 
+    logging.info("{:d} pixels out of {:d} visible".format
+                 (len(indices), len(skymap.skymap)))
     maskedmap.skymap[indices] = skymap.skymap[indices]
 
     return maskedmap, indices
@@ -213,7 +218,7 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
 def calculate_tiling(skymap, telescopes, date=None,
                      coverage=None, maxtiles=100, within=None,
                      nightsky=False, catalog=None,
-                     tilespath=None, njobs=1, tileduration=None):
+                     tilespath=None, njobs=1):
     if coverage is None:
         coverage = COVERAGE
     if catalog is None:
@@ -301,9 +306,11 @@ def calculate_tiling(skymap, telescopes, date=None,
     base_indices = np.arange(len(telescopes))
     ntiles = 0
     nobs = 0
+    logging.info("Calculating timing between %s and %s", time, endtime)
     while (GWobs <= coverage['max'] * GWtot and
            ntiles < maxtiles and
            time < endtime):
+        logging.debug("Calculating tiling for %s", time)
         # Filter out telescopes in daytime
         indices = np.array([i for i in base_indices[:]
                             if telescopes[i].is_night(time)])
@@ -327,11 +334,14 @@ def calculate_tiling(skymap, telescopes, date=None,
             GWobs += prob
             center = telescope.topcenter
             if prob >= MINPROB:
+                logging.debug("Tile with prob. %.4f for %s",
+                              prob, telescope.name)
                 pointings.append([center, prob, GWobs, prob/GWtot,
                                   GWobs/GWtot, telescope.name,
                                   time, time-date, tile, sources])
                 obstilelist.append(tile)
                 obspixlist.append(telescope.toppixlist)
+                logging.debug("Total probability: %.4f", GWobs)
             # Blank out used pixels in all telescope skymaps
             pixlist = telescope.toppixlist
             for telescope in telescopes:

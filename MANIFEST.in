@@ -8,6 +8,7 @@ include gototile/app/static/gototile/css/skymap.css
 include gototile/app/templates/gototile/base.html
 include gototile/app/templates/gototile/skymap.html
 include README
-include requirements.txt
+include VERSION
 include MANIFEST.in
+include requirements.txt
 include setup.py
