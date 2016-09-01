@@ -265,7 +265,7 @@ class SkyMap(object):
             if options.get('coverage'):
                 # show % coverage as outline thickness
                 linewidth = 100 * pointing['prob']
-            if np.any(ra2+180 >= 180) and np.any(ra2+180 <= 180):
+            if np.any(ra2+180 > 180) and np.any(ra2+180 <= 180):
                 mask = ra2+180 > 180
                 axes.fill(x[mask], y[mask],
                           fill=True, facecolor=acolor,
