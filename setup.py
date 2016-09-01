@@ -80,7 +80,7 @@ setup(
     author="Darren White, Evert Rol",
     author_email="Darren.White@warwick.ac.uk, evert.rol@monash.edu",
     url="http://goto-observatory.org",
-    scripts=["scripts/tileskymap", "scripts/create-grid"],
+    scripts=["scripts/gototile", "scripts/create-grid"],
     packages=["gototile"],
     package_dir={'gototile': "gototile"},
     install_requires=["numpy", "astropy", "matplotlib", "healpy",
