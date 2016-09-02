@@ -6,6 +6,7 @@ from astropy.time import Time, TimeDelta
 from astropy import units
 from astropy.coordinates import SkyCoord
 from .settings import GWGC_PATH
+from . import telescope as telmodule
 
 
 def parse_args(args=None):
@@ -36,7 +37,8 @@ def parse_args(args=None):
                                  'swasp','vista'],
                         default=[], action='append',
                         help=("Telescope to use. GOTO-4 (default), GOTO-8, "
-                              "SuperWASP-North, VISTA."))
+                              "SuperWASP-North, VISTA. Repeat when using "
+                              "multiple telescopes"))
     parser.add_argument("--tiles", default='./tiles/', dest='tiles',
                         help=("File name or base file name of pre-made "
                               "fixed grid of tiles on the sky."))
@@ -47,6 +49,10 @@ def parse_args(args=None):
                         help="Skip existing grid files")
     parser.add_argument('-S', '--scopefile',
                         help="YAML file with telescope configuration(s)")
+    parser.add_argument('--min-elevation', type=float, action='append',
+                        help="Set an alternative minimum elevation in "
+                        "degrees. Use this option as many times as "
+                        "the --scope option")
     parser.add_argument('-c', '--catalog', nargs='?', const=True,
                         help="Use a catalog to convolve with; specify as an "
                         "astropy readable table format (default catalog: GWGC)")
@@ -116,13 +122,18 @@ def parse_args(args=None):
     }
     telescopes = []
     for scope in args.scope:
-        telescopes.append(telclasses[scope])
+        name = telclasses[scope]
+        telclass = getattr(telmodule, name)
+        telescopes.append(telclass())
+    if args.min_elevation:
+        for i, telescope in enumerate(telescopes):
+            telescope.min_elevation = args.min_elevation[i] * units.degree
     args.scope = telescopes
 
     if args.scopefile:
         telconfigs = read_config_file(args.scopefile)
         for config in telconfigs:
-            telescope = build_scope(config)
+            telescope = telmodule.build_scope(config)
             args.scope.append(telescope)
     if not args.scope:
         sys.exit("No telescopes given")
