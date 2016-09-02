@@ -48,6 +48,9 @@ def parse_args(args=None):
                         help="Skip existing grid files")
     parser.add_argument('-S', '--scopefile',
                         help="YAML file with telescope configuration(s)")
+    parser.add_argument('--dump-scopes', action='store_true',
+                        help="Print a YAML file with standard telescope "
+                        "configuration to stdout")
     parser.add_argument('--min-elevation', type=float, action='append',
                         help="Set an alternative minimum elevation in "
                         "degrees. Use this option as many times as "
@@ -107,6 +110,11 @@ def parse_args(args=None):
     group.add_argument('-q', '--quiet', action='store_true',
                        help="Turn off warnings")
     args = parser.parse_args(args=args)
+
+    if args.dump_scopes:
+        telmodule.print_config_file()
+        parser.exit()
+
     if args.njobs:
         args.njobs = int(args.njobs)
 
@@ -135,7 +143,7 @@ def parse_args(args=None):
     args.scope = telescopes
 
     if args.scopefile:
-        telconfigs = read_config_file(args.scopefile)
+        telconfigs = telmoculde.read_config_file(args.scopefile)
         for config in telconfigs:
             telescope = telmodule.build_scope(config)
             args.scope.append(telescope)

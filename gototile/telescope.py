@@ -2,11 +2,13 @@
 
 """
 from __future__ import division
+import sys
 import os
 import gzip
 import pickle
 import logging
 import yaml
+import inspect
 import numpy as np
 from astropy.coordinates import EarthLocation, Latitude, Longitude, get_sun
 from astropy.coordinates import AltAz, SkyCoord
@@ -299,6 +301,26 @@ def read_config_file(filename):
     with open(filename) as infile:
         config = yaml.safe_load(infile)
     return config
+
+
+def print_config_file():
+    config = []
+    for name, attr in inspect.getmembers(sys.modules[__name__]):
+        if (inspect.isclass(attr)
+            and issubclass(attr, Telescope) and
+            attr != Telescope):
+            telescope = attr()
+            config.append({
+                'short': telescope.name,
+                'full': telescope.name,
+                'longitude': telescope.location.longitude.to('degree').value,
+                'latitude': telescope.location.latitude.to('degree').value,
+                'height': telescope.location.height.to('meter').value,
+                'fov-ra': telescope.fov['ra'].to('degree').value,
+                'fov-dec': telescope.fov['dec'].to('degree').value,
+            })
+    print(yaml.dump(config, default_flow_style=False))
+
 
 
 # # # Pre-defined telescopes # # #
