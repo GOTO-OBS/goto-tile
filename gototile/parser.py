@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import sys
 from astropy.time import Time, TimeDelta
 from astropy import units
 from astropy.coordinates import SkyCoord
