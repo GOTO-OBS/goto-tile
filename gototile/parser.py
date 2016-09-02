@@ -5,7 +5,7 @@ import os
 from astropy.time import Time, TimeDelta
 from astropy import units
 from astropy.coordinates import SkyCoord
-from .settings import GWGC_PATH
+from . import settings
 from . import telescope as telmodule
 
 
@@ -53,6 +53,9 @@ def parse_args(args=None):
                         help="Set an alternative minimum elevation in "
                         "degrees. Use this option as many times as "
                         "the --scope option")
+    parser.add_argument('--exptime', type=float,
+                        help="Use this exposure times, in seconds. "
+                        "Applies to *all* telescopes")
     parser.add_argument('-c', '--catalog', nargs='?', const=True,
                         help="Use a catalog to convolve with; specify as an "
                         "astropy readable table format (default catalog: GWGC)")
@@ -138,6 +141,9 @@ def parse_args(args=None):
     if not args.scope:
         sys.exit("No telescopes given")
 
+    if args.exptime:
+        settings.TIMESTEP = TimeDelta(args.exptime * units.second)
+
     if args.within:
         try:
             val = float(args.within) * units.second
@@ -158,7 +164,7 @@ def parse_args(args=None):
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
 
     if args.catalog is True:
-        args.catalog = GWGC_PATH
+        args.catalog = settings.GWGC_PATH
         if not args.catalog_weight_key:
             args.catalog_weight_key = 'weight'
     args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}

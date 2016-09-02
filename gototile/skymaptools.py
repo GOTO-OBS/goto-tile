@@ -11,7 +11,7 @@ import sys
 import math
 import multiprocessing
 import numpy as np
-from .settings import SUNALTITUDE, TIMESTEP, COVERAGE, MINPROB
+from . import settings
 from .catalog import visible_catalog, read_catalog, map2catalog
 from . import math
 
@@ -78,7 +78,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
     logging.info("Calculating sideral times for {}".format(location))
     obs = ephem.Observer()
     obs.pressure = 0
-    obs.horizon = str(SUNALTITUDE.value)
+    obs.horizon = str(settings.SUNALTITUDE.value)
     obs.lon = str(location.longitude.value)
     obs.lat = str(location.latitude.value)
     obs.elevation = location.height.value
@@ -108,7 +108,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
             return []
         if stop_ < stop:  # Stop before Sun rise
             stop = stop_
-    delta = TIMESTEP
+    delta = settings.TIMESTEP
     diff = stop - start
     steps = int(np.round(diff / delta))
     times = np.linspace(start.mjd, stop.mjd, steps)
@@ -220,7 +220,7 @@ def calculate_tiling(skymap, telescopes, date=None,
                      nightsky=False, catalog=None,
                      tilespath=None, njobs=1):
     if coverage is None:
-        coverage = COVERAGE
+        coverage = settings.COVERAGE
     if catalog is None:
         catalog = {'path': None, 'key': None}
     date = skymap.header['date-det'] if date is None else date
@@ -301,7 +301,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     GWobs = 0.0
     nscopes = len(telescopes)
     time = date
-    dt = TIMESTEP
+    dt = settings.TIMESTEP
     endtime = date + within if within else date + units.year
     base_indices = np.arange(len(telescopes))
     ntiles = 0
@@ -333,7 +333,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             sources = telescope.topsources
             GWobs += prob
             center = telescope.topcenter
-            if prob >= MINPROB:
+            if prob >= settings.MINPROB:
                 logging.debug("Tile with prob. %.4f for %s",
                               prob, telescope.name)
                 pointings.append([center, prob, GWobs, prob/GWtot,
@@ -350,6 +350,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             nobs = len(obstilelist)
             ntiles += 1
         time += dt
+
 
     # The `rows` parameter in the `QTable` initializer can't properly
     # handle equal-sized numpy arrays that should be treated as a
