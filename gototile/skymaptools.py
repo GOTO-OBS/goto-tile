@@ -8,7 +8,6 @@ from astropy.table import QTable
 from astropy import units
 import ephem
 import sys
-import math
 import multiprocessing
 import numpy as np
 from . import settings

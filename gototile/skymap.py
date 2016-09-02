@@ -4,13 +4,6 @@ import os
 import itertools
 import logging
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-from matplotlib.colors import colorConverter, LinearSegmentedColormap
-from matplotlib import cm
-
-from mpl_toolkits.basemap import Basemap
 import astropy
 from astropy.time import Time
 from astropy.coordinates import get_sun, SkyCoord, AltAz
@@ -27,6 +20,8 @@ except NameError:
 
 def read_colormaps(name='cylon'):
     """Read special color maps, such as 'cylon'"""
+    from matplotlib import cm
+    from matplotlib.colors import LinearSegmentedColormap
     filename = os.path.join(os.path.dirname(__file__), name + '.csv')
     data = np.loadtxt(filename, delimiter=',')
     cmap = LinearSegmentedColormap.from_list(name, data)
@@ -175,6 +170,13 @@ class SkyMap(object):
 
         """
 
+        from matplotlib import pyplot as plt
+        from matplotlib.backends.backend_agg import FigureCanvasAgg as\
+            FigureCanvas
+        from matplotlib.figure import Figure
+        from matplotlib.colors import colorConverter
+        from mpl_toolkits.basemap import Basemap
+
         read_colormaps()
         if catalog is None:
             catalog = {'path': None, 'key': None}
@@ -211,7 +213,8 @@ class SkyMap(object):
             axes = figure.add_subplot(1, 1, 1)
         m = Basemap(projection='moll', resolution='c', lon_0=0.0, ax=axes)
         m.drawmeridians(np.arange(0, 360, 30), linewidth=0.25)
-        m.drawparallels(np.arange(-90, 90, 30), linewidth=0.25, labels=[1,0,0,0])
+        m.drawparallels(np.arange(-90, 90, 30), linewidth=0.25,
+                        labels=[1,0,0,0])
         m.drawmapboundary(color='k', linewidth=0.5)
 
         if geoplot:
@@ -293,7 +296,8 @@ class SkyMap(object):
                 sidtimes = []
                 for telescope in telescopes:
                     visras, visdecs = [], []
-                    sidtimes.append(smt.calc_siderealtimes(date, telescope.location))
+                    sidtimes.append(smt.calc_siderealtimes(
+                        date, telescope.location))
                 sidtimes = np.hstack(sidtimes)
                 radius = 75
                 logging.info("Calculating night sky coverage for %d "
@@ -322,12 +326,14 @@ class SkyMap(object):
                              ha='center', va='top', size='x-small',
                              zorder=12)
         if sun:
-            x, y = m(np.array(sun.ra.value) - (dlon / np.pi*180), sun.dec.value)
+            x, y = m(np.array(sun.ra.value) - (dlon / np.pi*180),
+                     sun.dec.value)
             m.plot(x, y, color=(1, 1, 0, 0.5), marker='o',
                    markerfacecolor=(1, 1, 0, 0.5), markersize=12)
         if moon:
             phase = moon.phase
-            x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180), moon.dec.value)
+            x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180),
+                     moon.dec.value)
             m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
                    markerfacecolor=(phase, phase, phase, 0.5))
         axes.set_title(title, y=1.05)
