@@ -23,8 +23,7 @@ def parse_args(args=None):
     parser.add_argument('--latex',
                         help="Write LaTeX table of pointings")
     parser.add_argument('--pickle',
-                        help="Write the pointing to a Python pickle file "
-                        "(useful for further processing)")
+                        help="Write the pointing to a pickle file")
     parser.add_argument('--maxtiles', type=int, default=100,
                         help="Maximum number of tiles to return")
     parser.add_argument('--maxfrac', type=float, default=0.95,
@@ -92,14 +91,16 @@ def parse_args(args=None):
     parser.add_argument('--moon', action='store_true',
                         help="Plot the Moon position and phase")
     parser.add_argument('--plot-coverage', action='store_true',
-                        help="Plot %% coverage as outline thickness")
+                        help="Plot percentage coverage as outline thickness")
     parser.add_argument('--plot-delay', action='store_true',
                         help="Plot delay as tile transparency")
-    parser.add_argument('--within',
+    parser.add_argument('--timespan', dest='within',
                         help="Only calculate when an area is observable within "
                         "the given amount of time. Default unit is seconds; "
                         "Optionally append a 'd' (day) 'h' (hour), "
                         "'m' (minute) or 's' (second)")
+    parser.add_argument('--within', dest='within',
+                        help="Alias for --timespan")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--verbose', action='count', default=0,
                        help="Verbose level")
