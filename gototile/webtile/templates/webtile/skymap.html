@@ -1,14 +1,14 @@
-{% extends "gototile/base.html" %}
+{% extends "webtile/base.html" %}
 {% load staticfiles %}
 {% block stylesheets %}
 {{ block.super }}
-<link rel="stylesheet" type="text/css" href="{% static 'gototile/css/skymap.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'webtile/css/skymap.css' %}">
 {% endblock stylesheets %}
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'gototile/js/skymap.js' %}"></script>
+<script src="{% static 'webtile/js/skymap.js' %}"></script>
 {% endblock scripts %}
-{% block body %}{{ block.super }}
+{% block content %}{{ block.super }}
 <main>
 
 {% if image %}
@@ -79,4 +79,4 @@
 </form>
 
 </main>
-{% endblock body %}
+{% endblock content %}
