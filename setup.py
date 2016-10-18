@@ -81,7 +81,7 @@ setup(
     author_email="Darren.White@warwick.ac.uk, evert.rol@monash.edu",
     url="http://goto-observatory.org",
     scripts=["scripts/tileskymap", "scripts/create-grid"],
-    packages=["gototile"],
+    packages=["gototile", "gototile.app"],
     package_dir={'gototile': "gototile"},
     install_requires=["numpy", "astropy", "matplotlib", "healpy",
                       "pyephem", "basemap"],
