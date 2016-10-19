@@ -32,10 +32,16 @@
 </tbody>
 </table>
 {% endif %}
+{% if image or pointings %}
+<hr>
+{% endif %}
 
+<div class="note">
+Note: this page is provided for convenience, but it will take some time to calculate a tiled map (you'll have time to grab a coffee). The page may even time-out during the calculation, or crash with a server error.<br>
+If you regularly create tiled maps, you may want to install GOTO-tile locally.
+</div>
 
 {{ form.non_field_errors }}
-<hr>
 <form enctype="multipart/form-data" method="post" action=".">{% csrf_token %}
 <div>
 {{ form.non_field.errors }}

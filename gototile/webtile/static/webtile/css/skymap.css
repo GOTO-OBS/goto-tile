@@ -19,3 +19,9 @@ ul.errorlist li {
 	margin-left: 0;
 	color: red;
 }
+div.note {
+	border-left: 1px solid black;
+	padding-left: 1em;
+	margin-top: 5ex;
+	font-size: 80%;
+}
