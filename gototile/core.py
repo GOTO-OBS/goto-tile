@@ -8,8 +8,6 @@ try:
 except ImportError:
     import pickle
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 import astropy
 from astropy.time import Time
 from .skymaptools import calculate_tiling

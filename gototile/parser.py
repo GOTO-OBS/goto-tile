@@ -2,10 +2,12 @@
 
 import argparse
 import os
+import sys
 from astropy.time import Time, TimeDelta
 from astropy import units
 from astropy.coordinates import SkyCoord
-from .settings import GWGC_PATH
+from . import settings
+from . import telescope as telmodule
 
 
 def parse_args(args=None):
@@ -22,8 +24,7 @@ def parse_args(args=None):
     parser.add_argument('--latex',
                         help="Write LaTeX table of pointings")
     parser.add_argument('--pickle',
-                        help="Write the pointing to a Python pickle file "
-                        "(useful for further processing)")
+                        help="Write the pointing to a pickle file")
     parser.add_argument('--maxtiles', type=int, default=100,
                         help="Maximum number of tiles to return")
     parser.add_argument('--maxfrac', type=float, default=0.95,
@@ -36,7 +37,8 @@ def parse_args(args=None):
                                  'swasp','vista'],
                         default=[], action='append',
                         help=("Telescope to use. GOTO-4 (default), GOTO-8, "
-                              "SuperWASP-North, VISTA."))
+                              "SuperWASP-North, VISTA. Repeat when using "
+                              "multiple telescopes"))
     parser.add_argument("--tiles", default='./tiles/', dest='tiles',
                         help=("File name or base file name of pre-made "
                               "fixed grid of tiles on the sky."))
@@ -47,6 +49,16 @@ def parse_args(args=None):
                         help="Skip existing grid files")
     parser.add_argument('-S', '--scopefile',
                         help="YAML file with telescope configuration(s)")
+    parser.add_argument('--dump-scopes', action='store_true',
+                        help="Print a YAML file with standard telescope "
+                        "configuration to stdout")
+    parser.add_argument('--min-elevation', type=float, action='append',
+                        help="Set an alternative minimum elevation in "
+                        "degrees. Use this option as many times as "
+                        "the --scope option")
+    parser.add_argument('--exptime', type=float,
+                        help="Use this exposure times, in seconds. "
+                        "Applies to *all* telescopes")
     parser.add_argument('-c', '--catalog', nargs='?', const=True,
                         help="Use a catalog to convolve with; specify as an "
                         "astropy readable table format (default catalog: GWGC)")
@@ -83,20 +95,27 @@ def parse_args(args=None):
     parser.add_argument('--moon', action='store_true',
                         help="Plot the Moon position and phase")
     parser.add_argument('--plot-coverage', action='store_true',
-                        help="Plot %% coverage as outline thickness")
+                        help="Plot percentage coverage as outline thickness")
     parser.add_argument('--plot-delay', action='store_true',
                         help="Plot delay as tile transparency")
-    parser.add_argument('--within',
+    parser.add_argument('--timespan', dest='within',
                         help="Only calculate when an area is observable within "
                         "the given amount of time. Default unit is seconds; "
                         "Optionally append a 'd' (day) 'h' (hour), "
                         "'m' (minute) or 's' (second)")
+    parser.add_argument('--within', dest='within',
+                        help="Alias for --timespan")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--verbose', action='count', default=0,
                        help="Verbose level")
     group.add_argument('-q', '--quiet', action='store_true',
                        help="Turn off warnings")
     args = parser.parse_args(args=args)
+
+    if args.dump_scopes:
+        telmodule.print_config_file()
+        parser.exit()
+
     if args.njobs:
         args.njobs = int(args.njobs)
 
@@ -116,16 +135,24 @@ def parse_args(args=None):
     }
     telescopes = []
     for scope in args.scope:
-        telescopes.append(telclasses[scope])
+        name = telclasses[scope]
+        telclass = getattr(telmodule, name)
+        telescopes.append(telclass())
+    if args.min_elevation:
+        for i, telescope in enumerate(telescopes):
+            telescope.min_elevation = args.min_elevation[i] * units.degree
     args.scope = telescopes
 
     if args.scopefile:
-        telconfigs = read_config_file(args.scopefile)
+        telconfigs = telmoculde.read_config_file(args.scopefile)
         for config in telconfigs:
-            telescope = build_scope(config)
+            telescope = telmodule.build_scope(config)
             args.scope.append(telescope)
     if not args.scope:
         sys.exit("No telescopes given")
+
+    if args.exptime:
+        settings.TIMESTEP = TimeDelta(args.exptime * units.second)
 
     if args.within:
         try:
@@ -147,7 +174,7 @@ def parse_args(args=None):
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
 
     if args.catalog is True:
-        args.catalog = GWGC_PATH
+        args.catalog = settings.GWGC_PATH
         if not args.catalog_weight_key:
             args.catalog_weight_key = 'weight'
     args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}

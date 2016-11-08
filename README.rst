@@ -1,154 +1,85 @@
-Tileskymap.py reads in single/multiple skymaps and attempts to provide 
-the best tiling layout using a 'greedy tile' strategy. The version
-here is designed for use during the early stages of Advanced LIGO/VIRGO
-using the GOTO prototype observatory. 
+GOTO-tile reads in single/multiple skymaps and attempts to provide the
+best tiling layout using a 'greedy tile' strategy. The version here is
+designed for use during the early stages of Advanced LIGO/VIRGO using
+the GOTO prototype observatory.
 
-The user can choose a range of options, such as tiling with galaxy 
+The user can choose a range of options, such as tiling with galaxy
 weighting, or selecting between the two GOTO configurations (4- and
 8-astrograph designs).
 
-Output is in the form of a list of tiles, ordered by probability,
-as well as optional plots (geocentric, or celestial).
+Output is in the form of a list of tiles, ordered by probability, as
+well as optional plots (geocentric, or celestial).
 
-Pre-requisites:
-===============
+Installation
+============
 
-Before installing additional pre-requisite modules, please ensure that
-the `numpy` package is installed. Using the ``pip`` command below will
-automatically do this as the first step for you.
-    
-The remaining modules required for GOTO-tile to work can be found in
-the `requirements.txt` file. Two dependencies are not found in the
-regular spot: `basemap` and `spherical-geometry` (there is a `basemap`
-listed when using ``pip search basemap``, but this is an outdated
-version).
+GOTO-tile relies on a few Python packages:
+- numpy
+- astropy
+- healpy
+- PyYAML
+- pyephem
+
+If you want the plotting abilities as well, you will also need:
+- matplotlib
+- basemap
 
 The easiest way to install all requirements is:
 
     $ pip install -r requirements.txt
     
-
 Note that basemap requires the geos C library, which is usually found
 in package managers as `libgeos-dev` or `libgeos-devel`.
 
 
-Known issues: 
+You can install GOTO-tile and its dependencies directly from GitHub,
+through:
 
-For python3 installations, pip install healpy does not seem to build/install
-the internal healpix libraries (but seems to work fine for python 2.7). This
-can be fixed by manually installing the healpix_cxx libraries 
-(http://sourceforge.net/projects/healpix/files/Healpix_3.11/autotools_packages)
+    $ pip install git+https://github.com/GOTO-OBS/goto-tile.git#egg=gototile
 
-Installation:
-=============
-
-Installation can be done using the standard python setup.py install command.
-This will place the tileskymap executable in your path, and allow import
-of gototile modules in other python scripts.
-
-Post-install:
-=============
-
-In order to tile the sky, we must first create the list of fixed tiles,
-in a given directory. This speeds up the time taken to tile a given skymap.
-This can be done by running:
-
-	$ tileskymap --makegrid
-	
-with a user chosen directory:
-
-	$ tileskymap --makegrid --tiles <path-to-tiles>
+Note that if you install it this way, the basemap will not be
+installed (matplotlib will be installed, because it's a requirement of
+Healpy. It is, however, still not necessary to have it installed when
+running GOTO-tile in its non-plotting mode: healpy will work fine
+without it).
 
 
-Running skymaptile.py
-======================
+
+Running GOTO-tile
+=================
 
 The basic method for calling the script with default settings is:
 
-	$ tileskymap <skymap-file>
+	$ gototile -s<telescope> <skymap-file>
 
-A list of user-changeable options can be found using:
+where <telescope> is one of the predefined telescope, and
+<skymap-file> is the LGIO probability skymap.
 
-    $ tileskymap -h
+A list of options and telescopes can be seen with:
 
-Output:-
+    $ gototile -h
 
-usage: tileskymap [-h] [-i ID] [-p PATH] [--maxtiles MAXTILES]
-                  [--maxfrac MAXFRAC] [--minfrac MINFRAC] [-s {g4,g8,swn}]
-                  [--site SITE SITE SITE] [--fov FOV FOV] [-g] [-n]
-                  [-d [DATE]] [--geoplot] [--plot] [--title TITLE]
-                  [--makegrid] [--tiles TILES] [--object OBJECT OBJECT OBJECT]
-                  [--sun] [--moon] [--sim] [--injgal] [--simpath SIMPATH]
-                  [infiles [infiles ...]]
 
-This script creates pointings for selected telescopes, with given skymap
-files.
-
-positional arguments:
-  infiles               Space separated input files (default: None)
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i ID, --id ID        Name of output files (without extension) (default: )
-  -p PATH, --path PATH  Output path (default: ./)
-  --maxtiles MAXTILES   Maximum number of tiles to return (default: 100)
-  --maxfrac MAXFRAC     Maximum fraction of visible skymap to tile (default:
-                        0.95)
-  --minfrac MINFRAC     Minimum fraction of visible skymap required to attempt
-                        tiling (default: 0.05)
-  -s {g4,g8,swn}, --scope {g4,g8,swn}
-                        Telescope to use. GOTO-4, GOTO-8, SuperWASP-North.
-                        (default: g4)
-  --site SITE SITE SITE
-                        Set the longitude, latitude and elevation. Overrides
-                        the defaults from the 'scope' setting. (default: None)
-  --fov FOV FOV         Set the width (RA) and height (dec) of the field of
-                        view, in degrees. Overrides the default from the
-                        'scope' setting. (default: None)
-  -g, --usegals         Use GWGC in tiling/plotting (default: False)
-  -n, --nightsky        Use nightsky visbility in tiling/plotting (default:
-                        False)
-  -d [DATE], --date [DATE]
-                        Set observation date. If not used, defaults to the
-                        current date. If given without argument, defaults to
-                        the trigger date in the input file(s). The optional
-                        argument can be a date-time string that can be parsed
-                        by astropy.time.Time, such as '2012-12-12T12:12:12'. A
-                        single number is interpreted as Julian days; use a
-                        number with 'mjd' appended to specify Modified Julian
-                        Days. (default: now)
-  --geoplot             Plot in geographic coordinates, (lat, lon) (default:
-                        False)
-  --plot                Plot in RA-Dec (default: False)
-  --title TITLE         Use suppied title in skymap plot. (default: None)
-  --makegrid            Create fixed grid of tiles on sky. WARNING: Can take
-                        some time. (default: False)
-  --tiles TILES         Location of pre-made fixed grid of tiles on sky.
-                        (default: ./tiles/)
-  --object OBJECT OBJECT OBJECT
-                        Overplot an object. Requires three values: RA, Dec and
-                        an object name. (default: [])
-  --sun                 Plot the Sun position (default: False)
-  --moon                Plot the Moon position (default: False)
-  --sim                 A first2years simulation. Check tiles for known
-                        position of source. (default: False)
-  --injgal              Inject galaxy at location in f2y map. Take into
-                        account known position and distance. (default: False)
-  --simpath SIMPATH     Path to folder of Skymaps, organised into folders by
-                        year. (default: ./Skymaps)
-                        
 An example command might be:
 
-tileskymap -i 10206 -p allskyinjgal -s g4 --sim --simpath /storage/astro2/phsnap/LIGO/Skymaps --object 64.9 42.2 10206 --date  --plot --injgal --usegals /storage/astro2/phsnap/LIGO/Skymaps/2015_fits/10206/bayestar.fits.gz
+    gototile -s gn4 --night --catalog --plot --sun --moon bayestar.fits.gz
+
 
 Notes:
     Currently the script assumes greedy tiling is required. However, this may
     be sub-optimal given the large filed-of-view of GOTO, and poor pointing
     from the GW detectors, particularly in the 2-detector scenario, and is
     an avenue of future work.
-    
+
+
+Additional scripts
+==================
+
+The following two scripts are from previous versions of GOTO-tile.
+Your mileage may vary as to how well they work and perform.
+
 Running f2ytile
-================
+---------------
 
 The script f2ytile is essentially a wrapper around the tileskymap script, that
 allows the user to run the tiling algorith across the first2years simulated
@@ -195,7 +126,7 @@ Notes:
     have not been able to figure out just yet.
     
 Running postmap
-===============
+---------------
 
 The postmap script is included to generate plots, combined data and basic
 statistics on the tiles generated by f2ytile. 
