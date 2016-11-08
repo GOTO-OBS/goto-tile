@@ -1,14 +1,14 @@
-{% extends "gototile/base.html" %}
+{% extends "webtile/base.html" %}
 {% load staticfiles %}
 {% block stylesheets %}
 {{ block.super }}
-<link rel="stylesheet" type="text/css" href="{% static 'gototile/css/skymap.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'webtile/css/skymap.css' %}">
 {% endblock stylesheets %}
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'gototile/js/skymap.js' %}"></script>
+<script src="{% static 'webtile/js/skymap.js' %}"></script>
 {% endblock scripts %}
-{% block body %}{{ block.super }}
+{% block content %}{{ block.super }}
 <main>
 
 {% if image %}
@@ -32,10 +32,16 @@
 </tbody>
 </table>
 {% endif %}
+{% if image or pointings %}
+<hr>
+{% endif %}
 
+<div class="note">
+Note: this page is provided for convenience, but it will take some time to calculate a tiled map (you'll have time to grab a coffee). The page may even time-out during the calculation, or crash with a server error.<br>
+If you regularly create tiled maps, you may want to install GOTO-tile locally.
+</div>
 
 {{ form.non_field_errors }}
-<hr>
 <form enctype="multipart/form-data" method="post" action=".">{% csrf_token %}
 <div>
 {{ form.non_field.errors }}
@@ -79,4 +85,4 @@
 </form>
 
 </main>
-{% endblock body %}
+{% endblock content %}

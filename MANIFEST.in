@@ -3,10 +3,10 @@ include gototile/GWGC.csv
 include gototile/cylon.csv
 include scripts/gototile
 include scripts/create-grid
-include gototile/app/static/gototile/js/skymap.js
-include gototile/app/static/gototile/css/skymap.css
-include gototile/app/templates/gototile/base.html
-include gototile/app/templates/gototile/skymap.html
+include gototile/webtile/static/gototile/js/skymap.js
+include gototile/webtile/static/gototile/css/skymap.css
+include gototile/webtile/templates/gototile/base.html
+include gototile/webtile/templates/gototile/skymap.html
 include README
 include VERSION
 include MANIFEST.in

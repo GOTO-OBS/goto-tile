@@ -5,5 +5,5 @@ from .views import SkyMapView
 urlpatterns = [
     url(r'^$',
         SkyMapView.as_view(),
-        name='gototile-skymap'),
+        name='main'),
 ]

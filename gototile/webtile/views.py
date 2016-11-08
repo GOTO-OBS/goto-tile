@@ -8,7 +8,7 @@ from .forms import SkyMapForm
 
 
 class SkyMapView(FormView):
-    template_name = 'gototile/skymap.html'
+    template_name = 'webtile/skymap.html'
     form_class = SkyMapForm
     success_url = '.'
 
