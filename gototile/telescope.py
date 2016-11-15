@@ -253,6 +253,7 @@ class Telescope(object):
         return tilespath
 
     def readtiles(self, tilespath=None):
+        logger = logging.getLogger(__name__)
         if isinstance(tilespath, tuple) and len(tilespath) == 3:
             self.tiles, self.pixlist, self.tilecenters = tilespath
             return self.tiles, self.pixlist, self.tilecenters
@@ -264,11 +265,13 @@ class Telescope(object):
                 tilespath += ".pgz"
             if not os.path.isfile(tilespath):
                 # Create one in-memory
+                logger.debug("Creating tiles on the fly")
                 data = tileallsky(self.fov, NSIDE, overlap=0.5)
                 self.tiles, self.pixlist, self.tilecenters = data
                 return self.tiles, self.pixlist, self.tilecenters
 
         with gzip.GzipFile(tilespath, 'r') as infile:
+            logger.debug("Reading tiles from %s", tilespath)
             try:
                 data = pickle.load(infile, encoding='latin1')  # Python 3
             except TypeError:
