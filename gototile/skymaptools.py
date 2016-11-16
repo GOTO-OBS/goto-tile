@@ -6,6 +6,7 @@ from astropy.coordinates import SkyCoord, AltAz, EarthLocation
 from astropy.time import Time, TimeDelta
 from astropy.table import QTable
 from astropy import units
+from astropy.utils import iers
 import ephem
 import sys
 import multiprocessing
@@ -13,6 +14,7 @@ import numpy as np
 from . import settings
 from .catalog import visible_catalog, read_catalog, map2catalog
 from . import math
+from . import utils
 
 
 def getshape(tile, steps=50):
@@ -121,17 +123,29 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
 # class, where extra arguments are passed as instance attributes, and
 # __call__ is used to mimic a function
 class VisibleMap(object):
-    def __init__(self, telescope, skycoords, ipix):
+    def __init__(self, telescope, skycoords, ipix, iers_url=None):
         self.telescope = telescope
         self.skycoords = skycoords
         self.ipix = ipix
-        #self.min_elevation = min_elevation
+        self.iers_url = iers_url
 
     def __call__(self, sidtime):
+        # Since this call is multiprocessed and on an independent
+        # Python process, we need to (re)set the IERS URL as necessary
+        # for each process
+        if self.iers_url is not None:
+            iers.conf.iers_auto_url = self.iers_url
+            if self.iers_url == '':
+                # These two settings don't really help; perhaps in the
+                # future
+                iers.conf.auto_max_age = None
+                iers.conf.auto_download = False
+
         frame = AltAz(obstime=sidtime,
                       location=self.telescope.location)
         obscoords = self.skycoords.transform_to(frame)
-        seenpix = self.ipix[np.where(obscoords.alt > self.telescope.min_elevation)]
+        seenpix = self.ipix[np.where(obscoords.alt >
+                                     self.telescope.min_elevation)]
         return seenpix
 
 
@@ -147,7 +161,8 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     skycoords = skymap.skycoords()
     ipix = np.arange(len(skymap.skymap))
     pool = multiprocessing.Pool(njobs)
-    func = VisibleMap(telescope, skycoords, ipix)
+    func = VisibleMap(telescope, skycoords, ipix,
+                      iers_url=iers.conf.iers_auto_url)
     seen = pool.map(func, sidtimes)
     # Close and free up the memory
     pool.close()
@@ -224,12 +239,14 @@ def calculate_tiling(skymap, telescopes, date=None,
         catalog = {'path': None, 'key': None}
     date = skymap.header['date-det'] if date is None else date
 
+    utils.test_iers()
+
     allskymap = skymap.copy()
     tiles, pixlist, sidtimes = {}, {}, {}
     for telescope in telescopes:
         telescope.indices = {}
         if isinstance(tilespath, dict):
-            telescope.readtiles(tilespath[telescope])
+            telescope.readtiles(tilespath.get(telescope.__class__.__name__))
         else:
             telescope.readtiles(tilespath)
         telescope.sidtimes = calc_siderealtimes(
