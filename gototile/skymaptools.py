@@ -89,31 +89,57 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
     # daytime so want to know time of next setting and rising of sun
     if sun.alt > ephem.degrees(obs.horizon):
         start = Time(
-            obs.next_setting(ephem.Sun()).datetime(), format='datetime')
+            obs.next_setting(sun).datetime(), format='datetime')
         stop = Time(
-            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+            obs.next_rising(sun).datetime(), format='datetime')
     elif allnight: # currently night, but take into account the part
                    # of sky that has already set.
         start = Time(
-            obs.previous_setting(ephem.Sun()).datetime(), format='datetime')
+            obs.previous_setting(sun).datetime(), format='datetime')
         stop = Time(
-            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
+            obs.next_rising(sun).datetime(), format='datetime')
     else: # currently night; only calculate from now until Sun rise
         start = date
         stop = Time(
-            obs.next_rising(ephem.Sun()).datetime(), format='datetime')
-
+            obs.next_rising(sun).datetime(), format='datetime')
     if within:
         stop_ = date + within
         if stop_ <= start:  # Stop before Sun set
             return []
         if stop_ < stop:  # Stop before Sun rise
             stop = stop_
+        else:  # check we're not in the next night
+            nextset = Time(
+                obs.next_setting(sun).datetime(), format='datetime')
+            if stop_ >= nextset:
+                if within > 1 * units.year:  # limit to 1 year
+                    within = 1 * units.year
+                start = [start]
+                stop = [stop]
+                t = nextset
+                while t < stop_:
+                    obs.date = ephem.Date((t + 1*units.min).iso )
+                    rise = Time(
+                        obs.next_rising(sun).datetime(), format='datetime')
+                    if stop_ < rise:
+                        rise = stop_
+                    start.append(t)
+                    stop.append(rise)
+                    t = Time(
+                        obs.next_setting(sun).datetime(), format='datetime')
+
+    if not isinstance(start, list):
+        start = [start]
+    if not isinstance(stop, list):
+        stop = [stop]
     delta = settings.TIMESTEP
-    diff = stop - start
-    steps = int(np.round(diff / delta))
-    times = np.linspace(start.mjd, stop.mjd, steps)
-    times = Time(times, format='mjd')
+    times = []
+    for start_, stop_ in zip(start, stop):
+        diff = stop_ - start_
+        steps = int(np.round(diff / delta))
+        times_ = np.linspace(start_.mjd, stop_.mjd, steps)
+        times.append(Time(times_, format='mjd'))
+    times = Time(np.hstack(times))
 
     return times
 
