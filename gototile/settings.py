@@ -9,4 +9,4 @@ TIMESTEP = TimeDelta(300 * units.second)
 SUNALTITUDE = -18 * units.degree
 COVERAGE = {'min': 0.05, 'max': 0.95}
 ARC_PRECISION = 9000
-MINPROB = 1e-6
+MINPROB = 1e-3

@@ -79,7 +79,7 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
 
     if outputoptions.get('latex'):  # Very similar to output, but with less
                              # precision (more human readable when rendered)
-        table = pointings[['prob', 'cumprob', 'telescope']].copy()
+        table = pointings[['fieldname', 'prob', 'cumprob', 'telescope']].copy()
         table['prob'] = ["{:.2f}".format(100 * prob)
                          for prob in table['prob']]
         table['cumprob'] = ["{:.2f}".format(100*prob)
@@ -91,7 +91,7 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         table['time'] = [time.datetime.strftime('%Y-%m-%d %H:%M')
                          for time in pointings['time']]
         table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
-        table[['telescope', 'ra', 'dec', 'time', 'dt',
+        table[['telescope', 'fieldname', 'ra', 'dec', 'time', 'dt',
                'prob', 'cumprob']].write(outputoptions['latex'], format='latex')
 
     if outputoptions.get('pickle'):  # For re-use within Python
@@ -115,7 +115,7 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
 
 def print_pointings(pointings):
     print("\n".join(pointings.meta['comments']))
-    print("#     RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
+    print("# fieldname  RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
           "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
           end=" ")
     if (len(pointings) and
@@ -124,7 +124,7 @@ def print_pointings(pointings):
     else:
         print("")
     for pointing in pointings:
-        print("{ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
+        print("{p[fieldname]} {ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
               "{p[cumprob]:17.6f}  {p[relprob]:9.6f}  {p[cumrelprob]:9.6f}  "
               "{coverage:12.2f}  {p[telescope]:>9s}  "
               "{dt:10.2f} {p[time].datetime:%Y-%m-%d %H:%M} UT".format(

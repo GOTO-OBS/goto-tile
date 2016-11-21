@@ -77,7 +77,8 @@ def parse_args():
                         "If one of --fov-ra/dec is used, overrides that "
                         "telescope parameter.")
     parser.add_argument('--pointings',
-                        help="Pointing file (rows of 'ra dec' in degrees)")
+                        help="CSV pointing file (rows of 'ra dec' in degrees. "
+                        "Optionally provide a 'name' column)")
     parser.add_argument('--overlap-ra', type=float, default=0.5,
                         help="Amount of overlap between tiles along the RA. "
                         "Ignored when given a pointing file")
@@ -124,7 +125,7 @@ def parse_args():
 
 
 def create_gridfile(nside, fov, overlap, filename, force=False,
-                    pointings=None):
+                    pointings=None, names=None):
     """Create and write a file with a sky grid
 
     A set of pointings can be given as a SkyCoord array. When not
@@ -169,6 +170,9 @@ def create_gridfile(nside, fov, overlap, filename, force=False,
     logging.debug("Tiling for nside = %d", nside)
     tiles = tileallsky(
             fov, nside, overlap=overlap, gridcoords=pointings, nested=True)
+    if names is None:
+        names = np.arange(len(tiles[0]))+1
+    tiles = (names,) + tiles
     logging.debug("Writing %s", filename)
     with gzip.GzipFile(filename, 'w', compresslevel=5) as fp:
         pickle.dump(tiles, fp, protocol=2)
@@ -184,9 +188,17 @@ def main():
            'dec': args.fov_dec * units.degree if args.fov_dec else None}
     overlap = {'ra': args.overlap_ra, 'dec': args.overlap_dec}
 
+    names = None
     if args.pointings:
-        pointings = np.loadtxt(args.pointings)
-        pointings = SkyCoord(pointings, unit=units.degree)
+        pointings = np.genfromtxt(
+            args.pointings, dtype=None, names=True, delimiter=',')
+        try:
+            names = pointings['name']
+            names = [name.decode('ascii') for name in names]
+        except ValueError:
+            pass
+        pointings = SkyCoord(ra=pointings['ra'], dec=pointings['dec'],
+                             unit=units.degree)
     else:
         pointings = None
 
@@ -201,7 +213,7 @@ def main():
                 pathname = os.path.join(dirname, pathname)
 
                 create_gridfile(nside, fov, overlap, pathname, args.force,
-                                pointings=pointings)
+                                pointings=pointings, names=names)
 
     else:
         for nside in args.nside:
@@ -211,7 +223,7 @@ def main():
             else:
                 pathname = args.output
             create_gridfile(nside, fov, overlap, pathname, args.force,
-                            pointings=pointings)
+                            pointings=pointings, names=names)
 
 
 if __name__ == "__main__":
