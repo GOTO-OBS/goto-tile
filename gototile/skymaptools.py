@@ -375,10 +375,11 @@ def calculate_tiling(skymap, telescopes, date=None,
             sources = telescope.topsources
             GWobs += prob
             center = telescope.topcenter
+            name = telescope.topname
             if prob >= settings.MINPROB:
                 logging.debug("Tile with prob. %.4f for %s",
                               prob, telescope.name)
-                pointings.append([center, prob, GWobs, prob/GWtot,
+                pointings.append([str(name), center, prob, GWobs, prob/GWtot,
                                   GWobs/GWtot, telescope.name,
                                   time, time-date, tile, sources])
                 obstilelist.append(tile)
@@ -393,24 +394,18 @@ def calculate_tiling(skymap, telescopes, date=None,
             ntiles += 1
         time += dt
 
-
     # The `rows` parameter in the `QTable` initializer can't properly
     # handle equal-sized numpy arrays that should be treated as a
     # single object ('tile' and 'source'): it will attempt to expand
     # the array. The list(zip(*pointings)) works around that.
+    names = ['fieldname', 'center', 'prob', 'cumprob', 'relprob',
+             'cumrelprob', 'telescope', 'time', 'dt', 'tile', 'sources']
+    dtype = ['U20', SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
+             Time, TimeDelta, np.ndarray, np.ndarray]
     if len(pointings) == 0:
-        pointings = QTable(names=['center', 'prob', 'cumprob', 'relprob',
-                                  'cumrelprob', 'telescope', 'time', 'dt',
-                                  'tile', 'sources'],
-                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
-                                  Time, TimeDelta, np.ndarray, np.ndarray])
+        pointings = QTable(names=names, dtype=dtype)
     else:
-        pointings = QTable(list(zip(*pointings)),
-                           names=['center', 'prob', 'cumprob', 'relprob',
-                                  'cumrelprob', 'telescope', 'time', 'dt',
-                                  'tile', 'sources'],
-                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
-                                  Time, TimeDelta, np.ndarray, np.ndarray])
+        pointings = QTable(list(zip(*pointings)), names=names, dtype=dtype)
     # Add the obstilelist and obspixelist separately
     # Note that individual tiles inside the table are preserved as
     # type 'object', not as type 'float64'
@@ -441,6 +436,7 @@ def ordertiles(telescopes):
             telescope.toptile = None
             telescope.toppixlist = []
             telescope.topcenter = None
+            telescope.topname = ''
             continue
         indices = np.argsort(telescope.tileprobs[vismask])[::-1]
         itop = np.where(vismask)[0][indices[0]]
@@ -449,6 +445,7 @@ def ordertiles(telescopes):
         telescope.toptile = telescope.tiles[itop]
         telescope.toppixlist = telescope.pixlist[itop]
         telescope.topcenter = telescope.tilecenters[itop]
+        telescope.topname = telescope.tilenames[itop]
         telescope.topsources = []
         if hasattr(telescope, 'catsources'):
             for pixel in telescope.pixlist[itop]:

@@ -256,7 +256,8 @@ class Telescope(object):
         logger = logging.getLogger(__name__)
         if isinstance(tilespath, tuple) and len(tilespath) == 3:
             self.tiles, self.pixlist, self.tilecenters = tilespath
-            return self.tiles, self.pixlist, self.tilecenters
+            self.tilenames = np.arange(len(self.tiles)) + 1
+            return self.tilenames, self.tiles, self.pixlist, self.tilecenters
 
         tilespath = self.gettilespath(tilespath)
         if not os.path.isfile(tilespath):
@@ -268,7 +269,9 @@ class Telescope(object):
                 logger.debug("Creating tiles on the fly")
                 data = tileallsky(self.fov, NSIDE, overlap=0.5)
                 self.tiles, self.pixlist, self.tilecenters = data
-                return self.tiles, self.pixlist, self.tilecenters
+                self.tilenames = np.arange(len(self.tiles)) + 1
+                return (self.tilenames, self.tiles, self.pixlist,
+                        self.tilecenters)
 
         with gzip.GzipFile(tilespath, 'r') as infile:
             logger.debug("Reading tiles from %s", tilespath)
@@ -278,15 +281,24 @@ class Telescope(object):
                 data = pickle.load(infile)  # Python 2
         # Allow for multiple 'nside' grids inside the file
         if isinstance(data, dict):
-            tilelist, pixlist, centers = data[NSIDE]
+            if len(data[NSIDE]) == 4:
+                names, tilelist, pixlist, centers = data[NSIDE]
+            else:
+                tilelist, pixlist, centers = data[NSIDE]
+                names = np.arange(len(tilelist)) + 1
         else:
-            tilelist, pixlist, centers = data
+            if len(data) == 4:
+                names, tilelist, pixlist, centers = data
+            else:
+                tilelist, pixlist, centers = data
+                names = np.arange(len(tilelist)) + 1
         logging.debug("Read %s: %d tiles, %d pixels", tilespath,
                       len(tilelist), len(pixlist))
+        self.tilenames = names
         self.tiles = tilelist
         self.pixlist = pixlist
         self.tilecenters = centers
-        return tilelist, pixlist, centers
+        return names, tilelist, pixlist, centers
 
 
 def build_scope(config):

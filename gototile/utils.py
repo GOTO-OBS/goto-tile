@@ -12,7 +12,7 @@ class FileExistsError(IOError):
 def pointings_to_text(pointings, catalog=None):
     if catalog is None:
         catalog = {'path': None, 'key': None}
-    table = pointings[['prob', 'cumprob', 'telescope']].copy()
+    table = pointings[['fieldname', 'prob', 'cumprob', 'telescope']].copy()
     table['prob'] = ["{:.5f}".format(100 * prob)
                      for prob in table['prob']]
     table['cumprob'] = ["{:.5f}".format(100*prob)
@@ -25,7 +25,8 @@ def pointings_to_text(pointings, catalog=None):
     table['time'] = [time.datetime.strftime('%Y-%m-%dT%H:%M:%S%z')
                      for time in pointings['time']]
     table['dt'] = ["{:.5f}".format(dt.jd) for dt in pointings['dt']]
-    columns = ['telescope', 'ra', 'dec', 'time', 'dt', 'prob', 'cumprob']
+    columns = ['telescope', 'fieldname', 'ra', 'dec', 'time', 'dt',
+               'prob', 'cumprob']
     if catalog['path']:
         table['ncatsources'] = [len(sources)
                                 for sources in pointings['sources']]
