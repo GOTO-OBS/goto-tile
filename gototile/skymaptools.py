@@ -189,10 +189,16 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     pool = multiprocessing.Pool(njobs)
     func = VisibleMap(telescope, skycoords, ipix,
                       iers_url=iers.conf.iers_auto_url)
-    seen = pool.map(func, sidtimes)
-    # Close and free up the memory
-    pool.close()
-    pool.join()
+    if njobs is None or njobs > 1:
+        pool = multiprocessing.Pool(njobs)
+        seen = pool.map(func, sidtimes)
+        # Close and free up the memory
+        pool.close()
+        pool.join()
+    else:
+        seen = []
+        for sidtime in sidtimes:
+            seen.append(func(sidtime))
     indices = np.unique(np.hstack(seen))
 
     logging.info("{:d} pixels out of {:d} visible".format
