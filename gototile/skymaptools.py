@@ -185,8 +185,8 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     if not sidtimes:
         return maskedmap, np.array([], dtype=np.int)
     skycoords = skymap.skycoords()
-    ipix = np.arange(len(skymap.skymap))
-    pool = multiprocessing.Pool(njobs)
+    dtype = getattr(settings, 'IDTYPE')
+    ipix = np.arange(len(skymap.skymap), dtype=dtype)
     func = VisibleMap(telescope, skycoords, ipix,
                       iers_url=iers.conf.iers_auto_url)
     if njobs is None or njobs > 1:
@@ -200,7 +200,6 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
         for sidtime in sidtimes:
             seen.append(func(sidtime))
     indices = np.unique(np.hstack(seen))
-
     logging.info("{:d} pixels out of {:d} visible".format
                  (len(indices), len(skymap.skymap)))
     maskedmap.skymap[indices] = skymap.skymap[indices]
