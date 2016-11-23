@@ -102,6 +102,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
         start = date
         stop = Time(
             obs.next_rising(sun).datetime(), format='datetime')
+
     if within:
         stop_ = date + within
         if stop_ <= start:  # Stop before Sun set
@@ -134,6 +135,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
         stop = [stop]
     delta = getattr(settings, 'TIMESTEP')
     times = []
+
     for start_, stop_ in zip(start, stop):
         diff = stop_ - start_
         steps = int(np.round(diff / delta))
@@ -189,6 +191,7 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     ipix = np.arange(len(skymap.skymap), dtype=dtype)
     func = VisibleMap(telescope, skycoords, ipix,
                       iers_url=iers.conf.iers_auto_url)
+
     if njobs is None or njobs > 1:
         pool = multiprocessing.Pool(njobs)
         seen = pool.map(func, sidtimes)
@@ -283,6 +286,10 @@ def calculate_tiling(skymap, telescopes, date=None,
         telescope.sidtimes = calc_siderealtimes(
             date, telescope.location, within=within,
             allnight=(nightsky == 'all'))
+    timespan = within
+    if timespan is None:
+        timespan = max([telescope.sidtimes[-1] for telescope in telescopes])
+        timespan = timespan - date
     if catalog['path']:
         cattable = read_catalog(**catalog)
         allskymap, catsources = map2catalog(allskymap, cattable)
@@ -349,7 +356,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     nscopes = len(telescopes)
     time = date
     dt = getattr(settings, 'TIMESTEP')
-    endtime = date + within if within else date + units.year
+    endtime = date + timespan
     base_indices = np.arange(len(telescopes))
     ntiles = 0
     nobs = 0
