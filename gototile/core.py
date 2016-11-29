@@ -12,7 +12,7 @@ import astropy
 from astropy.time import Time
 from .skymaptools import calculate_tiling
 from .skymap import SkyMap
-from .settings import NSIDE
+from . import settings
 from . import telescope as telmodule
 from .telescope import build_scope, read_config_file
 from .utils import pointings_to_text
@@ -24,7 +24,7 @@ except NameError:
     from .utils import FileExistsError
 
 
-def run(skymap, telescopes, nside=NSIDE, date=None,
+def run(skymap, telescopes, nside=None, date=None,
         coverage=None, maxtiles=100, within=None,
         nightsky=False, catalog=None, tilespath='./tiles',
         njobs=1, command='',
@@ -34,6 +34,8 @@ def run(skymap, telescopes, nside=NSIDE, date=None,
         coverage = {'min': 0.05, 'max': 0.95}
     if catalog is None:
         catalog = {'path': None, 'key': None}
+    if nside is None:
+        nside = getattr(settings, 'NSIDE')
     if outputoptions is None:
         outputoptions = {}
     if plotoptions is None:

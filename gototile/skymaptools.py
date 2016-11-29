@@ -79,7 +79,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
     logging.info("Calculating sideral times for {}".format(location))
     obs = ephem.Observer()
     obs.pressure = 0
-    obs.horizon = str(settings.SUNALTITUDE.value)
+    obs.horizon = str(getattr(settings, 'SUNALTITUDE').value)
     obs.lon = str(location.longitude.value)
     obs.lat = str(location.latitude.value)
     obs.elevation = location.height.value
@@ -102,6 +102,7 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
         start = date
         stop = Time(
             obs.next_rising(sun).datetime(), format='datetime')
+
     if within:
         stop_ = date + within
         if stop_ <= start:  # Stop before Sun set
@@ -132,8 +133,9 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
         start = [start]
     if not isinstance(stop, list):
         stop = [stop]
-    delta = settings.TIMESTEP
+    delta = getattr(settings, 'TIMESTEP')
     times = []
+
     for start_, stop_ in zip(start, stop):
         diff = stop_ - start_
         steps = int(np.round(diff / delta))
@@ -185,16 +187,22 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
     if not sidtimes:
         return maskedmap, np.array([], dtype=np.int)
     skycoords = skymap.skycoords()
-    ipix = np.arange(len(skymap.skymap))
-    pool = multiprocessing.Pool(njobs)
+    dtype = getattr(settings, 'IDTYPE')
+    ipix = np.arange(len(skymap.skymap), dtype=dtype)
     func = VisibleMap(telescope, skycoords, ipix,
                       iers_url=iers.conf.iers_auto_url)
-    seen = pool.map(func, sidtimes)
-    # Close and free up the memory
-    pool.close()
-    pool.join()
-    indices = np.unique(np.hstack(seen))
 
+    if njobs is None or njobs > 1:
+        pool = multiprocessing.Pool(njobs)
+        seen = pool.map(func, sidtimes)
+        # Close and free up the memory
+        pool.close()
+        pool.join()
+    else:
+        seen = []
+        for sidtime in sidtimes:
+            seen.append(func(sidtime))
+    indices = np.unique(np.hstack(seen))
     logging.info("{:d} pixels out of {:d} visible".format
                  (len(indices), len(skymap.skymap)))
     maskedmap.skymap[indices] = skymap.skymap[indices]
@@ -260,7 +268,7 @@ def calculate_tiling(skymap, telescopes, date=None,
                      nightsky=False, catalog=None,
                      tilespath=None, njobs=1):
     if coverage is None:
-        coverage = settings.COVERAGE
+        coverage = getattr(settings, 'COVERAGE')
     if catalog is None:
         catalog = {'path': None, 'key': None}
     date = skymap.header['date-det'] if date is None else date
@@ -278,6 +286,10 @@ def calculate_tiling(skymap, telescopes, date=None,
         telescope.sidtimes = calc_siderealtimes(
             date, telescope.location, within=within,
             allnight=(nightsky == 'all'))
+    timespan = within
+    if timespan is None:
+        timespan = max([telescope.sidtimes[-1] for telescope in telescopes])
+        timespan = timespan - date
     if catalog['path']:
         cattable = read_catalog(**catalog)
         allskymap, catsources = map2catalog(allskymap, cattable)
@@ -343,8 +355,8 @@ def calculate_tiling(skymap, telescopes, date=None,
     GWobs = 0.0
     nscopes = len(telescopes)
     time = date
-    dt = settings.TIMESTEP
-    endtime = date + within if within else date + units.year
+    dt = getattr(settings, 'TIMESTEP')
+    endtime = date + timespan
     base_indices = np.arange(len(telescopes))
     ntiles = 0
     nobs = 0
@@ -376,7 +388,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             GWobs += prob
             center = telescope.topcenter
             name = telescope.topname
-            if prob >= settings.MINPROB:
+            if prob >= getattr(settings, 'MINPROB'):
                 logging.debug("Tile with prob. %.4f for %s",
                               prob, telescope.name)
                 pointings.append([str(name), center, prob, GWobs, prob/GWtot,

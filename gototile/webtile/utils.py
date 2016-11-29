@@ -4,7 +4,7 @@ import inspect
 import gototile.grid
 import gototile.telescope
 from gototile.skymaptools import calculate_tiling
-from gototile.settings import NSIDE
+from gototile import settings
 
 
 
@@ -29,11 +29,13 @@ class TiledMapError(Exception):
     pass
 
 
-def create_grid(telescopes=None, overlap=None, nside=NSIDE):
+def create_grid(telescopes=None, overlap=None, nside=None):
     """Create the GOTO tiled pointing map, one per telescope"""
 
     if telescopes is None:
         telescopes = []
+    if nside is None:
+        nside = getattr(settings, 'NSIDE')
 
     grid = {}
     for telescope in telescopes:
@@ -50,5 +52,5 @@ def makegrid(tilesdir, name=None):
                                      delete=False)
     path = fp.name
     fp.close()
-    gototile.grid.tileallsky(path, name, NSIDE)
+    gototile.grid.tileallsky(path, name, getattr(settings, 'NSIDE'))
     return path

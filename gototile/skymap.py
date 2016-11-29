@@ -10,6 +10,7 @@ from astropy.coordinates import get_sun, SkyCoord, AltAz
 from astropy import units
 import healpy
 import ephem
+from . import settings
 from . import skymaptools as smt
 from .catalog import read_catalog
 try:
@@ -52,7 +53,8 @@ class SkyMap(object):
         self.isnested = header.get('nested')
         if not self.order:
             self.order = 'NESTED' if self.isnested else 'RING'
-        self.skymap = skymap
+        dtype = getattr(settings, 'DTYPE')
+        self.skymap = skymap.astype(dtype)
         self.objid = header.get('objid')
         self.header = header
 

@@ -15,7 +15,7 @@ from astropy.coordinates import AltAz, SkyCoord
 from astropy.units import Quantity
 from astropy import units
 from .catalog import visible_catalog, read_catalog, map2catalog
-from .settings import NSIDE, TILESDIR, SUNALTITUDE, COVERAGE
+from . import settings
 from .grid import tileallsky
 from .skymaptools import calc_siderealtimes, get_visiblemap, getvectors
 
@@ -236,24 +236,26 @@ class Telescope(object):
         frame = AltAz(obstime=time, location=self.location)
         obscoords = suncoords.transform_to(frame)
 
-        return obscoords.alt < SUNALTITUDE
+        return obscoords.alt < getattr(settings, 'SUNALTITUDE')
 
 
     def gettilespath(self, tilespath=None):
+        nside = getattr(settings, 'NSIDE')
         if tilespath is None:
-            tilespath = TILESDIR
+            tilespath = getattr(settings, 'TILESDIR')
         if os.path.isdir(tilespath):
-            filename = "{}_nside{}.pgz".format(self.name, NSIDE)
+            filename = "{}_nside{}.pgz".format(self.name, nside)
             tilespath = os.path.join(tilespath, filename)
         elif not os.path.isfile(tilespath):
             # Assume tilespath is a 'base' path
             dirname, filename = os.path.split(tilespath)
-            filename = "{}_nside{}_{}".format(self.name, NSIDE, filename)
+            filename = "{}_nside{}_{}".format(self.name, nside, filename)
             tilespath = os.path.join(dirname, filename)
         return tilespath
 
     def readtiles(self, tilespath=None):
         logger = logging.getLogger(__name__)
+        nside = getattr(settings, 'NSIDE')
         if isinstance(tilespath, tuple) and len(tilespath) == 3:
             self.tiles, self.pixlist, self.tilecenters = tilespath
             self.tilenames = np.arange(len(self.tiles)) + 1
@@ -267,7 +269,7 @@ class Telescope(object):
             if not os.path.isfile(tilespath):
                 # Create one in-memory
                 logger.debug("Creating tiles on the fly")
-                data = tileallsky(self.fov, NSIDE, overlap=0.5)
+                data = tileallsky(self.fov, nside, overlap=0.5)
                 self.tiles, self.pixlist, self.tilecenters = data
                 self.tilenames = np.arange(len(self.tiles)) + 1
                 return (self.tilenames, self.tiles, self.pixlist,
@@ -281,10 +283,10 @@ class Telescope(object):
                 data = pickle.load(infile)  # Python 2
         # Allow for multiple 'nside' grids inside the file
         if isinstance(data, dict):
-            if len(data[NSIDE]) == 4:
-                names, tilelist, pixlist, centers = data[NSIDE]
+            if len(data[nside]) == 4:
+                names, tilelist, pixlist, centers = data[nside]
             else:
-                tilelist, pixlist, centers = data[NSIDE]
+                tilelist, pixlist, centers = data[nside]
                 names = np.arange(len(tilelist)) + 1
         else:
             if len(data) == 4:

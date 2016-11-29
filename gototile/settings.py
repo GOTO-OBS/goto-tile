@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from astropy import units
 from astropy.time import TimeDelta
 
@@ -10,3 +11,5 @@ SUNALTITUDE = -18 * units.degree
 COVERAGE = {'min': 0.05, 'max': 0.95}
 ARC_PRECISION = 9000
 MINPROB = 1e-3
+DTYPE = np.float64
+IDTYPE = np.int64
