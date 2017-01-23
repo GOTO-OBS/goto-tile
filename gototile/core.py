@@ -77,7 +77,7 @@ def run(skymap, telescopes, nside=None, date=None,
 
     if outputoptions.get('text'):
         table = pointings_to_text(pointings, catalog=catalog)
-        table.write(outputoptions['text'], format='ascii.ecsv')
+        table.write(outputoptions['text'], format='ascii.ecsv', overwrite=True)
 
     if outputoptions.get('latex'):  # Very similar to output, but with less
                              # precision (more human readable when rendered)
@@ -94,7 +94,8 @@ def run(skymap, telescopes, nside=None, date=None,
                          for time in pointings['time']]
         table['dt'] = ["{:.2f}".format(dt.jd*24) for dt in pointings['dt']]
         table[['telescope', 'fieldname', 'ra', 'dec', 'time', 'dt',
-               'prob', 'cumprob']].write(outputoptions['latex'], format='latex')
+               'prob', 'cumprob']].write(outputoptions['latex'],
+                                         format='latex', overwrite=True)
 
     if outputoptions.get('pickle'):  # For re-use within Python
         with open(outputoptions['pickle'], 'wb') as outfile:
