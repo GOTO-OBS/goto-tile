@@ -270,6 +270,14 @@ class SkyMap(object):
                 # show % coverage as outline thickness
                 linewidth = 100 * pointing['prob']
             ra2 = ra + 180
+            # Work around an issue with cartopy-Proj.4, where polygons
+            # aren't drawn >= abs(89) latitude. Since the M-W
+            # projection is bad near the poles anyway, we can probably
+            # safely cheat. See
+            # https://github.com/SciTools/cartopy/issues/724
+            dec = np.array(dec)
+            dec[dec >= 88.99] = 88.99
+            dec[dec <= -88.99] = -88.99
             if np.any(ra2 > 0) and np.any(ra2 <= 0):
                 mask = ra2 > 0
                 axes.fill(ra[mask], dec[mask],
