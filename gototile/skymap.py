@@ -178,6 +178,11 @@ class SkyMap(object):
         from matplotlib.figure import Figure
         from matplotlib.colors import colorConverter
         import cartopy.crs as ccrs
+        import cartopy
+
+        datadir = os.environ.get('CARTOPY_DATADIR')
+        if datadir:
+            cartopy.config['data_dir'] = datadir
 
         read_colormaps()
         if catalog is None:
