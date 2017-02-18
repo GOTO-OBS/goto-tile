@@ -140,8 +140,8 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
         diff = stop_ - start_
         steps = int(np.round(diff / delta))
         times_ = np.linspace(start_.mjd, stop_.mjd, steps)
-        times.append(Time(times_, format='mjd'))
-    times = Time(np.hstack(times))
+        times.append(Time(times_, format='mjd').mjd)
+    times = Time(np.hstack(times), format='mjd')
 
     return times
 

@@ -3,5 +3,6 @@ matplotlib
 astropy
 pyephem
 healpy
-git+https://github.com/matplotlib/basemap.git
+cartopy
 PyYAML
+scipy

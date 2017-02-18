@@ -177,7 +177,12 @@ class SkyMap(object):
             FigureCanvas
         from matplotlib.figure import Figure
         from matplotlib.colors import colorConverter
-        from mpl_toolkits.basemap import Basemap
+        import cartopy.crs as ccrs
+        import cartopy
+
+        datadir = os.environ.get('CARTOPY_DATADIR')
+        if datadir:
+            cartopy.config['data_dir'] = datadir
 
         read_colormaps()
         if catalog is None:
@@ -212,27 +217,27 @@ class SkyMap(object):
 
         if axes is None:
             figure = Figure()
-            axes = figure.add_subplot(1, 1, 1)
-        m = Basemap(projection='moll', resolution='c', lon_0=0.0, ax=axes)
-        m.drawmeridians(np.arange(0, 360, 30), linewidth=0.25)
-        m.drawparallels(np.arange(-90, 90, 30), linewidth=0.25,
-                        labels=[1,0,0,0])
-        m.drawmapboundary(color='k', linewidth=0.5)
+            axes = figure.add_subplot(1, 1, 1, projection=ccrs.Mollweide())
+        geodetic = ccrs.Geodetic()
 
         if geoplot:
             t = Time(date, location=('0d', '0d'))
             t.delta_ut1_utc = 0
             st = t.sidereal_time('mean')
             dlon = st.radian
-            m.drawcoastlines(linewidth=0.25)
-            m.nightshade(date=date.datetime, ax=axes)
+            axes.coastlines(linewidth=0.25)
+            axes.gridlines(linewidth=0.25, color='grey',
+                           linestyle='--')
+            axes.set_global()
+            #m.nightshade(date=date.datetime, ax=axes)
             longs, lats = zip(*[(telescope.location.longitude.deg,
                                telescope.location.latitude.deg)
                               for telescope in telescopes])
-            x, y = m(longs, lats)
-            m.plot(x, y, color='#BBBBBB', marker='8', markersize=10,
-                   linestyle='none')
+            axes.plot(longs, lats, color='#BBBBBB', marker='8', markersize=10,
+                      linestyle='none', transform=geodetic)
         else:
+            axes.set_global()
+
             dlon = 0  # longitude correction
 
         npix = healpy.nside2npix(self.nside)
@@ -240,9 +245,9 @@ class SkyMap(object):
         thetas, phis = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
         ras = np.rad2deg(phis-dlon)%360
         decs = np.rad2deg(np.pi/2 - thetas%np.pi)
-        xmap, ymap = m(ras, decs)
-        m.scatter(xmap, ymap, s=1, c=self.skymap,
-                  cmap='cylon', alpha=0.5, linewidths=0, zorder=1)
+        axes.scatter(ras, decs, s=1, c=self.skymap,
+                     cmap='cylon', alpha=0.5, linewidths=0, zorder=1,
+                     transform=geodetic)
 
         # Set up colorscheme for telescopes
         colors = itertools.cycle(
@@ -257,8 +262,7 @@ class SkyMap(object):
             # the latter has dtype 'object' (containg floats), the
             # former 'float64'
             ra, dec = smt.getshape(pointings.tilelist[i], steps=10)
-            ra2 = ra - dlon / np.pi * 180
-            x, y = m(ra2, dec)
+            ra = ra - np.rad2deg(dlon)
             color = colors[pointing['telescope']]
             alpha = 0
             if options.get('delay'):
@@ -270,23 +274,32 @@ class SkyMap(object):
             if options.get('coverage'):
                 # show % coverage as outline thickness
                 linewidth = 100 * pointing['prob']
-            ra2 += 180
+            ra2 = ra + 180
+            # Work around an issue with cartopy-Proj.4, where polygons
+            # aren't drawn >= abs(89) latitude. Since the M-W
+            # projection is bad near the poles anyway, we can probably
+            # safely cheat. See
+            # https://github.com/SciTools/cartopy/issues/724
+            dec = np.array(dec)
+            dec[dec >= 88.99] = 88.99
+            dec[dec <= -88.99] = -88.99
             if np.any(ra2 > 0) and np.any(ra2 <= 0):
                 mask = ra2 > 0
-                axes.fill(x[mask], y[mask],
+                axes.fill(ra[mask], dec[mask],
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
-                          edgecolor='black')
-                mask = ra2 <= 0
-                axes.fill(x[mask], y[mask],
+                          edgecolor='black', transform=geodetic)
+                mask = ~mask
+                axes.fill(ra[mask], dec[mask],
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
-                          edgecolor='black')
+                          edgecolor='black', transform=geodetic)
             else:
-                axes.fill(x, y,
+                axes.fill(ra, dec,
                           fill=True, facecolor=acolor,
                           linewidth=linewidth, linestyle='solid',
-                          edgecolor='black')
+                          edgecolor='black',
+                          transform=geodetic)
 
         if catalog['path']:
             logging.info("Reading catalog data for plot")
@@ -311,34 +324,34 @@ class SkyMap(object):
                     altaz = radecs.transform_to(frame)
                     visras.extend(ras[np.where(altaz.alt.degree > (90-radius))])
                     visdecs.extend(decs[np.where(altaz.alt.degree > (90-radius))])
-                xcat, ycat = m(np.array(visras) - (dlon/np.pi*180.0), visdecs)
+                xcat, ycat = np.array(visras) - np.rad2deg(dlon), visdecs
             else:
-                xcat, ycat = m(np.array(ras) - (dlon/np.pi*180.0), decs)
+                xcat, ycat = np.array(ras) - np.rad2deg(dlon), decs
             logging.info("Overplotting catalog")
-            m.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
-                      zorder=2)
+            axes.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
+                         transform=geodetic)
 
         if objects:
-            ra = [obj.ra.value for obj in objects]
+            ra = [obj.ra.value - np.rad2deg(dlon) for obj in objects]
             dec = [obj.dec.value for obj in objects]
-            x, y = m(np.array(ra) - (dlon / np.pi*180), np.array(dec))
-            m.plot(x, y, linestyle='None', marker='p', color=(0, 1, 1, 0.5),
-                    zorder=5)
-            for obj, xpos, ypos in zip(objects, x, y):
-                plt.annotate(obj.name, xy=(xpos, ypos), xytext=(xpos, ypos),
-                             ha='center', va='top', size='x-small',
-                             zorder=12)
+            axes.plot(ra, dec, linestyle='None', marker='p',
+                      color=(0, 1, 1, 0.5), zorder=5,
+                      transform=geodetic)
+            for obj, xpos, ypos in zip(objects, ra, dec):
+                axes.text(xpos, ypos, obj.name, ha='center', va='top',
+                          size='x-small', zorder=12,
+                          transform=geodetic)
         if sun:
-            x, y = m(np.array(sun.ra.value) - (dlon / np.pi*180),
-                     sun.dec.value)
-            m.plot(x, y, color=(1, 1, 0, 0.5), marker='o',
-                   markerfacecolor=(1, 1, 0, 0.5), markersize=12)
+            axes.plot(sun.ra.value-np.rad2deg(dlon), sun.dec.value,
+                      color=(1, 1, 0, 0.5), marker='o',
+                      markerfacecolor=(1, 1, 0, 0.5), markersize=12,
+                      transform=geodetic)
         if moon:
             phase = moon.phase
-            x, y = m(np.array(moon.ra.value) - (dlon / np.pi*180),
-                     moon.dec.value)
-            m.plot(x, y, marker='o', markersize=10, markeredgecolor='black',
-                   markerfacecolor=(phase, phase, phase, 0.5))
+            axes.plot(moon.ra.value, moon.dec.value,
+                      marker='o', markersize=10, markeredgecolor='black',
+                      markerfacecolor=(phase, phase, phase, 0.5),
+                      transform=geodetic)
         axes.set_title(title, y=1.05)
 
         if filename:

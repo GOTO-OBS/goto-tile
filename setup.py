@@ -83,7 +83,8 @@ setup(
     scripts=["scripts/gototile", "scripts/create-grid"],
     packages=["gototile", "gototile.webtile"],
     package_dir={'gototile': "gototile"},
-    install_requires=["numpy", "astropy", "healpy", "pyephem", "PyYAML"],
+    install_requires=["numpy", "astropy", "healpy", "pyephem", "PyYAML",
+                      "cartopy", "scipy"],
     data_files=[
         ('gototile', ["gototile/GWGC.csv",
                       "gototile/cylon.csv"]),
