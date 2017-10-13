@@ -501,7 +501,7 @@ def tile_skymap(skymap, telescopes,
                 tileprobs[i], names]))
 
     names = ['fieldname', 'prob', 'telescope']
-    dtype = ['U20', 'f8', 'U20']
+    dtype = ['U20', 'f8', 'U']
     if len(pointings) == 0:
         pointings = QTable(names=names, dtype=dtype)
     else:
