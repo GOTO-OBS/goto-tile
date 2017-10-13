@@ -477,12 +477,28 @@ def tile_skymap(skymap, telescopes,
     # Run best tile calculating on the telescopes
     filltiles(telescopes)
 
+    # Check to avoid duplicating tiles for telescopes that use the same grid
+    # For example GOTO-N-4 and GOTO-S-4 have the same FoV, so produce the
+    # same tiling solution.
+    _, unique_indices, unique_inverse = np.unique([t.tiles.tostring()
+                                                   for t in telescopes],
+                                                   return_index=1,
+                                                   return_inverse=1)
+    unique_tilenames = np.array([t.tilenames for t in telescopes])[unique_indices]
+    unique_tileprobs = np.array([t.tileprobs for t in telescopes])[unique_indices]
+    shared_names = ['']*len(unique_indices)
+    for i in range(len(telescopes)):
+        shared_names[unique_inverse[i]] += telescopes[i].name + ';'
+    shared_names = [i[:-1] for i in shared_names] # remove trailing ;
+
     pointings = []
-    for telescope in telescopes:
-        for i in range(len(telescope.tiles)):
-            pointings.append(np.array([str(telescope.tilenames[i]),
-                telescope.tileprobs[i],
-                telescope.name]))
+    for j in range(len(unique_indices)):
+        tilenames = unique_tilenames[j]
+        tileprobs = unique_tileprobs[j]
+        names = shared_names[j]
+        for i in range(len(tilenames)):
+            pointings.append(np.array([str(tilenames[i]),
+                tileprobs[i], names]))
 
     names = ['fieldname', 'prob', 'telescope']
     dtype = ['U20', 'f8', 'U20']
