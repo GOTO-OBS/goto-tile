@@ -427,17 +427,13 @@ def calculate_tiling(skymap, telescopes, date=None,
     return pointings, newskymap.skymap, allskymap.skymap
 
 
-def tile_skymap(skymap, telescopes,
-                coverage=None, maxtiles=100, catalog=None,
-                tilespath=None):
+def tile_skymap(skymap, telescopes, catalog=None, tilespath=None):
     '''Return the tile probabilities for a given skymap.
 
     Unlike calculate_tiling this function doesn't consider time and
     visibility, only attributes of the telescope and tiles.
     '''
 
-    if coverage is None:
-        coverage = getattr(settings, 'COVERAGE')
     if catalog is None:
         catalog = {'path': None, 'key': None}
 
