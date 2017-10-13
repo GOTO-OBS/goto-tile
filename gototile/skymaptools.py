@@ -427,15 +427,22 @@ def calculate_tiling(skymap, telescopes, date=None,
     return pointings, newskymap.skymap, allskymap.skymap
 
 
-def tile_skymap(skymap, telescopes, catalog=None, tilespath=None):
+def tile_skymap(skymap, telescopes, catalog=None, tilespath=None,
+                observed=None):
     '''Return the tile probabilities for a given skymap.
 
     Unlike calculate_tiling this function doesn't consider time and
     visibility, only attributes of the telescope and tiles.
+
+    observed : A list, the same length as the number of telescopes,
+               containing an array of tilenames that have already been
+               observed by each telescope (if any).
     '''
 
     if catalog is None:
         catalog = {'path': None, 'key': None}
+    if observed is None:
+        observed = [None]*len(telescopes)
 
     utils.test_iers()
 
@@ -452,17 +459,24 @@ def tile_skymap(skymap, telescopes, catalog=None, tilespath=None):
         cattable = read_catalog(**catalog)
         allskymap, catsources = map2catalog(allskymap, cattable)
 
-    newskymap = allskymap.copy()
-    for telescope in telescopes:
-        telescope.skymap = allskymap.copy()
-
     # get fractional percentage covered per pix
     total = allskymap.skymap.sum()
-    newskymap.skymap /= total
     # normalise so allskymap.sum() == 1
     allskymap.skymap /= total
+
+    newskymap = allskymap.copy()
+
+    # Blank out pixels for observed tiles in all telescope skymaps
+    for obslist, telescope in zip(observed,telescopes):
+        if obslist:
+            obsmask = np.array([tile in obslist
+                                for tile in telescope.tilenames])
+            pixlists = telescope.pixlist[obsmask]
+            for pixlist in pixlists:
+                newskymap.skymap[pixlist] = 0
+
     for telescope in telescopes:
-        telescope.skymap.skymap /= total
+        telescope.skymap = newskymap.copy()
 
     GWtot = newskymap.skymap.sum()
     if GWtot < 1e-8:
