@@ -427,15 +427,83 @@ def calculate_tiling(skymap, telescopes, date=None,
     return pointings, newskymap.skymap, allskymap.skymap
 
 
+def tile_skymap(skymap, telescopes,
+                coverage=None, maxtiles=100, catalog=None,
+                tilespath=None):
+    '''Return the tile probabilities for a given skymap.
+
+    Unlike calculate_tiling this function doesn't consider time and
+    visibility, only attributes of the telescope and tiles.
+    '''
+
+    if coverage is None:
+        coverage = getattr(settings, 'COVERAGE')
+    if catalog is None:
+        catalog = {'path': None, 'key': None}
+
+    utils.test_iers()
+
+    allskymap = skymap.copy()
+    tiles, pixlist = {}, {}
+    for telescope in telescopes:
+        telescope.indices = {}
+        if isinstance(tilespath, dict):
+            telescope.readtiles(tilespath.get(telescope.__class__.__name__))
+        else:
+            telescope.readtiles(tilespath)
+
+    if catalog['path']:
+        cattable = read_catalog(**catalog)
+        allskymap, catsources = map2catalog(allskymap, cattable)
+
+    newskymap = allskymap.copy()
+    for telescope in telescopes:
+        telescope.skymap = allskymap.copy()
+
+    # get fractional percentage covered per pix
+    total = allskymap.skymap.sum()
+    newskymap.skymap /= total
+    # normalise so allskymap.sum() == 1
+    allskymap.skymap /= total
+    for telescope in telescopes:
+        telescope.skymap.skymap /= total
+
+    GWtot = newskymap.skymap.sum()
+    if GWtot < 1e-8:
+        pointings = QTable(names=['fieldname', 'prob', 'telescope'],
+                           dtype=['U20', 'f8', 'U20'])
+        return pointings
+
+    # Run best tile calculating on the telescopes
+    filltiles(telescopes)
+
+    pointings = []
+    for telescope in telescopes:
+        for i in range(len(telescope.tiles)):
+            pointings.append(np.array([str(telescope.tilenames[i]),
+                telescope.tileprobs[i],
+                telescope.name]))
+
+    names = ['fieldname', 'prob', 'telescope']
+    dtype = ['U20', 'f8', 'U20']
+    if len(pointings) == 0:
+        pointings = QTable(names=names, dtype=dtype)
+    else:
+        pointings = QTable(list(zip(*pointings)), names=names, dtype=dtype)
+    return pointings
+
+
 # NB: the telescope instances are modified in-place, so we don't
 # return from this function
-def filltiles(telescopes, time):
+def filltiles(telescopes, time=None):
     tileprobs = []
     for telescope in telescopes:
         telescope.tileprobs = np.array(
             [telescope.skymap.skymap[pixels].sum()
              for i, pixels in enumerate(telescope.pixlist)])
-        telescope.vismask = telescope.is_visible(time, telescope.tilecenters)
+        if time:
+            telescope.vismask = telescope.is_visible(time,
+                telescope.tilecenters)
 
 
 # NB: the telescope instances are modified in-place, so we don't
