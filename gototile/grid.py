@@ -22,8 +22,8 @@ def get_tile_vertices(coords, delew, delns):
     ra = coords.ra.value
     dec = coords.dec.value
 
-    phiew = delew*RAD
-    phins = delns*RAD
+    phiew = delew/2*RAD
+    phins = delns/2*RAD
 
     l, b = ra*RAD, dec*RAD
     xyz = lb2xyz(l, b)
@@ -123,7 +123,7 @@ def tileallsky(fov, nside, overlap=None, gridcoords=None, nested=True):
     if not gridcoords:
         gridcoords = SkyCoord(ras, decs, unit=units.deg)
     logging.debug("Calculating vertices for %d tiles", len(gridcoords))
-    tilelist = get_tile_vertices(gridcoords, step['ra'], step['dec'])
+    tilelist = get_tile_vertices(gridcoords, fov['ra'].value, fov['dec'].value)
     logging.debug("Calculating HEALPix indices for tiles")
     polygon_query = PolygonQuery(nside, nested)
     pool = multiprocessing.Pool()
