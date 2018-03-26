@@ -128,6 +128,8 @@ def tileallsky(fov, nside, overlap=None, gridcoords=None, nested=True):
     polygon_query = PolygonQuery(nside, nested)
     pool = multiprocessing.Pool()
     pixlist = pool.map(polygon_query, tilelist)
+    pool.close()
+    pool.join()
     pixlist = np.array(pixlist)
 
     return tilelist, pixlist, gridcoords
