@@ -27,7 +27,7 @@ except NameError:
 def run(skymap, telescopes, nside=None, date=None,
         coverage=None, maxtiles=100, within=None,
         nightsky=False, catalog=None, tilespath='./tiles',
-        njobs=1, command='',
+        njobs=1, command='', testsources=[],
         outputoptions=None, plotoptions=None):
 
     if coverage is None:
@@ -59,7 +59,7 @@ def run(skymap, telescopes, nside=None, date=None,
         skymap, telescopes, date=date, coverage=coverage,
         maxtiles=maxtiles, within=within,
         nightsky=nightsky, catalog=catalog,
-        tilespath=tilespath, njobs=njobs)
+        tilespath=tilespath, njobs=njobs, testsources=testsources)
 
     gwtot = tiledmap.sum()
     allsky = allskymap.sum()
@@ -123,9 +123,8 @@ def print_pointings(pointings):
           end=" ")
     if (len(pointings) and
         np.any([len(sources) > 0 for sources in pointings['sources']])):
-        print("# of cat. srcs")
-    else:
-        print("")
+        print("# of cat. srcs", end=" ")
+    print("")
     for pointing in pointings:
         print("{p[fieldname]} {ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
               "{p[cumprob]:17.6f}  {p[relprob]:9.6f}  {p[cumrelprob]:9.6f}  "
@@ -137,9 +136,16 @@ def print_pointings(pointings):
                   dt=pointing['dt'].jd*24),
               end=' ')
         if len(pointing['sources']):
-            print("{:-8d}".format(len(pointing['sources'])))
-        else:
-            print("")
+            print("{:-8d}".format(len(pointing['sources'])), end=' ')
+        i = 1
+        while i:
+            key = "testsrc" + str(i)
+            if key in pointing.colnames:
+                print(pointing[key], end=' ')
+            else:
+                break
+            i += 1
+        print()
 
 
 def main(args=None):
@@ -161,12 +167,12 @@ def main(args=None):
                    'delay': args.plot_delay}
 
     pointings = run(args.skymap, args.scope, date=date,
-        coverage=args.coverage,
-        maxtiles=args.maxtiles, within=args.within,
-        nightsky=args.nightsky, catalog=args.catalog,
-        tilespath=args.tiles, njobs=args.njobs,
-        command=command,
-        outputoptions=outputoptions,
-        plotoptions=plotoptions)
+                    coverage=args.coverage,
+                    maxtiles=args.maxtiles, within=args.within,
+                    nightsky=args.nightsky, catalog=args.catalog,
+                    tilespath=args.tiles, njobs=args.njobs,
+                    command=command, testsources=args.test_sources,
+                    outputoptions=outputoptions,
+                    plotoptions=plotoptions)
 
     print_pointings(pointings)

@@ -66,3 +66,27 @@ def intersect(x1, x2, y1, y2):
     sign[mask, ...] = -1
     t = t * sign
     return t
+
+
+
+def point_in_polygon(point, polygon, center):
+    ras = polygon[0,:] * RAD
+    decs = polygon[1,:] * RAD
+    x, y, z = lb2xyz(ras, decs)
+    vertices = np.vstack(lb2xyz(ras, decs)).T
+    vertices = np.append(vertices, vertices[0:1,:], axis=0)
+    cra, cdec = center.ra.rad, center.dec.rad
+    ra, dec = point.ra.rad, point.dec.rad
+    poly = polygon.copy()
+    poly[0,:] += 360
+    #print(poly)
+    #print(point.ra.degree, point.dec.degree)
+    c = lb2xyz(cra, cdec)
+    p = lb2xyz(ra, dec)
+
+    frontside = 0
+    for v1, v2 in zip(vertices[:-1,:], vertices[1:,:]):
+        n = cross(v1, v2)
+        frontside += dot(p, n) > 0
+        #intersections += intersect(v1, v2, c, p)
+    return frontside == 0

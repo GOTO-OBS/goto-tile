@@ -105,6 +105,11 @@ def parse_args(args=None):
                         "'m' (minute) or 's' (second)")
     parser.add_argument('--within', dest='within',
                         help="Alias for --timespan")
+    parser.add_argument('--test-source', nargs=2, action='append', type=float,
+                        help="RA & Dec of source to be tested for being "
+                        "in a tile. Can be used multiple tiles (i.e., "
+                        "multiple sources. Useful for simulations of "
+                        "detectability")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--verbose', action='count', default=0,
                        help="Verbose level")
@@ -144,7 +149,7 @@ def parse_args(args=None):
     args.scope = telescopes
 
     if args.scopefile:
-        telconfigs = telmoculde.read_config_file(args.scopefile)
+        telconfigs = telmodule.read_config_file(args.scopefile)
         for config in telconfigs:
             telescope = telmodule.build_scope(config)
             args.scope.append(telescope)
@@ -181,6 +186,12 @@ def parse_args(args=None):
 
     if args.plot is True:
         args.plot = os.path.splitext(args.skymap)[0] + '.png'
+
+    args.test_sources = []
+    if args.test_source:
+        for source in args.test_source:
+            args.test_sources.append(SkyCoord(source[0], source[1],
+                                              unit='deg, deg'))
 
     return args
 

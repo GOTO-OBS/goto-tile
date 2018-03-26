@@ -1,4 +1,6 @@
 import logging
+from urllib.error import URLError
+from astropy.table import Table
 from astropy.utils import iers
 
 
@@ -12,7 +14,7 @@ class FileExistsError(IOError):
 def pointings_to_text(pointings, catalog=None):
     if catalog is None:
         catalog = {'path': None, 'key': None}
-    table = pointings[['fieldname', 'prob', 'cumprob', 'telescope']].copy()
+    table = pointings.copy()
     table['prob'] = ["{:.5f}".format(100 * prob)
                      for prob in table['prob']]
     table['cumprob'] = ["{:.5f}".format(100*prob)
@@ -31,6 +33,16 @@ def pointings_to_text(pointings, catalog=None):
         table['ncatsources'] = [len(sources)
                                 for sources in pointings['sources']]
         columns.append('ncatsources')
+    i = 1
+    while i:
+        key = "testsrc" + str(i)
+        if key in pointings.colnames:
+            columns.append(key)
+        else:
+            break
+        i += 1
+    if len(table) == 0:
+        return Table(names=columns, dtype=len(columns) * ['U1'])
     return table[columns]
 
 

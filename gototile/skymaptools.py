@@ -80,8 +80,8 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
     obs = ephem.Observer()
     obs.pressure = 0
     obs.horizon = str(getattr(settings, 'SUNALTITUDE').value)
-    obs.lon = str(location.longitude.value)
-    obs.lat = str(location.latitude.value)
+    obs.lon = str(location.lon.value)
+    obs.lat = str(location.lat.value)
     obs.elevation = location.height.value
     obs.date = ephem.Date(date.iso)
     sun = ephem.Sun(obs)
@@ -266,11 +266,13 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
 def calculate_tiling(skymap, telescopes, date=None,
                      coverage=None, maxtiles=100, within=None,
                      nightsky=False, catalog=None,
-                     tilespath=None, njobs=1):
+                     tilespath=None, njobs=1, testsources=None):
     if coverage is None:
         coverage = getattr(settings, 'COVERAGE')
     if catalog is None:
         catalog = {'path': None, 'key': None}
+    if testsources is None:
+        testsources = []
     date = skymap.header['date-det'] if date is None else date
 
     utils.test_iers()
@@ -337,11 +339,15 @@ def calculate_tiling(skymap, telescopes, date=None,
 
     GWtot = newskymap.skymap.sum()
     if GWtot < 1e-8:
-        pointings = QTable(names=['center', 'prob', 'cumprob', 'relprob',
-                                  'cumrelprob', 'telescope', 'time', 'dt',
-                                  'tile', 'sources'],
-                           dtype=[SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
-                                  Time, TimeDelta, np.ndarray, np.ndarray])
+        names = ['center', 'prob', 'cumprob', 'relprob',
+                 'cumrelprob', 'telescope', 'time', 'dt',
+                 'tile', 'sources']
+        dtype = [SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
+                 Time, TimeDelta, np.ndarray, np.ndarray]
+        for i in range(1, len(testsources)+1):
+            names.append("testsrc" + str(i))
+            dtype.append('i2')
+        pointings = QTable(names=names, dtype=dtype)
         pointings.tilelist = np.array([], dtype=np.float)
         pointings.pixellist = np.array([], dtype=np.ndarray)
 
@@ -394,6 +400,9 @@ def calculate_tiling(skymap, telescopes, date=None,
                 pointings.append([str(name), center, prob, GWobs, prob/GWtot,
                                   GWobs/GWtot, telescope.name,
                                   time, time-date, tile, sources])
+                for testsource in testsources:
+                    inside = math.point_in_polygon(testsource, tile, center)
+                    pointings[-1].append(int(inside))
                 obstilelist.append(tile)
                 obspixlist.append(telescope.toppixlist)
                 logging.debug("Total probability: %.4f", GWobs)
@@ -414,6 +423,9 @@ def calculate_tiling(skymap, telescopes, date=None,
              'cumrelprob', 'telescope', 'time', 'dt', 'tile', 'sources']
     dtype = ['U20', SkyCoord, 'f8', 'f8', 'f8', 'f8', 'U20',
              Time, TimeDelta, np.ndarray, np.ndarray]
+    for i in range(1, len(testsources)+1):
+        names.append("testsrc" + str(i))
+        dtype.append('i2')
     if len(pointings) == 0:
         pointings = QTable(names=names, dtype=dtype)
     else:
@@ -468,7 +480,7 @@ def tile_skymap(skymap, telescopes, catalog=None, tilespath=None,
 
     # Blank out pixels for observed tiles in all telescope skymaps
     for obslist, telescope in zip(observed,telescopes):
-        if obslist:
+        if obslist is not None:
             obsmask = np.array([tile in obslist
                                 for tile in telescope.tilenames])
             pixlists = telescope.pixlist[obsmask]
@@ -496,10 +508,10 @@ def tile_skymap(skymap, telescopes, catalog=None, tilespath=None,
                                                    return_inverse=1)
     unique_tilenames = np.array([t.tilenames for t in telescopes])[unique_indices]
     unique_tileprobs = np.array([t.tileprobs for t in telescopes])[unique_indices]
-    shared_names = ['']*len(unique_indices)
-    for i in range(len(telescopes)):
-        shared_names[unique_inverse[i]] += telescopes[i].name + ';'
-    shared_names = [i[:-1] for i in shared_names] # remove trailing ;
+    shared_names = [[] for _ in unique_indices]
+    for i, telescope in enumerate(telescopes):
+        shared_names[unique_inverse[i]].append(telescope.name)
+    shared_names = [';'.join(name) for name in shared_names]
 
     pointings = []
     for j in range(len(unique_indices)):
