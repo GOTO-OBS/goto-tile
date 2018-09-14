@@ -78,6 +78,7 @@ class SkyMap(object):
                 skymap, header = info
             else:
                 raise
+
         header = dict([(key.lower(), value) for key, value in header])
         header['file'] = filename
         if header['ordering'] not in ('NESTED', 'RING'):
@@ -101,6 +102,10 @@ class SkyMap(object):
             'mjd-obs', astropy.time.Time(header['date']).mjd)
         header['date-det'] = astropy.time.Time(float(header['mjddet']),
                                                format='mjd')
+
+        # code for dealing with 3D skymaps
+        if header['tfields'] > 1:
+            skymap = skymap[0]
 
         header['nside'] = header.get('nside', healpy.npix2nside(len(skymap)))
         return skymap, header
