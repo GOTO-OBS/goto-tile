@@ -3,7 +3,7 @@ import numpy as np
 from astropy import units
 from astropy.time import TimeDelta
 
-NSIDE = 256
+NSIDE = 64
 TILESDIR = 'tiles'
 GWGC_PATH = os.path.join(os.path.dirname(__file__), 'GWGC.csv')
 TIMESTEP = TimeDelta(300 * units.second)
