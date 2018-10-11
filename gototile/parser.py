@@ -19,7 +19,10 @@ def parse_args(args=None):
         description = description,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("skymap", help="Skymap FITS file",)
+    parser.add_argument("-fermi", nargs=3, type=float, action='append',
+                        default=[], help="Use final RA, Dec and statistical error "
+                        "reported by Fermi detection to create skymap (in degree unit).")
+    parser.add_argument("-skymap", help="Skymap FITS file",)
     parser.add_argument('-o', '--output', help="Output file name")
     parser.add_argument('--latex',
                         help="Write LaTeX table of pointings")

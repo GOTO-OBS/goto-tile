@@ -1,7 +1,7 @@
 GOTO-tile reads in single/multiple skymaps and attempts to provide the
 best tiling layout using a 'greedy tile' strategy. The version here is
 designed for use during the early stages of Advanced LIGO/VIRGO using
-the GOTO prototype observatory.
+the GOTO prototype observatory. It is also capable with Fermi reported position (final position).
 
 The user can choose a range of options, such as tiling with galaxy
 weighting, or selecting between the two GOTO configurations (4- and
@@ -50,10 +50,13 @@ Running GOTO-tile
 
 The basic method for calling the script with default settings is:
 
-	$ gototile -s<telescope> <skymap-file>
+	$ gototile -s<telescope> -skymap<skymap-file>
+or
+        $ gototile -s<telescope> -fermi<fermi-position>
 
-where <telescope> is one of the predefined telescope, and
-<skymap-file> is the LGIO probability skymap.
+where <telescope> is one of the predefined telescope, 
+<skymap-file> is the LGIO probability skymap, 
+and <fermi-position> is the GRB final position and error reported in GCN Fermi detection.
 
 A list of options and telescopes can be seen with:
 
@@ -62,8 +65,9 @@ A list of options and telescopes can be seen with:
 
 An example command might be:
 
-    gototile -s gn4 --night --catalog --plot --sun --moon bayestar.fits.gz
-
+    gototile -s gn4 --night --catalog --plot --sun --moon -skymap bayestar.fits.gz
+or
+    gototile -s gn4 --night --catalog --plot --sun --moon -fermi 60.640 -15.020 7.16
 
 Notes:
     Currently the script assumes greedy tiling is required. However, this may
