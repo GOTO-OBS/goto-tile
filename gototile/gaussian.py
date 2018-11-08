@@ -25,10 +25,10 @@ def prob(ra_grid,dec_grid,ra,dec,err):
 
     return prob
 
-def fermi_skymap(gbm_ra, gbm_dec, gbm_err, nside=64):
+def gaussian_skymap(ra, dec, err, nside=64):
     """calculate the probability for all skymap grids"""
-    gbm_ra = np.radians(gbm_ra)                                     # convert RA_detect to radian
-    gbm_dec = np.radians(gbm_dec)                                   # convert Dec_detect to radian
+    position_ra = np.radians(ra)                                     # convert RA_detect to radian
+    position_dec = np.radians(dec)                                   # convert Dec_detect to radian
 
     nside = nside
     npix = hp.nside2npix(nside)
@@ -40,7 +40,7 @@ def fermi_skymap(gbm_ra, gbm_dec, gbm_err, nside=64):
 
     post = np.zeros(npix)
     for i,coo in enumerate(radec):
-        post[i] = prob(coo[0],coo[1],gbm_ra,gbm_dec,gbm_err)
+        post[i] = prob(coo[0],coo[1],position_ra,position_dec,err)
     post = np.asarray(list(post))
     post /= np.sum(post * hp.nside2pixarea(nside))
     postcopy = np.copy(post)

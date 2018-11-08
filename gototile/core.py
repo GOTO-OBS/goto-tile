@@ -9,7 +9,7 @@ except ImportError:
     import pickle
 import numpy as np
 import astropy
-from .fermi import prob, fermi_skymap
+from .gaussian import prob, gaussian_skymap
 from astropy.time import Time
 from .skymaptools import calculate_tiling
 from .skymap import SkyMap
@@ -159,8 +159,8 @@ def main(args=None):
                    'objects': [parse_object(obj) for obj in args.object],
                    'coverage': args.plot_coverage,
                    'delay': args.plot_delay}
-    if (args.skymap == None) and (args.fermi == []):
-        print('ERROR: Skymap argument is missing. Please provide skymap or fermi arguments.')
+    if (args.skymap == None) and (args.gaussian == []):
+        print('ERROR: Skymap argument is missing. Please provide skymap or gaussian arguments.')
     elif args.skymap != None:
         pointings = run(args.skymap, args.scope, date=date,
             coverage=args.coverage,
@@ -172,7 +172,7 @@ def main(args=None):
             plotoptions=plotoptions)
         print_pointings(pointings)
     else:
-        args.skymap = fermi_skymap(args.fermi[0][0], args.fermi[0][1], args.fermi[0][2])
+        args.skymap = gaussian_skymap(args.gaussian[0][0], args.gaussian[0][1], args.gaussian[0][2])
         pointings = run(args.skymap, args.scope, date=date,
             coverage=args.coverage,
             maxtiles=args.maxtiles, within=args.within,
@@ -182,4 +182,3 @@ def main(args=None):
             outputoptions=outputoptions,
             plotoptions=plotoptions)
         print_pointings(pointings)
-

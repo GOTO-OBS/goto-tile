@@ -27,7 +27,7 @@ If you want the plotting abilities as well, you will also need:
 The easiest way to install all requirements is:
 
     $ pip install -r requirements.txt
-    
+
 Note that basemap requires the geos C library, which is usually found
 in package managers as `libgeos-dev` or `libgeos-devel`.
 
@@ -52,11 +52,11 @@ The basic method for calling the script with default settings is:
 
 	$ gototile -s<telescope> -skymap<skymap-file>
 or
-        $ gototile -s<telescope> -fermi<fermi-position>
+        $ gototile -s<telescope> -gaussian<gaussian-position>
 
-where <telescope> is one of the predefined telescope, 
-<skymap-file> is the LGIO probability skymap, 
-and <fermi-position> is the GRB final position and error reported in GCN Fermi detection.
+where <telescope> is one of the predefined telescope,
+<skymap-file> is the LGIO probability skymap,
+and <gaussian-position> is the GRB final position and error reported in GCN Fermi detection.
 
 A list of options and telescopes can be seen with:
 
@@ -67,7 +67,7 @@ An example command might be:
 
     gototile -s gn4 --night --catalog --plot --sun --moon -skymap bayestar.fits.gz
 or
-    gototile -s gn4 --night --catalog --plot --sun --moon -fermi 60.640 -15.020 7.16
+    gototile -s gn4 --night --catalog --plot --sun --moon -gaussian 60.640 -15.020 7.16
 
 Notes:
     Currently the script assumes greedy tiling is required. However, this may
@@ -89,7 +89,7 @@ The script f2ytile is essentially a wrapper around the tileskymap script, that
 allows the user to run the tiling algorith across the first2years simulated
 skymaps produced by Singer et al. (http://www.ligo.org/scientists/first2years/).
 The usage and list of user-configurable options are:
-  
+
 usage: f2ytile [-h] [--simpath SIMPATH] [--out OUT] [--log LOG]
                [--years YEARS] [--scopes SCOPES] [-d [DATE]] [--args ARGS]
 
