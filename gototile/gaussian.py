@@ -6,7 +6,6 @@ import healpy as hp
 from astropy import units as u
 from astropy.io import fits
 
-from .skymap import SkyMap
 
 def prob(ra_grid,dec_grid,ra,dec,err):
     """calculate the probability of specific grid (gaussian dist.)"""
@@ -64,8 +63,4 @@ def gaussian_skymap(ra, dec, err, nside=64):
     hdu = fits.table_to_hdu(m)
     hdu.header.extend(extra_header)
     hdulist = fits.HDUList([fits.PrimaryHDU(), hdu])
-    gw = hp.read_map(hdulist, verbose=False)
-
-    header_dict = {key.lower(): hdu.header[key] for key in hdu.header}
-    skymap = SkyMap(gw, header=header_dict)
-    return skymap
+    return hdulist

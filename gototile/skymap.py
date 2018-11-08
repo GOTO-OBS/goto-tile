@@ -13,6 +13,8 @@ import ephem
 from . import settings
 from . import skymaptools as smt
 from .catalog import read_catalog
+from .gaussian import gaussian_skymap
+
 try:
     stringtype = basestring  # Python 2
 except NameError:
@@ -32,31 +34,90 @@ def read_colormaps(name='cylon'):
 
 
 class SkyMap(object):
-    """A probability skymap
+    """A probability skymap.
 
     The SkyMap is a wrapper around the healpy skymap numpy.array,
     returned by healpy.fitsfunc.read_map. The SkyMap class holds track
     of the numpy array, the header information and some options.
 
+    SkyMaps should be created using one of the following class methods:
+        - SkyMap.from_fits(fits_file)
+            Will read in the sky map from a FITS file.
+            `fits_file` can be a string (the .FITS file to be loaded) or an
+            already-loaded `astropy.io.fits.HDU` or `HDUList`.
+
+        - SkyMap.from_position(ra, dec, error)
+            Will create the SkyMap from the given coordinates.
+            The arguments should be in decimal degrees.
+            The sky map will be calculated as a 2D Gaussian distribution
+            around the given position.
     """
 
-    def __init__(self, skymap, header=None, **kwargs):
+    def __init__(self, skymap, header=None):
         if isinstance(skymap, stringtype):
             skymap, header = self._read_file(skymap)
         elif header is None:
             header = {}
         elif not isinstance(header, dict):
             raise TypeError("header should be a dict")
+
         self.object = header.get('object')
         self.order = header.get('order')
         self.nside = header.get('nside')
         self.isnested = header.get('nested')
         if not self.order:
             self.order = 'NESTED' if self.isnested else 'RING'
+
         dtype = getattr(settings, 'DTYPE')
         self.skymap = skymap.astype(dtype)
         self.objid = header.get('objid')
         self.header = header
+
+    @classmethod
+    def from_fits(cls, fits_file):
+        """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.
+
+        Parameters
+        ----------
+        fits_file : str, `astropy.io.fits.HDU` or `astropy.io.fits.HDUList`
+            Path to the FITS file (if str) or FITS HDU,
+            to be passed to `healpy.read_map`.
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        info = healpy.read_map(fits_file, h=True, field=None,
+                               verbose=False, nest=None)
+        # `info` will be an array or multiple arrays, with the header appended.
+        # The first array should always be the sky map, and more will
+        # be from newer 3D sky maps (distmu, distsigma, distnorm).
+        # The header should be the last item (because h=True).
+        header = dict(info[-1])
+        header = {key.lower(): header[key] for key in header}
+        return cls(skymap=info[0], header=header)
+
+    @classmethod
+    def from_position(cls, ra, dec, error):
+        """Initialize a `~gototile.skymap.SkyMap` object from a sky position and error.
+
+        Parameters
+        ----------
+        ra : float
+            ra in decimal degrees
+        dec : float
+            declination in decimal degrees
+        error : float
+            uncertainty in the position in decimal degrees
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        hdulist = gaussian_skymap(ra, dec, error)
+        return cls.from_fits(hdulist)
 
     def copy(self):
         newmap = SkyMap(skymap=self.skymap.copy())

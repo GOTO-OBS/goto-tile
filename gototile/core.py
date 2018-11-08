@@ -9,7 +9,6 @@ except ImportError:
     import pickle
 import numpy as np
 import astropy
-from .gaussian import prob, gaussian_skymap
 from astropy.time import Time
 from .skymaptools import calculate_tiling
 from .skymap import SkyMap
@@ -162,23 +161,18 @@ def main(args=None):
     if (args.skymap == None) and (args.gaussian == []):
         print('ERROR: Skymap argument is missing. Please provide skymap or gaussian arguments.')
     elif args.skymap != None:
-        pointings = run(args.skymap, args.scope, date=date,
-            coverage=args.coverage,
-            maxtiles=args.maxtiles, within=args.within,
-            nightsky=args.nightsky, catalog=args.catalog,
-            tilespath=args.tiles, njobs=args.njobs,
-            command=command,
-            outputoptions=outputoptions,
-            plotoptions=plotoptions)
-        print_pointings(pointings)
+        args.skymap = SkyMap.from_fits(args.skymap)
     else:
-        args.skymap = gaussian_skymap(args.gaussian[0][0], args.gaussian[0][1], args.gaussian[0][2])
-        pointings = run(args.skymap, args.scope, date=date,
-            coverage=args.coverage,
-            maxtiles=args.maxtiles, within=args.within,
-            nightsky=args.nightsky, catalog=args.catalog,
-            tilespath=args.tiles, njobs=args.njobs,
-            command=command,
-            outputoptions=outputoptions,
-            plotoptions=plotoptions)
-        print_pointings(pointings)
+        args.skymap = SkyMap.from_position(args.gaussian[0][0],
+                                           args.gaussian[0][1],
+                                           args.gaussian[0][2])
+
+    pointings = run(args.skymap, args.scope, date=date,
+        coverage=args.coverage,
+        maxtiles=args.maxtiles, within=args.within,
+        nightsky=args.nightsky, catalog=args.catalog,
+        tilespath=args.tiles, njobs=args.njobs,
+        command=command,
+        outputoptions=outputoptions,
+        plotoptions=plotoptions)
+    print_pointings(pointings)
