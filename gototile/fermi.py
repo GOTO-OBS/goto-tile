@@ -25,12 +25,12 @@ def prob(ra_grid,dec_grid,ra,dec,err):
 
     return prob
 
-def fermi_skymap(gbm_ra, gbm_dec, gbm_err):                         
+def fermi_skymap(gbm_ra, gbm_dec, gbm_err, nside=64):
     """calculate the probability for all skymap grids"""
     gbm_ra = np.radians(gbm_ra)                                     # convert RA_detect to radian
     gbm_dec = np.radians(gbm_dec)                                   # convert Dec_detect to radian
 
-    nside = 64
+    nside = nside
     npix = hp.nside2npix(nside)
     ipix = range(npix)
     theta, phi = hp.pix2ang(nside, ipix)
