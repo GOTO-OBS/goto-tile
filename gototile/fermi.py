@@ -6,12 +6,14 @@ import healpy as hp
 from astropy import units as u
 from astropy.io import fits
 
-def prob(ra_grid,dec_grid,ra,dec,err):                      
+from .skymap import SkyMap
+
+def prob(ra_grid,dec_grid,ra,dec,err):
     """calculate the probability of specific grid (gaussian dist.)"""
     sys_err = np.sqrt((3.71**2)*0.9+(14.3**2)*0.1)          # quadrature sum of systematic error
     tot_err = np.sqrt(sys_err**2 + err**2)                  # quadrature sum of total error
 
-    # calculate the angular distance between the reported (RA,Dec) and the grid (RA,Dec) 
+    # calculate the angular distance between the reported (RA,Dec) and the grid (RA,Dec)
     a = np.sin(np.abs(dec_grid-dec)/2)**2
     b = np.cos(dec)*np.cos(dec_grid)*np.sin(np.abs(ra_grid-ra)/2)**2
     d = 2*np.arcsin(np.sqrt(a+b))
@@ -63,5 +65,7 @@ def fermi_skymap(gbm_ra, gbm_dec, gbm_err):
     hdu.header.extend(extra_header)
     hdulist = fits.HDUList([fits.PrimaryHDU(), hdu])
     gw = hp.read_map(hdulist, verbose=False)
-    return gw
 
+    header_dict = {key.lower(): hdu.header[key] for key in hdu.header}
+    skymap = SkyMap(gw, header=header_dict)
+    return skymap
