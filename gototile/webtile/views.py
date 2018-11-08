@@ -72,7 +72,7 @@ class SkyMapView(FormView):
         else:
             catalog = {'path': None, 'key': None}
         coverage = {'min': 0, 'max': fraction}
-        skymap = SkyMap(filename)
+        skymap = SkyMap.from_fits(filename)
         skymap.regrade(nside=NSIDE)
         try:
             pointings, _, _ = calculate_tiling(

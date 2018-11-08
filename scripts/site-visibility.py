@@ -6,7 +6,7 @@ from copy import deepcopy
 try:
     import cPickle as pickle
     class FileExistsError(IOError):
-        pass    
+        pass
 except ImportError:
     import pickle
 import numpy as np
@@ -54,10 +54,10 @@ def main():
     options.jobs = 6
     options.coverage = {'min': options.minfrac, 'max': options.maxfrac}
     options.outputfile = "4sitesaus_lapalma_fov8_bns-bbh-sims.pck"
-    
+
     locations = [EarthLocation(118.144 * units.deg, -22.608 * units.deg,
                                height = 1200 * units.m),
-                 EarthLocation(149.0672 * units.deg, -31.2754 * units.deg, 
+                 EarthLocation(149.0672 * units.deg, -31.2754 * units.deg,
                                height = 1130 * units.m),
                  EarthLocation(118.588 * units.deg, -22.980 * units.deg,
                                height = 1200 * units.m),
@@ -83,7 +83,7 @@ def main():
             results = {}
             logging.info("====== %s ======", name)
             for mapfile in sys.argv[1:]:
-                skymap = SkyMap(mapfile)
+                skymap = SkyMap.from_fits(mapfile)
                 objid = skymap.header['object']
                 objid = objid.split(':')[-1]
                 skymap.regrade(nside=NSIDE)
@@ -102,7 +102,7 @@ def main():
                     coverage=options.coverage,
                     maxtiles=maxtiles,
                     within=within,
-                    nightsky=options.nightsky, 
+                    nightsky=options.nightsky,
                     catalog=options.catalog,
                     visible=False,
                     tilespath=TILESPATH,
@@ -123,12 +123,12 @@ def main():
                 bestcoverage = pointings[-1][5]  # coverage compared to night sky
                 result['coverage'] = coverage
                 result['bestcoverage'] = bestcoverage
-                
+
                 source = SkyCoord
                 source = SkyCoord(skymap.header['injra'] * units.deg,
                                   skymap.header['injdec'] * units.deg)
                 source.id = objid
-                
+
                 observed, tile, tileno = is_source_in_tiles(tilelist, source)
                 result['observed'] = observed
                 result['tile'] = tile
@@ -148,12 +148,10 @@ def main():
             scoperesults[name] = deepcopy(results)
         key = within.decompose(bases=[units.hour]).value if within else None
         totals[key] = deepcopy(scoperesults)
-        
+
     with open(options.outputfile, "wb") as outfile:
         pickle.dump(totals, outfile)
-        
+
 
 if __name__ == '__main__':
     main()
-
-        
