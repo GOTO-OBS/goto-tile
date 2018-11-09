@@ -53,25 +53,45 @@ class SkyMap(object):
             around the given position.
     """
 
-    def __init__(self, skymap, header=None):
-        if isinstance(skymap, stringtype):
-            skymap, header = self._read_file(skymap)
-        elif header is None:
-            header = {}
-        elif not isinstance(header, dict):
+    def __init__(self, skymap, header):
+        # Check if types
+        if not isinstance(skymap, np.ndarray):
+            raise TypeError("skymap should be an array, use SkyMap.from_fits()")
+        if not isinstance(header, dict):
             raise TypeError("header should be a dict")
 
-        self.object = header.get('object')
-        self.order = header.get('order')
-        self.nside = header.get('nside')
-        self.isnested = header.get('nested')
-        if not self.order:
-            self.order = 'NESTED' if self.isnested else 'RING'
-
+        # Store the skymap as the requested type
         dtype = getattr(settings, 'DTYPE')
         self.skymap = skymap.astype(dtype)
-        self.objid = header.get('objid')
-        self.header = header
+
+        # Store the header, and make sure the header cards are lowercase
+        self.header = {key.lower(): header[key] for key in header}
+
+        # Parse the header dict and store the key attributes
+        self.order = self.header.get('ordering')
+        if self.order not in ('NESTED', 'RING'):
+            raise ValueError('ORDERING card in header has unknown value: {}'.format(self.order))
+        self.isnested = self.order == 'NESTED'
+
+        self.nside = self.header.get('nside')
+        if not self.nside == healpy.npix2nside(len(skymap)):
+            raise ValueError("Skymap length ({:.0f}) should be 12*nside**2 ({:.0f})".format(
+                             len(skymap), self.nside))
+
+        self.filename = self.header.get('filename')
+
+        alt_name = ''
+        if self.filename:
+            alt_name = os.path.basename(self.filename).split('.')[0]
+        self.object = self.header.get('object', alt_name)
+        self.objid = self.object.split(':')[-1]
+
+        self.url = header.get('referenc', '')
+
+        self.mjd = astropy.time.Time.now().mjd
+        self.date = astropy.time.Time(float(self.mjd), format='mjd')
+        self.mjd_det = header.get('mjd-obs', self.mjd)
+        self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
     @classmethod
     def from_fits(cls, fits_file):
@@ -90,13 +110,21 @@ class SkyMap(object):
         """
         info = healpy.read_map(fits_file, h=True, field=None,
                                verbose=False, nest=None)
-        # `info` will be an array or multiple arrays, with the header appended.
-        # The first array should always be the sky map, and more will
-        # be from newer 3D sky maps (distmu, distsigma, distnorm).
-        # The header should be the last item (because h=True).
+        # `info` will be an array or multiple arrays, with the header appended (because h=True).
+        skymap = info[0]
         header = dict(info[-1])
-        header = {key.lower(): header[key] for key in header}
-        return cls(skymap=info[0], header=header)
+
+        # Dealing with newer 3D skymaps, the "skymap" will have 4 components
+        # (prob, distmu, distsigma, distnorm)
+        # We only want the probability map
+        if header['TFIELDS'] > 1:
+            skymap = skymap[0]
+
+        # Store the file name if the header was from a file
+        if isinstance(fits_file, str):
+            header['FILENAME'] = fits_file
+
+        return cls(skymap, header)
 
     @classmethod
     def from_position(cls, ra, dec, error, nside=64):
@@ -129,49 +157,6 @@ class SkyMap(object):
         newmap.nside = self.nside
         newmap.objid = self.objid
         return newmap
-
-    def _read_file(self, filename):
-        info = healpy.read_map(filename, h=True, field=None,
-                               verbose=False, nest=None)
-        try:
-            skymap, distmu, distsigma, distnorm, header = info
-        except ValueError as exc:
-            if "not enough values to unpack" in str(exc):
-                # assume an older map without distance information
-                skymap, header = info
-            else:
-                raise
-
-        header = dict([(key.lower(), value) for key, value in header])
-        header['file'] = filename
-        if header['ordering'] not in ('NESTED', 'RING'):
-            raise ValueError(
-                'ORDERING card in header has unknown value: {}'.format(
-                    header['ordering']))
-        header['order'] = header['ordering']
-        header['nested'] = header['order'] == 'NESTED'
-
-        objid = os.path.basename(filename)
-        # Twice, in case we use a .fits.gz file
-        objid = os.path.splitext(objid)[0]
-        objid = os.path.splitext(objid)[0]
-        objid = header.get('object', objid)
-        header['objid'] = objid.split(':')[-1]
-        header['url'] = header.get('referenc', '')
-
-        header['mjd'] = astropy.time.Time.now().mjd
-        header['date'] = astropy.time.Time(float(header['mjd']), format='mjd')
-        header['mjddet'] = header.get(
-            'mjd-obs', astropy.time.Time(header['date']).mjd)
-        header['date-det'] = astropy.time.Time(float(header['mjddet']),
-                                               format='mjd')
-
-        # code for dealing with 3D skymaps
-        if header['tfields'] > 1:
-            skymap = skymap[0]
-
-        header['nside'] = header.get('nside', healpy.npix2nside(len(skymap)))
-        return skymap, header
 
     def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
                 dtype=None):
