@@ -195,7 +195,7 @@ class SkyMap(object):
         skycoords = SkyCoord(ra=phi*units.rad, dec=(0.5*np.pi - theta)*units.rad)
         return skycoords
 
-    def plot(self, filename, telescopes, date, pointings,
+    def plot(self, filename=None, telescopes=None, date=None, pointings=None,
              geoplot=False, catalog=None, nightsky=False,
              title="", objects=None,
              catcolor='#999999', dpi=300, options=None,
@@ -243,27 +243,33 @@ class SkyMap(object):
             cartopy.config['data_dir'] = datadir
 
         read_colormaps()
+
+        if filename is None:
+            filename = self.object
+        if telescopes is None:
+            telescopes = []
+        if date is None:
+            date = self.date_det
+        if pointings is None:
+            pointings = []
         if catalog is None:
             catalog = {'path': None, 'key': None}
         if options is None:
             options = {}
         if not title:
-            formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
-            telescope_names = ", ".join([telescope.name
-                                           for telescope in telescopes])
-            telescope_names = ' and '.join(telescope_names.rsplit(', ', 1))
+            title = "Skymap"
             if catalog['path']:
-                title = ("Skymap, catalog {catalog} and {telescope} tiling "
-                         "for trigger {trigger}\n{formatted_date}".format(
-                             catalog=os.path.basename(catalog['path']),
-                             telescope=telescope_names, trigger=self.objid,
-                             formatted_date=formatted_date))
-            else:
-                title = ("Skymap and {telescope} tiling "
-                         "for trigger {trigger}\n"
-                         "{formatted_date}".format(
-                             telescope=telescope_names, trigger=self.objid,
-                             formatted_date=formatted_date))
+                if len(telescopes) > 0:
+                    title += ", catalogue {}".format(os.path.basename(catalog['path']))
+                else:
+                    title += "and catalogue {}".format(os.path.basename(catalog['path']))
+            if len(telescopes) > 0:
+                telescope_names = ", ".join([telescope.name for telescope in telescopes])
+                telescope_names = ' and '.join(telescope_names.rsplit(', ', 1))
+                title += " and {} tiling".format(telescope_names)
+            title += " for trigger {}".format(self.objid)
+            title += "\n{}".format(Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S"))
+
         sun = get_sun(date) if options.get('sun') else None
         moon = None
         if options.get('moon'):
@@ -288,11 +294,12 @@ class SkyMap(object):
                            linestyle='--')
             axes.set_global()
             #m.nightshade(date=date.datetime, ax=axes)
-            longs, lats = zip(*[(telescope.location.lon.deg,
-                               telescope.location.lat.deg)
-                              for telescope in telescopes])
-            axes.plot(longs, lats, color='#BBBBBB', marker='8', markersize=10,
-                      linestyle='none', transform=geodetic)
+            if len(telescopes) > 0:
+                longs, lats = zip(*[(telescope.location.lon.deg,
+                                telescope.location.lat.deg)
+                                for telescope in telescopes])
+                axes.plot(longs, lats, color='#BBBBBB', marker='8', #markersize=10,
+                        linestyle='none', transform=geodetic)
         else:
             axes.set_global()
 
