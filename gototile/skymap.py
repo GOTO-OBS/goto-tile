@@ -86,7 +86,10 @@ class SkyMap(object):
         else:
             alt_name = 'unknown'
         self.object = self.header.get('object', alt_name)
-        self.objid = self.object.split(':')[-1]
+        if 'coinc_event_id:' in self.object:
+            # for test events
+            self.object = self.object.split(':')[-1]
+        self.objid = self.object
 
         self.url = self.header.get('referenc', '')
 
