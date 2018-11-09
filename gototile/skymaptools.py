@@ -271,7 +271,7 @@ def calculate_tiling(skymap, telescopes, date=None,
         coverage = getattr(settings, 'COVERAGE')
     if catalog is None:
         catalog = {'path': None, 'key': None}
-    date = skymap.header['date-det'] if date is None else date
+    date = skymap.date_det if date is None else date
 
     utils.test_iers()
 

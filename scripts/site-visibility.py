@@ -84,10 +84,10 @@ def main():
             logging.info("====== %s ======", name)
             for mapfile in sys.argv[1:]:
                 skymap = SkyMap.from_fits(mapfile)
-                objid = skymap.header['object']
+                objid = skymap.object
                 objid = objid.split(':')[-1]
                 skymap.regrade(nside=NSIDE)
-                date = skymap.header['date-det'] if options.date is None else options.date
+                date = skymap.date_det if options.date is None else options.date
                 logging.info("---- Map %s, for source ID %s", mapfile, objid)
                 if within:
                     logging.info("Calculating tiling between %s and %s UT",

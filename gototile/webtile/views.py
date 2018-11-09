@@ -80,7 +80,7 @@ class SkyMapView(FormView):
                 nightsky=nightsky, catalog=catalog,
                 coverage=coverage, tilespath=grids)
             if date is None:
-                date = skymap.header.get('date-det', astropy.time.Time.now())
+                date = skymap.date_det
             options = {'sun': sun, 'moon': moon}
             skymap.plot(skymapimage, telescopes, date, pointings,
                         geoplot=geoplot, catalog=catalog,
