@@ -83,6 +83,8 @@ class SkyMap(object):
         alt_name = ''
         if self.filename:
             alt_name = os.path.basename(self.filename).split('.')[0]
+        else:
+            alt_name = 'unknown'
         self.object = self.header.get('object', alt_name)
         self.objid = self.object.split(':')[-1]
 
