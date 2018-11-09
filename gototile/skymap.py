@@ -99,7 +99,7 @@ class SkyMap(object):
         return cls(skymap=info[0], header=header)
 
     @classmethod
-    def from_position(cls, ra, dec, error):
+    def from_position(cls, ra, dec, error, nside=64):
         """Initialize a `~gototile.skymap.SkyMap` object from a sky position and error.
 
         Parameters
@@ -110,13 +110,15 @@ class SkyMap(object):
             declination in decimal degrees
         error : float
             uncertainty in the position in decimal degrees
+        nside : int, optional
+            healpix nside parameter (must be a power of 2)
 
         Returns
         -------
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        hdulist = gaussian_skymap(ra, dec, error)
+        hdulist = gaussian_skymap(ra, dec, error, nside)
         return cls.from_fits(hdulist)
 
     def copy(self):

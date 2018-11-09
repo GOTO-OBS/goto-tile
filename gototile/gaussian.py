@@ -29,7 +29,6 @@ def gaussian_skymap(ra, dec, err, nside=64):
     position_ra = np.radians(ra)                                     # convert RA_detect to radian
     position_dec = np.radians(dec)                                   # convert Dec_detect to radian
 
-    nside = nside
     npix = hp.nside2npix(nside)
     ipix = range(npix)
     theta, phi = hp.pix2ang(nside, ipix)
