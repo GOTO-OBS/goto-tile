@@ -86,11 +86,11 @@ class SkyMap(object):
         self.object = self.header.get('object', alt_name)
         self.objid = self.object.split(':')[-1]
 
-        self.url = header.get('referenc', '')
+        self.url = self.header.get('referenc', '')
 
         self.mjd = astropy.time.Time.now().mjd
         self.date = astropy.time.Time(float(self.mjd), format='mjd')
-        self.mjd_det = header.get('mjd-obs', self.mjd)
+        self.mjd_det = self.header.get('mjd-obs', self.mjd)
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
     @classmethod
@@ -283,8 +283,8 @@ class SkyMap(object):
                            linestyle='--')
             axes.set_global()
             #m.nightshade(date=date.datetime, ax=axes)
-            longs, lats = zip(*[(telescope.location.longitude.deg,
-                               telescope.location.latitude.deg)
+            longs, lats = zip(*[(telescope.location.lon.deg,
+                               telescope.location.lat.deg)
                               for telescope in telescopes])
             axes.plot(longs, lats, color='#BBBBBB', marker='8', markersize=10,
                       linestyle='none', transform=geodetic)

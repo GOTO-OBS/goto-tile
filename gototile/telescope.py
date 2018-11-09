@@ -59,8 +59,8 @@ class Telescope(object):
             self.name = name
 
     def __str__(self):
-        location = "{:s}, {:s}, {:.1f}".format(self.location.longitude,
-                                               self.location.latitude,
+        location = "{:s}, {:s}, {:.1f}".format(self.location.lon,
+                                               self.location.lat,
                                                self.location.height)
         return "{:s} @ {:s} - [{:s}, {:s}]".format(
             self.name, location, self.fov['ra'], self.fov['dec'])
@@ -330,8 +330,8 @@ def print_config_file():
             config.append({
                 'short': telescope.name,
                 'full': telescope.name,
-                'longitude': telescope.location.longitude.to('degree').value,
-                'latitude': telescope.location.latitude.to('degree').value,
+                'longitude': telescope.location.lon.to('degree').value,
+                'latitude': telescope.location.lat.to('degree').value,
                 'height': telescope.location.height.to('meter').value,
                 'fov-ra': telescope.fov['ra'].to('degree').value,
                 'fov-dec': telescope.fov['dec'].to('degree').value,

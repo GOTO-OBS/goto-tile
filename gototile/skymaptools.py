@@ -80,8 +80,8 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
     obs = ephem.Observer()
     obs.pressure = 0
     obs.horizon = str(getattr(settings, 'SUNALTITUDE').value)
-    obs.lon = str(location.longitude.value)
-    obs.lat = str(location.latitude.value)
+    obs.lon = str(location.lon.value)
+    obs.lat = str(location.lat.value)
     obs.elevation = location.height.value
     obs.date = ephem.Date(date.iso)
     sun = ephem.Sun(obs)
