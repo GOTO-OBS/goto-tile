@@ -145,6 +145,7 @@ class SkyMap(object):
             uncertainty in the position in decimal degrees
         nside : int, optional
             healpix nside parameter (must be a power of 2)
+            default is 64
 
         Returns
         -------
@@ -195,24 +196,64 @@ class SkyMap(object):
         skycoords = SkyCoord(ra=phi*units.rad, dec=(0.5*np.pi - theta)*units.rad)
         return skycoords
 
-    def plot(self, filename=None, telescopes=None, date=None, pointings=None,
-             geoplot=False, catalog=None, nightsky=False,
-             title="", objects=None,
-             catcolor='#999999', dpi=300, options=None,
-             axes=None):
-        """Plot the skymap in a Moll-Weide projection
-
+    def plot(self, date=None, telescopes=None, pointings=None,
+             objects=None, catalog=None, catcolor='#999999',
+             nightsky=False, geoplot=False,
+             filename=None, title="", axes=None, dpi=300,
+             options=None):
+        """Plot the skymap in a Moll-Weide projection.
 
         Parameters
         ----------
+        date : `~astropy.time.Time`, optional
+            date to plot the skymap at
+            default is the date of the detection from `SkyMap.date_det`
 
-        - options : dict
+        telescopes : list of `~gototile.telescope.Telescope`, optional
+            visible telescopes to plot
 
-            Various extra plotting options.
+        pointings : list of pointings, optional
+            tile pointings to plot
+            needs `telescopes` to be >= 1
 
-            ``options`` takes various keys, each with a ``True`` or
-            ``False`` value. If a key does not exist in options, it
-            equals ``False``.
+        objects : list, optional
+            overplot an object, requires RA, Dec and object name
+
+        catalog : dict, optional
+            catalog of objects to overplot
+
+        catcolor : str, optional
+            color for catalog objects to be plotted
+            default is #999999
+
+        nightsky : bool, optional
+            plot the night sky visibility of each telescope in `telescopes`
+            only valid if `telescopes` and `catalog` is given
+            default is False
+
+        geoplot : bool, optional
+            plot in geographic coordinates (lat, lon) instead of (RA, Dec)
+            default is False
+
+        filename : str, optional
+            filename to save the plot to
+            default is the object name from `SkyMap.object`
+
+        title : str, optional
+            title for the plot
+            default is created based on object name and time observed
+
+        axes : `matplotlib.pyplot.Axes`, optional
+            axes to create the plot on
+            default is none, new axes will be created
+
+        dpi : int, optional
+            DPI to save the plot at
+            default is 300
+
+        options : dict, optional
+            various extra plotting options as keys, each with a `True` or `False` value
+            all are False by default
 
             - moon : plot the moon position. The illumination is shown
                   between black (new moon) and white (full moon). Note
