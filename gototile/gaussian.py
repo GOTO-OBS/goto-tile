@@ -6,12 +6,13 @@ import healpy as hp
 from astropy import units as u
 from astropy.io import fits
 
-def prob(ra_grid,dec_grid,ra,dec,err):                      
+
+def prob(ra_grid,dec_grid,ra,dec,err):
     """calculate the probability of specific grid (gaussian dist.)"""
     sys_err = np.sqrt((3.71**2)*0.9+(14.3**2)*0.1)          # quadrature sum of systematic error
     tot_err = np.sqrt(sys_err**2 + err**2)                  # quadrature sum of total error
 
-    # calculate the angular distance between the reported (RA,Dec) and the grid (RA,Dec) 
+    # calculate the angular distance between the reported (RA,Dec) and the grid (RA,Dec)
     a = np.sin(np.abs(dec_grid-dec)/2)**2
     b = np.cos(dec)*np.cos(dec_grid)*np.sin(np.abs(ra_grid-ra)/2)**2
     d = 2*np.arcsin(np.sqrt(a+b))
@@ -23,12 +24,11 @@ def prob(ra_grid,dec_grid,ra,dec,err):
 
     return prob
 
-def fermi_skymap(gbm_ra, gbm_dec, gbm_err):                         
+def gaussian_skymap(ra, dec, err, nside=64):
     """calculate the probability for all skymap grids"""
-    gbm_ra = np.radians(gbm_ra)                                     # convert RA_detect to radian
-    gbm_dec = np.radians(gbm_dec)                                   # convert Dec_detect to radian
+    position_ra = np.radians(ra)                                     # convert RA_detect to radian
+    position_dec = np.radians(dec)                                   # convert Dec_detect to radian
 
-    nside = 64
     npix = hp.nside2npix(nside)
     ipix = range(npix)
     theta, phi = hp.pix2ang(nside, ipix)
@@ -38,7 +38,7 @@ def fermi_skymap(gbm_ra, gbm_dec, gbm_err):
 
     post = np.zeros(npix)
     for i,coo in enumerate(radec):
-        post[i] = prob(coo[0],coo[1],gbm_ra,gbm_dec,gbm_err)
+        post[i] = prob(coo[0],coo[1],position_ra,position_dec,err)
     post = np.asarray(list(post))
     post /= np.sum(post * hp.nside2pixarea(nside))
     postcopy = np.copy(post)
@@ -62,6 +62,4 @@ def fermi_skymap(gbm_ra, gbm_dec, gbm_err):
     hdu = fits.table_to_hdu(m)
     hdu.header.extend(extra_header)
     hdulist = fits.HDUList([fits.PrimaryHDU(), hdu])
-    gw = hp.read_map(hdulist, verbose=False)
-    return gw
-
+    return hdulist

@@ -80,8 +80,8 @@ def calc_siderealtimes(date, location, within=None, allnight=False):
     obs = ephem.Observer()
     obs.pressure = 0
     obs.horizon = str(getattr(settings, 'SUNALTITUDE').value)
-    obs.lon = str(location.longitude.value)
-    obs.lat = str(location.latitude.value)
+    obs.lon = str(location.lon.value)
+    obs.lat = str(location.lat.value)
     obs.elevation = location.height.value
     obs.date = ephem.Date(date.iso)
     sun = ephem.Sun(obs)
@@ -271,7 +271,7 @@ def calculate_tiling(skymap, telescopes, date=None,
         coverage = getattr(settings, 'COVERAGE')
     if catalog is None:
         catalog = {'path': None, 'key': None}
-    date = skymap.header['date-det'] if date is None else date
+    date = skymap.date_det if date is None else date
 
     utils.test_iers()
 

@@ -13,6 +13,8 @@ import ephem
 from . import settings
 from . import skymaptools as smt
 from .catalog import read_catalog
+from .gaussian import gaussian_skymap
+
 try:
     stringtype = basestring  # Python 2
 except NameError:
@@ -32,83 +34,135 @@ def read_colormaps(name='cylon'):
 
 
 class SkyMap(object):
-    """A probability skymap
+    """A probability skymap.
 
     The SkyMap is a wrapper around the healpy skymap numpy.array,
     returned by healpy.fitsfunc.read_map. The SkyMap class holds track
     of the numpy array, the header information and some options.
 
+    SkyMaps should be created using one of the following class methods:
+        - SkyMap.from_fits(fits_file)
+            Will read in the sky map from a FITS file.
+            `fits_file` can be a string (the .FITS file to be loaded) or an
+            already-loaded `astropy.io.fits.HDU` or `HDUList`.
+
+        - SkyMap.from_position(ra, dec, error)
+            Will create the SkyMap from the given coordinates.
+            The arguments should be in decimal degrees.
+            The sky map will be calculated as a 2D Gaussian distribution
+            around the given position.
     """
 
-    def __init__(self, skymap, header=None, **kwargs):
-        if isinstance(skymap, stringtype):
-            skymap, header = self._read_file(skymap)
-        elif header is None:
-            header = {}
-        elif not isinstance(header, dict):
+    def __init__(self, skymap, header):
+        # Check if types
+        if not isinstance(skymap, np.ndarray):
+            raise TypeError("skymap should be an array, use SkyMap.from_fits()")
+        if not isinstance(header, dict):
             raise TypeError("header should be a dict")
-        self.object = header.get('object')
-        self.order = header.get('order')
-        self.nside = header.get('nside')
-        self.isnested = header.get('nested')
-        if not self.order:
-            self.order = 'NESTED' if self.isnested else 'RING'
+
+        # Store the skymap as the requested type
         dtype = getattr(settings, 'DTYPE')
         self.skymap = skymap.astype(dtype)
-        self.objid = header.get('objid')
-        self.header = header
+
+        # Store the header, and make sure the header cards are lowercase
+        self.header = {key.lower(): header[key] for key in header}
+
+        # Parse the header dict and store the key attributes
+        self.order = self.header.get('ordering')
+        if self.order not in ('NESTED', 'RING'):
+            raise ValueError('ORDERING card in header has unknown value: {}'.format(self.order))
+        self.isnested = self.order == 'NESTED'
+
+        self.nside = self.header.get('nside')
+        if not self.nside == healpy.npix2nside(len(skymap)):
+            raise ValueError("Skymap length ({:.0f}) should be 12*nside**2 ({:.0f})".format(
+                             len(skymap), self.nside))
+
+        self.filename = self.header.get('filename')
+
+        alt_name = ''
+        if self.filename:
+            alt_name = os.path.basename(self.filename).split('.')[0]
+        else:
+            alt_name = 'unknown'
+        self.object = self.header.get('object', alt_name)
+        if 'coinc_event_id:' in self.object:
+            # for test events
+            self.object = self.object.split(':')[-1]
+        self.objid = self.object
+
+        self.url = self.header.get('referenc', '')
+
+        self.mjd = astropy.time.Time.now().mjd
+        self.date = astropy.time.Time(float(self.mjd), format='mjd')
+        self.mjd_det = self.header.get('mjd-obs', self.mjd)
+        self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
+
+    @classmethod
+    def from_fits(cls, fits_file):
+        """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.
+
+        Parameters
+        ----------
+        fits_file : str, `astropy.io.fits.HDU` or `astropy.io.fits.HDUList`
+            Path to the FITS file (if str) or FITS HDU,
+            to be passed to `healpy.read_map`.
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        info = healpy.read_map(fits_file, h=True, field=None,
+                               verbose=False, nest=None)
+        # `info` will be an array or multiple arrays, with the header appended (because h=True).
+        skymap = info[0]
+        header = dict(info[-1])
+
+        # Dealing with newer 3D skymaps, the "skymap" will have 4 components
+        # (prob, distmu, distsigma, distnorm)
+        # We only want the probability map
+        if header['TFIELDS'] > 1:
+            skymap = skymap[0]
+
+        # Store the file name if the header was from a file
+        if isinstance(fits_file, str):
+            header['FILENAME'] = fits_file
+
+        return cls(skymap, header)
+
+    @classmethod
+    def from_position(cls, ra, dec, error, nside=64):
+        """Initialize a `~gototile.skymap.SkyMap` object from a sky position and error.
+
+        Parameters
+        ----------
+        ra : float
+            ra in decimal degrees
+        dec : float
+            declination in decimal degrees
+        error : float
+            uncertainty in the position in decimal degrees
+        nside : int, optional
+            healpix nside parameter (must be a power of 2)
+            default is 64
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        hdulist = gaussian_skymap(ra, dec, error, nside)
+        return cls.from_fits(hdulist)
 
     def copy(self):
-        newmap = SkyMap(skymap=self.skymap.copy())
+        newmap = SkyMap(self.skymap.copy(), self.header.copy())
         newmap.object = self.object
         newmap.order = self.order
         newmap.isnested = self.isnested
         newmap.nside = self.nside
         newmap.objid = self.objid
         return newmap
-
-    def _read_file(self, filename):
-        info = healpy.read_map(filename, h=True, field=None,
-                               verbose=False, nest=None)
-        try:
-            skymap, distmu, distsigma, distnorm, header = info
-        except ValueError as exc:
-            if "not enough values to unpack" in str(exc):
-                # assume an older map without distance information
-                skymap, header = info
-            else:
-                raise
-
-        header = dict([(key.lower(), value) for key, value in header])
-        header['file'] = filename
-        if header['ordering'] not in ('NESTED', 'RING'):
-            raise ValueError(
-                'ORDERING card in header has unknown value: {}'.format(
-                    header['ordering']))
-        header['order'] = header['ordering']
-        header['nested'] = header['order'] == 'NESTED'
-
-        objid = os.path.basename(filename)
-        # Twice, in case we use a .fits.gz file
-        objid = os.path.splitext(objid)[0]
-        objid = os.path.splitext(objid)[0]
-        objid = header.get('object', objid)
-        header['objid'] = objid.split(':')[-1]
-        header['url'] = header.get('referenc', '')
-
-        header['mjd'] = astropy.time.Time.now().mjd
-        header['date'] = astropy.time.Time(float(header['mjd']), format='mjd')
-        header['mjddet'] = header.get(
-            'mjd-obs', astropy.time.Time(header['date']).mjd)
-        header['date-det'] = astropy.time.Time(float(header['mjddet']),
-                                               format='mjd')
-
-        # code for dealing with 3D skymaps
-        if header['tfields'] > 1:
-            skymap = skymap[0]
-
-        header['nside'] = header.get('nside', healpy.npix2nside(len(skymap)))
-        return skymap, header
 
     def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
                 dtype=None):
@@ -142,24 +196,64 @@ class SkyMap(object):
         skycoords = SkyCoord(ra=phi*units.rad, dec=(0.5*np.pi - theta)*units.rad)
         return skycoords
 
-    def plot(self, filename, telescopes, date, pointings,
-             geoplot=False, catalog=None, nightsky=False,
-             title="", objects=None,
-             catcolor='#999999', dpi=300, options=None,
-             axes=None):
-        """Plot the skymap in a Moll-Weide projection
-
+    def plot(self, date=None, telescopes=None, pointings=None,
+             objects=None, catalog=None, catcolor='#999999',
+             nightsky=False, geoplot=False,
+             filename=None, title="", axes=None, dpi=300,
+             options=None):
+        """Plot the skymap in a Moll-Weide projection.
 
         Parameters
         ----------
+        date : `~astropy.time.Time`, optional
+            date to plot the skymap at
+            default is the date of the detection from `SkyMap.date_det`
 
-        - options : dict
+        telescopes : list of `~gototile.telescope.Telescope`, optional
+            visible telescopes to plot
 
-            Various extra plotting options.
+        pointings : list of pointings, optional
+            tile pointings to plot
+            needs `telescopes` to be >= 1
 
-            ``options`` takes various keys, each with a ``True`` or
-            ``False`` value. If a key does not exist in options, it
-            equals ``False``.
+        objects : list, optional
+            overplot an object, requires RA, Dec and object name
+
+        catalog : dict, optional
+            catalog of objects to overplot
+
+        catcolor : str, optional
+            color for catalog objects to be plotted
+            default is #999999
+
+        nightsky : bool, optional
+            plot the night sky visibility of each telescope in `telescopes`
+            only valid if `telescopes` and `catalog` is given
+            default is False
+
+        geoplot : bool, optional
+            plot in geographic coordinates (lat, lon) instead of (RA, Dec)
+            default is False
+
+        filename : str, optional
+            filename to save the plot to
+            default is the object name from `SkyMap.object`
+
+        title : str, optional
+            title for the plot
+            default is created based on object name and time observed
+
+        axes : `matplotlib.pyplot.Axes`, optional
+            axes to create the plot on
+            default is none, new axes will be created
+
+        dpi : int, optional
+            DPI to save the plot at
+            default is 300
+
+        options : dict, optional
+            various extra plotting options as keys, each with a `True` or `False` value
+            all are False by default
 
             - moon : plot the moon position. The illumination is shown
                   between black (new moon) and white (full moon). Note
@@ -190,27 +284,33 @@ class SkyMap(object):
             cartopy.config['data_dir'] = datadir
 
         read_colormaps()
+
+        if filename is None:
+            filename = self.object
+        if telescopes is None:
+            telescopes = []
+        if date is None:
+            date = self.date_det
+        if pointings is None:
+            pointings = []
         if catalog is None:
             catalog = {'path': None, 'key': None}
         if options is None:
             options = {}
         if not title:
-            formatted_date = Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S")
-            telescope_names = ", ".join([telescope.name
-                                           for telescope in telescopes])
-            telescope_names = ' and '.join(telescope_names.rsplit(', ', 1))
+            title = "Skymap"
             if catalog['path']:
-                title = ("Skymap, catalog {catalog} and {telescope} tiling "
-                         "for trigger {trigger}\n{formatted_date}".format(
-                             catalog=os.path.basename(catalog['path']),
-                             telescope=telescope_names, trigger=self.objid,
-                             formatted_date=formatted_date))
-            else:
-                title = ("Skymap and {telescope} tiling "
-                         "for trigger {trigger}\n"
-                         "{formatted_date}".format(
-                             telescope=telescope_names, trigger=self.objid,
-                             formatted_date=formatted_date))
+                if len(telescopes) > 0:
+                    title += ", catalogue {}".format(os.path.basename(catalog['path']))
+                else:
+                    title += "and catalogue {}".format(os.path.basename(catalog['path']))
+            if len(telescopes) > 0:
+                telescope_names = ", ".join([telescope.name for telescope in telescopes])
+                telescope_names = ' and '.join(telescope_names.rsplit(', ', 1))
+                title += " and {} tiling".format(telescope_names)
+            title += " for trigger {}".format(self.objid)
+            title += "\n{}".format(Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S"))
+
         sun = get_sun(date) if options.get('sun') else None
         moon = None
         if options.get('moon'):
@@ -235,11 +335,12 @@ class SkyMap(object):
                            linestyle='--')
             axes.set_global()
             #m.nightshade(date=date.datetime, ax=axes)
-            longs, lats = zip(*[(telescope.location.longitude.deg,
-                               telescope.location.latitude.deg)
-                              for telescope in telescopes])
-            axes.plot(longs, lats, color='#BBBBBB', marker='8', markersize=10,
-                      linestyle='none', transform=geodetic)
+            if len(telescopes) > 0:
+                longs, lats = zip(*[(telescope.location.lon.deg,
+                                telescope.location.lat.deg)
+                                for telescope in telescopes])
+                axes.plot(longs, lats, color='#BBBBBB', marker='8', #markersize=10,
+                        linestyle='none', transform=geodetic)
         else:
             axes.set_global()
 
