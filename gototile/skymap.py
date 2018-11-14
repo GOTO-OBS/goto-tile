@@ -156,7 +156,7 @@ class SkyMap(object):
         return cls.from_fits(hdulist)
 
     def copy(self):
-        newmap = SkyMap(skymap=self.skymap.copy())
+        newmap = SkyMap(self.skymap.copy(), self.header.copy())
         newmap.object = self.object
         newmap.order = self.order
         newmap.isnested = self.isnested
