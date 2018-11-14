@@ -11,8 +11,10 @@ import logging
 import multiprocessing
 import numpy as np
 import healpy as hp
+
 from astropy.coordinates import SkyCoord
-from astropy import units
+from astropy import units as u
+
 from . import skymaptools as smt
 from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
@@ -107,29 +109,82 @@ class PolygonQuery(object):
         return hp.query_polygon(self.nside, vertices, nest=self.nested)
 
 
-def tileallsky(fov, nside, overlap=None, gridcoords=None, nested=True):
-    """Create a grid across all sky and store in a file"""
-    if overlap is None:
-        overlap = {'ra': 0.5, 'dec': 0.5}
-    if isinstance(overlap, (int, float)):
-        overlap = {'ra': overlap, 'dec': overlap}
-    step = {}
-    for key in ('ra', 'dec'):
-        overlap[key] = min(max(overlap[key], 0), 0.9)
-        step[key] = fov[key].value * (1-overlap[key])
+class SkyGrid(object):
+    """An all-sky grid of defined tiles.
 
-    ras, decs = create_allsky_strips(step['ra'], step['dec'])
+    Parameters
+    ----------
+    fov : list or tuple or dict of int or float or `astropy.units.Quantity`
+        The field of view of the tiles in the RA and Dec directions.
+        If given as a tuple, the arguments are assumed to be (ra, dec).
+        If given as a dict, it should contains the keys 'ra' and 'dec'.
+        If not given units the values are assumed to be in degrees.
 
-    if not gridcoords:
-        gridcoords = SkyCoord(ras, decs, unit=units.deg)
-    logging.debug("Calculating vertices for %d tiles", len(gridcoords))
-    tilelist = get_tile_vertices(gridcoords, fov['ra'].value, fov['dec'].value)
-    logging.debug("Calculating HEALPix indices for tiles")
-    polygon_query = PolygonQuery(nside, nested)
-    pool = multiprocessing.Pool()
-    pixlist = pool.map(polygon_query, tilelist)
-    pool.close()
-    pool.join()
-    pixlist = np.array(pixlist)
+    overlap : int or float or list or tuple or dict of int or float, optional
+        The overlap amount between the tiles in the RA and Dec directions.
+        If given a single value, assumed to be the same overlap in both RA and Dec.
+        If given as a tuple, the arguments are assumed to be (ra, dec).
+        If given as a dict, it should contains the keys 'ra' and 'dec'.
+        default is 0.5 in both axes, minimum is 0 and maximum is 0.9
 
-    return tilelist, pixlist, gridcoords
+    nside : int, optional
+        default is 64
+
+    nested : bool, optional
+        default is True
+
+    """
+
+    def __init__(self, fov, overlap=None, nside=64, nested=True):
+        # Parse fov
+        if isinstance(fov, (list,tuple)):
+            fov = {'ra': fov[0], 'dec': fov[1]}
+        for key in ('ra', 'dec'):
+            # make sure fov is in degrees
+            if not isinstance(fov[key], u.Quantity):
+                fov[key] *= u.deg
+        self.fov = fov
+
+        # Parse overlap
+        if overlap is None:
+            overlap = {'ra': 0.5, 'dec': 0.5}
+        elif isinstance(overlap, (int, float, u.Quantity)):
+            overlap = {'ra': overlap, 'dec': overlap}
+        elif isinstance(overlap, (list,tuple)):
+            overlap = {'ra': overlap[0], 'dec': overlap[1]}
+        for key in ('ra', 'dec'):
+            # limit overlap to between 0 and 0.9
+            overlap[key] = min(max(overlap[key], 0), 0.9)
+        self.overlap = overlap
+
+        # Calculate step sizes
+        step = {}
+        for key in ('ra', 'dec'):
+            step[key] = fov[key].value * (1 - overlap[key])
+        self.step = step
+
+        # Other params
+        self.nside = nside
+        self.isnested = nested
+
+        # Create the grid
+        ras, decs = create_allsky_strips(self.step['ra'], self.step['dec'])
+        self.coords = SkyCoord(ras, decs, unit=u.deg)
+        self.ntiles = len(self.coords)
+
+        # Get the tile vertices
+        self.vertices = get_tile_vertices(self.coords,
+                                          self.fov['ra'].value,
+                                          self.fov['dec'].value)
+
+        # Calculate the HEALPix indicies within each tile
+        # This is the complicated bit, so it's done over multiple processes
+        polygon_query = PolygonQuery(self.nside, self.isnested)
+        pool = multiprocessing.Pool()
+        pixels = pool.map(polygon_query, self.vertices)
+        pool.close()
+        pool.join()
+        self.pixels = np.array(pixels)
+
+        # Give the tiles unique ids
+        self.tilenames = np.arange(self.ntiles) + 1
