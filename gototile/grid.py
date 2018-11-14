@@ -208,3 +208,5 @@ class SkyGrid(object):
         pool.close()
         pool.join()
         self.pixels = np.array(pixels)
+        self.nside = nside
+        self.isnested = nested
