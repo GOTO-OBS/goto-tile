@@ -156,24 +156,19 @@ class SkyMap(object):
         return cls.from_fits(hdulist)
 
     def copy(self):
+        """Return a new instance containing a copy of the sky map data."""
         newmap = SkyMap(self.skymap.copy(), self.header.copy())
-        newmap.object = self.object
-        newmap.order = self.order
-        newmap.isnested = self.isnested
-        newmap.nside = self.nside
-        newmap.objid = self.objid
         return newmap
 
     def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
                 dtype=None):
-        """Up- or downgrade the skymap resolution.
+        """Up- or downgrade the sky map  HEALPix resolution.
 
-        See the healpy.pixelfunc.ud_grade documentation about the options.
-
+        See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
         """
-
         if nside == self.nside and order == self.order:
             return
+
         self.skymap = healpy.ud_grade(self.skymap, nside_out=nside,
                                       order_in=self.order, order_out=order,
                                       power=power, pess=pess, dtype=dtype)

@@ -188,3 +188,23 @@ class SkyGrid(object):
 
         # Give the tiles unique ids
         self.tilenames = np.arange(self.ntiles) + 1
+
+    def copy(self):
+        """Return a new instance containing a copy of the sky grid data."""
+        newgrid = SkyGrid(self.fov, self.overlap, self.nside, self.isnested)
+        return newgrid
+
+    def regrade(self, nside, nested=True):
+        """Up- or downgrade the sky grid HEALPix resolution.
+
+        See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
+        """
+        if nside == self.nside and nested == self.isnested:
+            return
+
+        polygon_query = PolygonQuery(nside, nested)
+        pool = multiprocessing.Pool()
+        pixels = pool.map(polygon_query, self.vertices)
+        pool.close()
+        pool.join()
+        self.pixels = np.array(pixels)
