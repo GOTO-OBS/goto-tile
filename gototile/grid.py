@@ -269,3 +269,49 @@ class SkyGrid(object):
             table = QTable([self.tilenames, self.coords.ra, self.coords.dec, np.zeros(self.ntiles)],
                            names=col_names, dtype=col_types)
         return table
+
+
+    def plot(self, centre=(0,45), orthoplot=False):
+        """Plot the grid."""
+        import matplotlib as mpl
+        from matplotlib import pyplot as plt
+        from matplotlib.patches import Polygon
+        from matplotlib.collections import PatchCollection
+        import cartopy.crs as ccrs
+        from .math import xyz2radec
+        from .skymap import read_colormaps
+        from .skymaptools import getshape
+
+        fig = plt.figure()
+        if orthoplot:
+            projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
+        else:
+            projection = ccrs.Mollweide(central_longitude=0)
+        geodetic = ccrs.Geodetic()
+        axes = fig.add_subplot(1, 1, 1, projection=projection)
+
+        axes.set_global()
+        axes.coastlines(linewidth=0.25)
+        axes.gridlines()
+
+        read_colormaps()
+
+        # Plot tile areas
+        radecs = []
+        for i, tile in enumerate(self.vertices):
+
+            tile = xyz2radec(*tile.T)
+            ra, dec = getshape(tile, steps=5)
+            # Need to reverse and transpose to get into format for Polygon
+            radec = np.array((ra[::-1], dec[::-1])).T
+            radecs.append(radec)
+
+        p = PatchCollection([Polygon(radec) for radec in radecs],
+                            edgecolor='black', facecolor='black', alpha=0.3,
+                            cmap='cylon',
+                            transform=geodetic)
+        if hasattr(self, 'probs'):
+            p.set_array(np.array(self.probs))
+            fig.colorbar(p, ax=axes)
+        axes.add_collection(p)
+        plt.show()
