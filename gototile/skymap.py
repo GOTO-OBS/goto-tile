@@ -173,7 +173,9 @@ class SkyMap(object):
                                       order_in=self.order, order_out=order,
                                       power=power, pess=pess, dtype=dtype)
         self.nside = nside
+        self.header['nside'] = nside
         self.order = order
+        self.header['order'] = order
         self.isnested = order == 'NESTED'
 
     def skycoords(self):
