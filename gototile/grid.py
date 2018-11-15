@@ -210,3 +210,9 @@ class SkyGrid(object):
         self.pixels = np.array(pixels)
         self.nside = nside
         self.isnested = nested
+
+    def apply_skymap(self, skymap):
+        """Apply a SkyMap to the grid.
+
+        This means caculate the contained probabiltiy within each tile."""
+        self.probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
