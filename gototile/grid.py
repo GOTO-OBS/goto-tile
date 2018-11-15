@@ -215,6 +215,7 @@ class SkyGrid(object):
         """Apply a SkyMap to the grid.
 
         This means caculate the contained probabiltiy within each tile.
+        The probability contained within each tile will be stored in self.probs.
 
         Parameters
         ----------
