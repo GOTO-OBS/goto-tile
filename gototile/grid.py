@@ -167,6 +167,12 @@ class SkyGrid(object):
         self.nside = nside
         self.isnested = nested
 
+        # Give the grid a unique name
+        self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
+                                                self.fov['dec'].value,
+                                                self.overlap['ra'],
+                                                self.overlap['dec'])
+
         # Create the grid
         ras, decs = create_allsky_strips(self.step['ra'], self.step['dec'])
         self.coords = SkyCoord(ras, decs, unit=u.deg)
@@ -187,7 +193,9 @@ class SkyGrid(object):
         self.pixels = np.array(pixels)
 
         # Give the tiles unique ids
-        self.tilenames = np.arange(self.ntiles) + 1
+        self.tilenums = np.arange(self.ntiles) + 1
+        filllen = len(str(max(self.tilenums)))
+        self.tilenames = ['T' + str(num).zfill(filllen) for num in self.tilenums]
 
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
