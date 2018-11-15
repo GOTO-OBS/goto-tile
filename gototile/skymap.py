@@ -98,6 +98,21 @@ class SkyMap(object):
         self.mjd_det = self.header.get('mjd-obs', self.mjd)
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
+    def __eq__(self, other):
+        try:
+            if len(self.skymap) != len(other.skymap):
+                return False
+            return np.all(self.skymap == other.skymap) and self.header == other.header
+        except AttributeError:
+            return False
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __repr__(self):
+        template = ('SkyMap(objid="{}", date_det="{}", nside={})')
+        return template.format(self.objid, self.date_det.iso, self.nside)
+
     @classmethod
     def from_fits(cls, fits_file):
         """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.

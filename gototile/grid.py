@@ -197,6 +197,21 @@ class SkyGrid(object):
         filllen = len(str(max(self.tilenums)))
         self.tilenames = ['T' + str(num).zfill(filllen) for num in self.tilenums]
 
+    def __eq__(self, other):
+        try:
+            return self.fov == other.fov and self.overlap == other.overlap
+        except AttributeError:
+            return False
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __repr__(self):
+        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), nside={})')
+        return template.format(self.fov['ra'].value, self.fov['dec'].value,
+                               self.overlap['ra'], self.overlap['dec'],
+                               self.nside)
+
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
         newgrid = SkyGrid(self.fov, self.overlap, self.nside, self.isnested)
