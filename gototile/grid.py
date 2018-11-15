@@ -14,6 +14,7 @@ import healpy as hp
 
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.table import QTable
 
 from . import skymaptools as smt
 from .math import lb2xyz, xyz2lb, intersect
@@ -251,3 +252,20 @@ class SkyGrid(object):
             self.regrade(skymap.nside)
         self.skymap = skymap.copy()
         self.probs = np.array([self.skymap.skymap[pix].sum() for pix in self.pixels])
+
+    def get_table(self):
+        """Return an astropy QTable containing infomation on the defined tiles.
+
+        If a sky map has been applied to the grid the table will include a column with
+            the contained probability within each tile.
+        """
+        col_names = ['tilename', 'ra', 'dec', 'prob']
+        col_types = ['U', u.deg, u.deg, 'f8']
+
+        try:
+            table = QTable([self.tilenames, self.coords.ra, self.coords.dec, self.probs],
+                           names=col_names, dtype=col_types)
+        except AttributeError:
+            table = QTable([self.tilenames, self.coords.ra, self.coords.dec, np.zeros(self.ntiles)],
+                           names=col_names, dtype=col_types)
+        return table
