@@ -226,4 +226,5 @@ class SkyGrid(object):
             # Need to regrade so they match
             # Best option is to match grid precision to the skymap
             self.regrade(skymap.nside)
-        self.probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
+        self.skymap = skymap.copy()
+        self.probs = np.array([self.skymap.skymap[pix].sum() for pix in self.pixels])
