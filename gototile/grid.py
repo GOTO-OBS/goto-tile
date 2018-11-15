@@ -214,5 +214,15 @@ class SkyGrid(object):
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid.
 
-        This means caculate the contained probabiltiy within each tile."""
+        This means caculate the contained probabiltiy within each tile.
+
+        Parameters
+        ----------
+        skymap : `gototile.skymap.SkyMap`
+            The sky map to map onto this grid.
+        """
+        if self.nside != skymap.nside:
+            # Need to regrade so they match
+            # Best option is to match grid precision to the skymap
+            self.regrade(skymap.nside)
         self.probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
