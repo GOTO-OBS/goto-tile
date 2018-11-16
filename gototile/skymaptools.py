@@ -186,7 +186,7 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
         njobs = None
     if not sidtimes:
         return maskedmap, np.array([], dtype=np.int)
-    skycoords = skymap.skycoords()
+    skycoords = skymap.coords.copy()
     dtype = getattr(settings, 'IDTYPE')
     ipix = np.arange(len(skymap.skymap), dtype=dtype)
     func = VisibleMap(telescope, skycoords, ipix,
@@ -239,7 +239,7 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
                               njobs=1):
     if njobs == -1 or njobs is None:
         njobs = os.cpu_count()
-    skycoords = skymap.skycoords()
+    skycoords = skymap.coords.copy()
     ipix = np.arange(len(skymap.skymap))
     seenlist = []
     pool = multiprocessing.Pool(njobs)

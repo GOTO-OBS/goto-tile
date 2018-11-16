@@ -7,7 +7,7 @@ import numpy as np
 import astropy
 from astropy.time import Time
 from astropy.coordinates import get_sun, SkyCoord, AltAz
-from astropy import units
+from astropy import units as u
 from astropy.table import QTable
 import healpy
 import ephem
@@ -98,6 +98,14 @@ class SkyMap(object):
         self.date = astropy.time.Time(float(self.mjd), format='mjd')
         self.mjd_det = self.header.get('mjd-obs', self.mjd)
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
+
+        # Store the coordinates of the pixels
+        self.npix = len(self.skymap)
+        self.pixnums = np.arange(self.npix)
+        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
+        ras = phi
+        decs = 0.5*np.pi - theta
+        self.coords = SkyCoord(ras, decs, unit=u.rad)
 
     def __eq__(self, other):
         try:
@@ -194,29 +202,14 @@ class SkyMap(object):
         self.header['order'] = order
         self.isnested = order == 'NESTED'
 
-    def skycoords(self):
-        """Return the sky coordinates (RA, Dec) for the current map.
-
-        The returned value is an astropy.coordinates.SkyCoord object,
-        with the number of coordinates equal to the size of the
-        skymap.
-
-        """
-
-        npix = len(self.skymap)
-        ipix = np.arange(npix)
-        theta, phi = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
-        skycoords = SkyCoord(ra=phi*units.rad, dec=(0.5*np.pi - theta)*units.rad)
-        return skycoords
-
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'prob']
-        col_types = ['U', units.deg, units.deg, 'f8']
+        col_types = ['U', u.deg, u.deg, 'f8']
 
         npix = len(self.skymap)
         ipix = np.arange(npix)
-        coords = self.skycoords()
+        coords = self.coords
 
         table = QTable([ipix, coords.ra, coords.dec, self.skymap],
                         names=col_names, dtype=col_types)
@@ -342,8 +335,7 @@ class SkyMap(object):
         if options.get('moon'):
             moon = ephem.Moon(date.iso)
             phase = moon.phase
-            moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180,
-                            unit=units.degree)
+            moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, unit=u.deg)
             moon.phase = phase/100
 
         if axes is None:
@@ -452,7 +444,7 @@ class SkyMap(object):
                              "points in time", len(sidtimes))
                 for st in sidtimes:
                     frame = AltAz(obstime=st, location=telescope.location)
-                    radecs = SkyCoord(ra=ras*units.deg, dec=decs*units.deg)
+                    radecs = SkyCoord(ras, decs, unit=u.deg)
                     altaz = radecs.transform_to(frame)
                     visras.extend(ras[np.where(altaz.alt.degree > (90-radius))])
                     visdecs.extend(decs[np.where(altaz.alt.degree > (90-radius))])
