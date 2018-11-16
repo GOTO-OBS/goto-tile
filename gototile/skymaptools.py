@@ -279,10 +279,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     tiles, pixlist, sidtimes = {}, {}, {}
     for telescope in telescopes:
         telescope.indices = {}
-        if isinstance(tilespath, dict):
-            telescope.readtiles(tilespath.get(telescope.__class__.__name__))
-        else:
-            telescope.readtiles(tilespath)
+        telescope.get_grid()
         telescope.sidtimes = calc_siderealtimes(
             date, telescope.location, within=within,
             allnight=(nightsky == 'all'))
@@ -373,9 +370,40 @@ def calculate_tiling(skymap, telescopes, date=None,
         while len(indices):
             # Select subset of relevant telescopes
             seltelescopes = [telescopes[i] for i in indices]
+
             # Run best tile calculating on this subset
-            filltiles(seltelescopes, time)
-            ordertiles(seltelescopes)
+            for telescope in seltelescopes:
+                #filltiles
+                telescope.grid.apply_skymap(telescope.skymap)
+                telescope.tileprobs = telescope.grid.probs
+                if time:
+                    telescope.vismask = telescope.is_visible(time,
+                        telescope.grid.coords)
+
+                #ordertiles
+                vismask = telescope.vismask
+                if not len(telescope.tileprobs[vismask]):
+                    telescope.topprob = 0
+                    telescope.toptile = None
+                    telescope.toppixlist = []
+                    telescope.topcenter = None
+                    telescope.topname = ''
+                    continue
+                ins = np.argsort(telescope.tileprobs[vismask])[::-1]
+                itop = np.where(vismask)[0][ins[0]]
+                itops = np.where(vismask)[0][ins[:10]]
+                telescope.topprob = telescope.tileprobs[itop]
+                telescope.toptile = telescope.grid.vertices[itop]
+                telescope.toppixlist = telescope.grid.pixels[itop]
+                telescope.topcenter = telescope.grid.coords[itop]
+                telescope.topname = telescope.grid.tilenames[itop]
+                telescope.topsources = []
+                if hasattr(telescope, 'catsources'):
+                    for pixel in telescope.pixlist[itop]:
+                        sources = telescope.catsources[pixel]
+                        telescope.topsources.extend(sources)
+                telescope.topsources = np.asarray(telescope.topsources)
+
             # Compare first (brightest) tiles of telescopes
             sortindices = np.argsort([telescope.topprob
                                       for telescope in seltelescopes])[::-1]
@@ -472,44 +500,3 @@ def tile_skymap(skymap, grid, observed=None):
     grid.apply_skymap(skymap)
 
     return grid.get_table()
-
-
-# NB: the telescope instances are modified in-place, so we don't
-# return from this function
-def filltiles(telescopes, time=None):
-    tileprobs = []
-    for telescope in telescopes:
-        telescope.tileprobs = np.array(
-            [telescope.skymap.skymap[pixels].sum()
-             for i, pixels in enumerate(telescope.pixlist)])
-        if time:
-            telescope.vismask = telescope.is_visible(time,
-                telescope.tilecenters)
-
-
-# NB: the telescope instances are modified in-place, so we don't
-# return from this function
-def ordertiles(telescopes):
-    for telescope in telescopes:
-        vismask = telescope.vismask
-        if not len(telescope.tileprobs[vismask]):
-            telescope.topprob = 0
-            telescope.toptile = None
-            telescope.toppixlist = []
-            telescope.topcenter = None
-            telescope.topname = ''
-            continue
-        indices = np.argsort(telescope.tileprobs[vismask])[::-1]
-        itop = np.where(vismask)[0][indices[0]]
-        itops = np.where(vismask)[0][indices[:10]]
-        telescope.topprob = telescope.tileprobs[itop]
-        telescope.toptile = telescope.tiles[itop]
-        telescope.toppixlist = telescope.pixlist[itop]
-        telescope.topcenter = telescope.tilecenters[itop]
-        telescope.topname = telescope.tilenames[itop]
-        telescope.topsources = []
-        if hasattr(telescope, 'catsources'):
-            for pixel in telescope.pixlist[itop]:
-                sources = telescope.catsources[pixel]
-                telescope.topsources.extend(sources)
-        telescope.topsources = np.asarray(telescope.topsources)

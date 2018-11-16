@@ -104,11 +104,11 @@ def run(skymap, telescopes, nside=None, date=None,
                        moon=plotoptions.get('moon'),
                        coverage=plotoptions.get('coverage'),
                        delay=plotoptions.get('delay'))
-        skymap.plot(plotoptions['output'], telescopes, date, pointings,
+        skymap.plot(filename=plotoptions['output'], telescopes=telescopes,
+                    date=date, pointings=pointings,
                     geoplot=plotoptions.get('geo'), catalog=catalog,
                     nightsky=nightsky,
                     title=plotoptions.get('title'),
-                    objects=plotoptions.get('objects'),
                     options=options)
 
     return pointings
