@@ -16,7 +16,7 @@ from astropy.units import Quantity
 from astropy import units
 from .catalog import visible_catalog, read_catalog, map2catalog
 from . import settings
-from .grid import tileallsky
+from .grid import SkyGrid
 from .skymaptools import calc_siderealtimes, get_visiblemap, getvectors
 
 try:  # Python 3
@@ -238,69 +238,17 @@ class Telescope(object):
 
         return obscoords.alt < getattr(settings, 'SUNALTITUDE')
 
+    def get_grid(self, overlap=0.5):
+        """Get the SkyGrid for the telescope field of view.
 
-    def gettilespath(self, tilespath=None):
-        nside = getattr(settings, 'NSIDE')
-        if tilespath is None:
-            tilespath = getattr(settings, 'TILESDIR')
-        if os.path.isdir(tilespath):
-            filename = "{}_nside{}.pgz".format(self.name, nside)
-            tilespath = os.path.join(tilespath, filename)
-        elif not os.path.isfile(tilespath):
-            # Assume tilespath is a 'base' path
-            dirname, filename = os.path.split(tilespath)
-            filename = "{}_nside{}_{}".format(self.name, nside, filename)
-            tilespath = os.path.join(dirname, filename)
-        return tilespath
-
-    def readtiles(self, tilespath=None):
-        logger = logging.getLogger(__name__)
-        nside = getattr(settings, 'NSIDE')
-        if isinstance(tilespath, tuple) and len(tilespath) == 3:
-            self.tiles, self.pixlist, self.tilecenters = tilespath
-            self.tilenames = np.arange(len(self.tiles)) + 1
-            return self.tilenames, self.tiles, self.pixlist, self.tilecenters
-
-        tilespath = self.gettilespath(tilespath)
-        if not os.path.isfile(tilespath):
-            # Try with a .pgz extension
-            if os.path.splitext(tilespath)[0] == tilespath:
-                tilespath += ".pgz"
-            if not os.path.isfile(tilespath):
-                # Create one in-memory
-                logger.debug("Creating tiles on the fly")
-                data = tileallsky(self.fov, nside, overlap=0.5)
-                self.tiles, self.pixlist, self.tilecenters = data
-                self.tilenames = np.arange(len(self.tiles)) + 1
-                return (self.tilenames, self.tiles, self.pixlist,
-                        self.tilecenters)
-
-        with gzip.GzipFile(tilespath, 'r') as infile:
-            logger.debug("Reading tiles from %s", tilespath)
-            try:
-                data = pickle.load(infile, encoding='latin1')  # Python 3
-            except TypeError:
-                data = pickle.load(infile)  # Python 2
-        # Allow for multiple 'nside' grids inside the file
-        if isinstance(data, dict):
-            if len(data[nside]) == 4:
-                names, tilelist, pixlist, centers = data[nside]
-            else:
-                tilelist, pixlist, centers = data[nside]
-                names = np.arange(len(tilelist)) + 1
-        else:
-            if len(data) == 4:
-                names, tilelist, pixlist, centers = data
-            else:
-                tilelist, pixlist, centers = data
-                names = np.arange(len(tilelist)) + 1
-        logging.debug("Read %s: %d tiles, %d pixels", tilespath,
-                      len(tilelist), len(pixlist))
-        self.tilenames = names
-        self.tiles = tilelist
-        self.pixlist = pixlist
-        self.tilecenters = centers
-        return names, tilelist, pixlist, centers
+        Parameters
+        ----------
+        overlap : optional
+            See `gototile.grid.SkyGrid` for overlap formats.
+            Default is 0.5 deg in both RA and Dec
+        """
+        self.grid = SkyGrid(self.fov, overlap=overlap)
+        return self.grid
 
 
 def build_scope(config):
