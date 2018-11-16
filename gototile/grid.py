@@ -127,16 +127,9 @@ class SkyGrid(object):
         If given as a tuple, the arguments are assumed to be (ra, dec).
         If given as a dict, it should contains the keys 'ra' and 'dec'.
         default is 0.5 in both axes, minimum is 0 and maximum is 0.9
-
-    nside : int, optional
-        default is 64
-
-    nested : bool, optional
-        default is True
-
     """
 
-    def __init__(self, fov, overlap=None, nside=64, nested=True):
+    def __init__(self, fov, overlap=None):
         # Parse fov
         if isinstance(fov, (list,tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
@@ -166,10 +159,6 @@ class SkyGrid(object):
             step[key] = fov[key].value * (1 - overlap[key])
         self.step = step
 
-        # Other params
-        self.nside = nside
-        self.isnested = nested
-
         # Give the grid a unique name
         self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
                                                 self.fov['dec'].value,
@@ -186,15 +175,6 @@ class SkyGrid(object):
                                           self.fov['ra'].value,
                                           self.fov['dec'].value)
 
-        # Calculate the HEALPix indicies within each tile
-        # This is the complicated bit, so it's done over multiple processes
-        polygon_query = PolygonQuery(self.nside, self.isnested)
-        pool = multiprocessing.Pool()
-        pixels = pool.map(polygon_query, self.vertices)
-        pool.close()
-        pool.join()
-        self.pixels = np.array(pixels)
-
         # Give the tiles unique ids
         self.tilenums = np.arange(self.ntiles) + 1
         filllen = len(str(max(self.tilenums)))
@@ -210,32 +190,26 @@ class SkyGrid(object):
         return not self == other
 
     def __repr__(self):
-        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), nside={})')
+        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}))')
         return template.format(self.fov['ra'].value, self.fov['dec'].value,
-                               self.overlap['ra'], self.overlap['dec'],
-                               self.nside)
+                               self.overlap['ra'], self.overlap['dec'])
 
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
-        newgrid = SkyGrid(self.fov, self.overlap, self.nside, self.isnested)
+        newgrid = SkyGrid(self.fov, self.overlap)
         return newgrid
 
-    def regrade(self, nside, nested=True):
-        """Up- or downgrade the sky grid HEALPix resolution.
+    def get_pixels(self, nside, nested=True):
+        """Calculate the HEALPix indicies within each tile.
 
         See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
         """
-        if nside == self.nside and nested == self.isnested:
-            return
-
         polygon_query = PolygonQuery(nside, nested)
         pool = multiprocessing.Pool()
         pixels = pool.map(polygon_query, self.vertices)
         pool.close()
         pool.join()
-        self.pixels = np.array(pixels)
-        self.nside = nside
-        self.isnested = nested
+        return np.array(pixels)
 
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid.
@@ -248,12 +222,20 @@ class SkyGrid(object):
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
         """
-        if self.nside != skymap.nside or self.isnested != skymap.isnested:
-            # Need to regrade so they match
-            # Best option is to match grid precision to the skymap
-            self.regrade(skymap.nside, skymap.isnested)
+        # Calculate which pixels are within the tiles
+        pixels = self.get_pixels(skymap.nside, skymap.isnested)
+
+        # Calculate the contained probabilities within each tile
+        probs = np.array([skymap.skymap[pix].sum() for pix in pixels])
+
+        # Store skymap details on the class
         self.skymap = skymap.copy()
-        self.probs = np.array([self.skymap.skymap[pix].sum() for pix in self.pixels])
+        self.nside = skymap.nside
+        self.isnested = skymap.isnested
+        self.pixels = pixels
+        self.probs = probs
+
+        return probs
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.
@@ -264,12 +246,13 @@ class SkyGrid(object):
         col_names = ['tilename', 'ra', 'dec', 'prob']
         col_types = ['U', u.deg, u.deg, 'f8']
 
-        try:
-            table = QTable([self.tilenames, self.coords.ra, self.coords.dec, self.probs],
-                           names=col_names, dtype=col_types)
-        except AttributeError:
-            table = QTable([self.tilenames, self.coords.ra, self.coords.dec, np.zeros(self.ntiles)],
-                           names=col_names, dtype=col_types)
+        if hasattr(self, 'probs'):
+            probs = self.probs
+        else:
+            probs = np.zeros(self.ntiles)
+
+        table = QTable([self.tilenames, self.coords.ra, self.coords.dec, probs],
+                        names=col_names, dtype=col_types)
         return table
 
     def plot(self, centre=(0,45), orthoplot=False):
