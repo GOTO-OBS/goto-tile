@@ -209,7 +209,8 @@ class SkyGrid(object):
         pixels = pool.map(polygon_query, self.vertices)
         pool.close()
         pool.join()
-        return np.array(pixels)
+        self.pixels = np.array(pixels)
+        return self.pixels
 
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid.
@@ -223,16 +224,16 @@ class SkyGrid(object):
             The sky map to map onto this grid.
         """
         # Calculate which pixels are within the tiles
-        pixels = self.get_pixels(skymap.nside, skymap.isnested)
+        if not hasattr(self, 'pixels'):
+            self.get_pixels(skymap.nside, skymap.isnested)
 
         # Calculate the contained probabilities within each tile
-        probs = np.array([skymap.skymap[pix].sum() for pix in pixels])
+        probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
 
         # Store skymap details on the class
         self.skymap = skymap.copy()
         self.nside = skymap.nside
         self.isnested = skymap.isnested
-        self.pixels = pixels
         self.probs = probs
 
         return probs
