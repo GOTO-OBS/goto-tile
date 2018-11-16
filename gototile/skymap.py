@@ -202,6 +202,11 @@ class SkyMap(object):
         self.header['order'] = order
         self.isnested = order == 'NESTED'
 
+    def normalise(self):
+        """Normalise the sky map so the probability sums to unity."""
+        total = self.skymap.sum()
+        self.skymap /= total
+
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'prob']

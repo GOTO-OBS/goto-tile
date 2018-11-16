@@ -462,16 +462,14 @@ def tile_skymap(skymap, grid, observed=None):
     bad_pix = np.array(list(bad_pix))
 
     # Make sure the skymap is normalised
-    normmap = skymap.copy()
-    total = normmap.skymap.sum()
-    normmap.skymap /= total
+    skymap.normalise()
 
     # Reduce the bad pixels to zero probability
     if len(bad_pix) > 0:
-        normmap.skymap[bad_pix] = 0
+        skymap.skymap[bad_pix] = 0
 
     # and apply the skymap
-    grid.apply_skymap(normmap)
+    grid.apply_skymap(skymap)
 
     return grid.get_table()
 
