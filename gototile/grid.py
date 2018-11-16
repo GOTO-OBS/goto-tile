@@ -144,6 +144,8 @@ class SkyGrid(object):
             # make sure fov is in degrees
             if not isinstance(fov[key], u.Quantity):
                 fov[key] *= u.deg
+            else:
+                fov[key] = fov[key].to(u.deg)
         self.fov = fov
 
         # Parse overlap
