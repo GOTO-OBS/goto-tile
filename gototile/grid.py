@@ -256,10 +256,13 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, centre=(0,45), orthoplot=False):
+    def plot(self, centre=(0,45), orthoplot=False, filename=None, dpi=300):
         """Plot the grid."""
         import matplotlib as mpl
         from matplotlib import pyplot as plt
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_agg import FigureCanvasAgg as\
+            FigureCanvas
         from matplotlib.patches import Polygon
         from matplotlib.collections import PatchCollection
         import cartopy.crs as ccrs
@@ -267,7 +270,10 @@ class SkyGrid(object):
         from .skymap import read_colormaps
         from .skymaptools import getshape
 
-        fig = plt.figure()
+        if filename:
+            fig = Figure()
+        else:
+            fig = plt.figure()
         if orthoplot:
             projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
         else:
@@ -299,4 +305,9 @@ class SkyGrid(object):
             p.set_array(np.array(self.probs))
             fig.colorbar(p, ax=axes)
         axes.add_collection(p)
-        plt.show()
+
+        if filename:
+            canvas = FigureCanvas(fig)
+            canvas.print_figure(filename, dpi=dpi)
+        else:
+            plt.show()

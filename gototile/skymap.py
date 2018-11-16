@@ -256,7 +256,7 @@ class SkyMap(object):
 
         filename : str, optional
             filename to save the plot to
-            default is the object name from `SkyMap.object`
+            if not given then the plot will be displayed with plt.show()
 
         title : str, optional
             title for the plot
@@ -304,8 +304,6 @@ class SkyMap(object):
 
         read_colormaps()
 
-        if filename is None:
-            filename = self.object
         if telescopes is None:
             telescopes = []
         if date is None:
@@ -339,7 +337,10 @@ class SkyMap(object):
             moon.phase = phase/100
 
         if axes is None:
-            figure = Figure()
+            if filename:
+                figure = Figure()
+            else:
+                figure = plt.figure()
             axes = figure.add_subplot(1, 1, 1, projection=ccrs.Mollweide())
         geodetic = ccrs.Geodetic()
 
@@ -481,3 +482,5 @@ class SkyMap(object):
         if filename:
             canvas = FigureCanvas(figure)
             canvas.print_figure(filename, dpi=dpi)
+        else:
+            plt.show()
