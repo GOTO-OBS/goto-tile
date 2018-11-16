@@ -270,7 +270,6 @@ class SkyGrid(object):
                            names=col_names, dtype=col_types)
         return table
 
-
     def plot(self, centre=(0,45), orthoplot=False):
         """Plot the grid."""
         import matplotlib as mpl

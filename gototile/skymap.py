@@ -8,6 +8,7 @@ import astropy
 from astropy.time import Time
 from astropy.coordinates import get_sun, SkyCoord, AltAz
 from astropy import units
+from astropy.table import QTable
 import healpy
 import ephem
 from . import settings
@@ -207,6 +208,19 @@ class SkyMap(object):
         theta, phi = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
         skycoords = SkyCoord(ra=phi*units.rad, dec=(0.5*np.pi - theta)*units.rad)
         return skycoords
+
+    def get_table(self):
+        """Return an astropy QTable containing infomation on the skymap pixels."""
+        col_names = ['pixel', 'ra', 'dec', 'prob']
+        col_types = ['U', units.deg, units.deg, 'f8']
+
+        npix = len(self.skymap)
+        ipix = np.arange(npix)
+        coords = self.skycoords()
+
+        table = QTable([ipix, coords.ra, coords.dec, self.skymap],
+                        names=col_names, dtype=col_types)
+        return table
 
     def plot(self, date=None, telescopes=None, pointings=None,
              objects=None, catalog=None, catcolor='#999999',
