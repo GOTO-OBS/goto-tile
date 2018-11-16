@@ -246,10 +246,10 @@ class SkyGrid(object):
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
         """
-        if self.nside != skymap.nside:
+        if self.nside != skymap.nside or self.isnested != skymap.isnested:
             # Need to regrade so they match
             # Best option is to match grid precision to the skymap
-            self.regrade(skymap.nside)
+            self.regrade(skymap.nside, skymap.isnested)
         self.skymap = skymap.copy()
         self.probs = np.array([self.skymap.skymap[pix].sum() for pix in self.pixels])
 
