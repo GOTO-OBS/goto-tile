@@ -46,9 +46,17 @@ class SkyGrid(object):
         If given as a tuple, the arguments are assumed to be (ra, dec).
         If given as a dict, it should contains the keys 'ra' and 'dec'.
         default is 0.5 in both axes, minimum is 0 and maximum is 0.9
+
+    kind : str, optional
+        The tiling method to use. Options are:
+        - 'cosine'  : Newer algorithm which adjusts RA spacing based on dec.
+                      Default.
+        - 'product' : Old, legacy algorithm.
+                      This method creates lots of overlap between tiles at high decs,
+                      which makes it impractical for survey purposes.
     """
 
-    def __init__(self, fov, overlap=None):
+    def __init__(self, fov, overlap=None, kind='cosine'):
         # Parse fov
         if isinstance(fov, (list,tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
@@ -79,7 +87,7 @@ class SkyGrid(object):
                                                 self.overlap['dec'])
 
         # Create the grid
-        ras, decs = create_grid(self.fov, self.overlap)
+        ras, decs = create_grid(self.fov, self.overlap, kind)
         self.coords = SkyCoord(ras, decs, unit=u.deg)
         self.ntiles = len(self.coords)
 

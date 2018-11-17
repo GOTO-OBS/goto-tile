@@ -21,7 +21,7 @@ from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
 
 
-def create_grid(fov, overlap):
+def create_grid(fov, overlap, kind='cosine'):
     """Create grid coordinates.
 
     Calculate strips along RA and stacked in declination to cover the full sky.
@@ -40,7 +40,57 @@ def create_grid(fov, overlap):
         The overlap amount between the tiles in the RA and Dec directions.
         It should contains the keys 'ra' and 'dec'.
 
+    kind : str, optional
+        The tiling method to use. Options are:
+        - 'cosine'  : Newer algorithm which adjusts RA spacing based on dec.
+                      Default.
+        - 'product' : Old, legacy algorithm.
+                      This method creates lots of overlap between tiles at high decs,
+                      which makes it impractical for survey purposes.
     """
+    if kind == 'cosine':
+        return create_grid_cosine(fov, overlap)
+    elif kind == 'product':
+        return create_grid_product(fov, overlap)
+
+
+def create_grid_product(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method uses the product of RA and Dec to get the RA spacings."""
+    fov = fov.copy()
+    overlap = overlap.copy()
+    step = {}
+    for key in ('ra', 'dec'):
+        # Get value of foc
+        if isinstance(fov[key], u.Quantity):
+            fov[key] = fov[key].to('deg').value
+
+        # Limit overlap to between 0 and 0.9
+        overlap[key] = min(max(overlap[key], 0), 0.9)
+
+        # Calculate step sizes
+        step[key] = fov[key] * (1 - overlap[key])
+
+    step_dec = step['dec']
+    step_ra = step['ra']
+
+    # Create the dec strips
+    pole = 90 // step_dec * step_dec
+    decs = np.arange(-pole, pole+step_dec/2, step_dec)
+
+    # Arrange the tiles in RA
+    ras = np.arange(0.0, 360., step['ra'])
+    allras, alldecs = zip(*[(ra, dec) for ra, dec in it.product(ras, decs)])
+    allras, alldecs = np.asarray(allras), np.asarray(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_cosine(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method adjusts the RA spacings based on the cos of the declination."""
     fov = fov.copy()
     overlap = overlap.copy()
     step = {}
