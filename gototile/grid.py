@@ -143,8 +143,7 @@ class SkyGrid(object):
             The sky map to map onto this grid.
         """
         # Calculate which pixels are within the tiles
-        if not hasattr(self, 'pixels'):
-            self.get_pixels(skymap.nside, skymap.isnested)
+        self.get_pixels(skymap.nside, skymap.isnested)
 
         # Calculate the contained probabilities within each tile
         probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
@@ -201,30 +200,77 @@ class SkyGrid(object):
         axes = fig.add_subplot(1, 1, 1, projection=projection)
 
         axes.set_global()
-        axes.coastlines(linewidth=0.25)
-        axes.gridlines()
+        #axes.coastlines(linewidth=0.25)
+        #axes.gridlines()
 
         read_colormaps()
 
         # Plot tile areas
         radecs = []
         for i, tile in enumerate(self.vertices):
-
             tile = xyz2radec(*tile.T)
             ra, dec = getshape(tile, steps=5)
             # Need to reverse and transpose to get into format for Polygon
             radec = np.array((ra[::-1], dec[::-1])).T
             radecs.append(radec)
 
-        p = PatchCollection([Polygon(radec) for radec in radecs],
-                            edgecolor='black', facecolor='black', alpha=0.3,
-                            cmap='cylon',
-                            transform=geodetic)
-        if hasattr(self, 'probs'):
-            p.set_array(np.array(self.probs))
-            fig.colorbar(p, ax=axes)
-        axes.add_collection(p)
+        # Create a collection to plot at once
+        polys = PatchCollection([Polygon(radec) for radec in radecs],
+                                 edgecolor='black', facecolor='black', alpha=0.3,
+                                 cmap='cylon',
+                                 transform=geodetic)
 
+        if hasattr(self, 'probs'):
+            # Colour the tiles by contained probability
+            polys.set_array(np.array(self.probs))
+            fig.colorbar(polys, ax=axes)
+
+        else:
+            # Colour in areas based on the number of tiles they are within
+            import healpy
+            import collections
+
+            nside = 128
+            self.get_pixels(nside, True)
+
+            # HealPix for the grid
+            npix = healpy.nside2npix(nside)
+            ipix = np.arange(npix)
+            thetas, phis = healpy.pix2ang(nside, ipix, nest=True)
+            pix_ras = np.rad2deg(phis)%360
+            pix_decs = np.rad2deg(np.pi/2 - thetas%np.pi)
+
+            # Statistics
+            pix_freq = np.array([0]*npix)
+            for tile_pix in self.pixels:
+                for pix in tile_pix:
+                    pix_freq[pix] += 1
+            counter = collections.Counter(pix_freq)
+            print('Tile statistics:')
+            for i in range(max(counter)+1):
+                print('{:>3.0f}: {:>6.0f} {:>5.1f}%'.format(i, counter[i],
+                                                            counter[i]/npix*100))
+            print('TOT: {:>6.0f} {:>4.1f}%'.format(npix, sum(counter.values())/npix*100))
+
+            # Plot HealPix points coloured by tile count
+            # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
+            cmap = plt.cm.jet
+            cmaplist = [cmap(i) for i in range(cmap.N)]
+            cmaplist[0] = (.5,.5,.5,1.0)
+            cmap = cmap.from_list('Custom cmap', cmaplist, cmap.N)
+
+            bounds = np.linspace(0,6,7)
+            norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+            points = axes.scatter(pix_ras, pix_decs, s=1, transform=geodetic,
+                                  c=pix_freq, cmap='gist_rainbow', norm=norm)
+            fig.colorbar(points)
+            polys.set_facecolor('none')
+
+        # Plot the tiles
+        axes.add_collection(polys)
+
+        # Save or display the plot
         if filename:
             canvas = FigureCanvas(fig)
             canvas.print_figure(filename, dpi=dpi)
