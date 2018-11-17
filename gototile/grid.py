@@ -16,7 +16,7 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
-from .gridtools import get_tile_vertices, create_allsky_strips
+from .gridtools import create_grid, get_tile_vertices
 from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
 
@@ -72,12 +72,6 @@ class SkyGrid(object):
             overlap[key] = min(max(overlap[key], 0), 0.9)
         self.overlap = overlap
 
-        # Calculate step sizes
-        step = {}
-        for key in ('ra', 'dec'):
-            step[key] = fov[key].value * (1 - overlap[key])
-        self.step = step
-
         # Give the grid a unique name
         self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
                                                 self.fov['dec'].value,
@@ -85,7 +79,7 @@ class SkyGrid(object):
                                                 self.overlap['dec'])
 
         # Create the grid
-        ras, decs = create_allsky_strips(self.step['ra'], self.step['dec'])
+        ras, decs = create_grid(self.fov, self.overlap)
         self.coords = SkyCoord(ras, decs, unit=u.deg)
         self.ntiles = len(self.coords)
 

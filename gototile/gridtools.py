@@ -21,29 +21,52 @@ from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
 
 
-def create_allsky_strips(rastep, decstep):
-    """Calculate strips along RA and stacked in declination to cover the
-    full sky
+def create_grid(fov, overlap):
+    """Create grid coordinates.
+
+    Calculate strips along RA and stacked in declination to cover the full sky.
 
     The step size in Right Ascension is adjusted with the declination,
     by a factor of 1/cos(declination).
 
     Parameters
     ----------
+    fov : dict of int or float or `astropy.units.Quantity`
+        The field of view of the tiles in the RA and Dec directions.
+        It should contains the keys 'ra' and 'dec'.
+        If not given units the values are assumed to be in degrees.
 
-    rastep : float
-        Step size in Right Ascension, uncorrected for declination.
-    decstep : float
-        Step size in declination.
+    overlap : dict of int or float
+        The overlap amount between the tiles in the RA and Dec directions.
+        It should contains the keys 'ra' and 'dec'.
 
     """
+    fov = fov.copy()
+    overlap = overlap.copy()
+    step = {}
+    for key in ('ra', 'dec'):
+        # Get value of foc
+        if isinstance(fov[key], u.Quantity):
+            fov[key] = fov[key].to('deg').value
 
-    pole = 90 // decstep * decstep
-    decs = np.arange(-pole, pole+decstep/2, decstep)
+        # Limit overlap to between 0 and 0.9
+        overlap[key] = min(max(overlap[key], 0), 0.9)
+
+        # Calculate step sizes
+        step[key] = fov[key] * (1 - overlap[key])
+
+    step_dec = step['dec']
+    step_ra = step['ra']
+
+    # Create the dec strips
+    pole = 90 // step_dec * step_dec
+    decs = np.arange(-pole, pole+step_dec/2, step_dec)
+
+    # Arrange the tiles in RA
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., rastep/np.cos(dec*RAD))
+        ras = np.arange(0.0, 360., step_ra/np.cos(dec*RAD))
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
     allras = np.concatenate(allras)
