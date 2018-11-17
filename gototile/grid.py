@@ -48,12 +48,8 @@ class SkyGrid(object):
         default is 0.5 in both axes, minimum is 0 and maximum is 0.9
 
     kind : str, optional
-        The tiling method to use. Options are:
-        - 'cosine'  : Newer algorithm which adjusts RA spacing based on dec.
-                      Default.
-        - 'product' : Old, legacy algorithm.
-                      This method creates lots of overlap between tiles at high decs,
-                      which makes it impractical for survey purposes.
+        The tiling method to use. See `gototile.gridtools.create_grid` for options.
+        Default is 'cosine'.
     """
 
     def __init__(self, fov, overlap=None, kind='cosine'):
