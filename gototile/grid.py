@@ -246,6 +246,7 @@ class SkyGrid(object):
                 for pix in tile_pix:
                     pix_freq[pix] += 1
             counter = collections.Counter(pix_freq)
+            print('Number of tiles: {}'.format(self.ntiles))
             print('Tile statistics:')
             for i in range(max(counter)+1):
                 print('{:>3.0f}: {:>6.0f} {:>5.1f}%'.format(i, counter[i],
