@@ -53,6 +53,16 @@ def create_grid(fov, overlap, kind):
                 This method creates lots of overlap between tiles at high decs,
                 which makes it impractical for survey purposes.
     """
+    fov = fov.copy()
+    overlap = overlap.copy()
+    for key in ('ra', 'dec'):
+        # Get value of foc
+        if isinstance(fov[key], u.Quantity):
+            fov[key] = fov[key].to('deg').value
+
+        # Limit overlap to between 0 and 0.9
+        overlap[key] = min(max(overlap[key], 0), 0.9)
+
     if kind == 'cosine':
         return create_grid_cosine(fov, overlap)
     elif kind == 'cosine_symmetric':
@@ -72,29 +82,16 @@ def create_grid_product(fov, overlap):
 
     This method uses the product of RA and Dec to get the RA spacings.
     """
-    fov = fov.copy()
-    overlap = overlap.copy()
-    step = {}
-    for key in ('ra', 'dec'):
-        # Get value of foc
-        if isinstance(fov[key], u.Quantity):
-            fov[key] = fov[key].to('deg').value
-
-        # Limit overlap to between 0 and 0.9
-        overlap[key] = min(max(overlap[key], 0), 0.9)
-
-        # Calculate step sizes
-        step[key] = fov[key] * (1 - overlap[key])
-
-    step_dec = step['dec']
-    step_ra = step['ra']
+    # Calculate steps
+    step_dec = fov['dec'] * (1 - overlap['dec'])
+    step_ra = fov['ra'] * (1 - overlap['ra'])
 
     # Create the dec strips
     pole = 90 // step_dec * step_dec
     decs = np.arange(-pole, pole+step_dec/2, step_dec)
 
     # Arrange the tiles in RA
-    ras = np.arange(0.0, 360., step['ra'])
+    ras = np.arange(0.0, 360., step_ra)
     allras, alldecs = zip(*[(ra, dec) for ra, dec in it.product(ras, decs)])
     allras, alldecs = np.asarray(allras), np.asarray(alldecs)
 
@@ -106,22 +103,9 @@ def create_grid_cosine(fov, overlap):
 
     This method adjusts the RA spacings based on the cos of the declination.
     """
-    fov = fov.copy()
-    overlap = overlap.copy()
-    step = {}
-    for key in ('ra', 'dec'):
-        # Get value of foc
-        if isinstance(fov[key], u.Quantity):
-            fov[key] = fov[key].to('deg').value
-
-        # Limit overlap to between 0 and 0.9
-        overlap[key] = min(max(overlap[key], 0), 0.9)
-
-        # Calculate step sizes
-        step[key] = fov[key] * (1 - overlap[key])
-
-    step_dec = step['dec']
-    step_ra = step['ra']
+    # Calculate steps
+    step_dec = fov['dec'] * (1 - overlap['dec'])
+    step_ra = fov['ra'] * (1 - overlap['ra'])
 
     # Create the dec strips
     pole = 90 // step_dec * step_dec
@@ -148,22 +132,9 @@ def create_grid_cosine_symmetric(fov, overlap):
     Compared to `create_grid_cosine` this method rotates the dec strips so
     they are symmetric around the meridian.
     """
-    fov = fov.copy()
-    overlap = overlap.copy()
-    step = {}
-    for key in ('ra', 'dec'):
-        # Get value of foc
-        if isinstance(fov[key], u.Quantity):
-            fov[key] = fov[key].to('deg').value
-
-        # Limit overlap to between 0 and 0.9
-        overlap[key] = min(max(overlap[key], 0), 0.9)
-
-        # Calculate step sizes
-        step[key] = fov[key] * (1 - overlap[key])
-
-    step_dec = step['dec']
-    step_ra = step['ra']
+    # Calculate steps
+    step_dec = fov['dec'] * (1 - overlap['dec'])
+    step_ra = fov['ra'] * (1 - overlap['ra'])
 
     # Create the dec strips
     pole = 90 // step_dec * step_dec
@@ -190,20 +161,6 @@ def create_grid_minverlap(fov, overlap):
     and then adjusts the number of tiles in RA and Dec until they overlap
     at least by the amount given.
     """
-    fov = fov.copy()
-    overlap = overlap.copy()
-    step = {}
-    for key in ('ra', 'dec'):
-        # Get value of foc
-        if isinstance(fov[key], u.Quantity):
-            fov[key] = fov[key].to('deg').value
-
-        # Limit overlap to between 0 and 0.9
-        overlap[key] = min(max(overlap[key], 0), 0.9)
-
-        # Calculate step sizes
-        step[key] = fov[key] * (1 - overlap[key])
-
     # Create the dec strips
     pole = 90
     n_tiles = math.ceil(pole/((1-overlap['dec'])*fov['dec']))
@@ -243,20 +200,6 @@ def create_grid_minverlap_enhanced(fov, overlap):
     This has the effect of overlapping the courners rather than the centre of
     the sides of adjacent tiles, thereby reducing the gaps between the tiles.
     """
-    fov = fov.copy()
-    overlap = overlap.copy()
-    step = {}
-    for key in ('ra', 'dec'):
-        # Get value of foc
-        if isinstance(fov[key], u.Quantity):
-            fov[key] = fov[key].to('deg').value
-
-        # Limit overlap to between 0 and 0.9
-        overlap[key] = min(max(overlap[key], 0), 0.9)
-
-        # Calculate step sizes
-        step[key] = fov[key] * (1 - overlap[key])
-
     # Create the dec strips
     pole = 90
     n_tiles = math.ceil(pole/((1-overlap['dec'])*fov['dec'])) + 1  # Bodge
