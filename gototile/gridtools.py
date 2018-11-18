@@ -212,11 +212,8 @@ def create_grid_minverlap_enhanced(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        if 90 > dec > 0:
-            dec2 = dec - fov['dec']/2
-            dec3 = 90 - np.sqrt((90-dec2)**2 + (fov['ra']/2)**2)
-        elif -90 < dec < 0:
-            dec2 = dec + fov['dec']/2
+        if 90 > abs(dec) > 0:
+            dec2 = abs(dec) - fov['dec']/2
             dec3 = 90 - np.sqrt((90-dec2)**2 + (fov['ra']/2)**2)
         else:
             dec2 = dec
