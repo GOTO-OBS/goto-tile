@@ -7,6 +7,7 @@ except ImportError:
 import itertools as it
 import gzip
 import os
+import math
 import tempfile
 import logging
 import multiprocessing
@@ -58,6 +59,8 @@ def create_grid(fov, overlap, kind):
         return create_grid_cosine_symmetric(fov, overlap)
     elif kind == 'product':
         return create_grid_product(fov, overlap)
+    elif kind == 'minverlap':
+        return create_grid_minverlap(fov, overlap)
     else:
         raise ValueError('Unknown grid tiling method: "{}"'.format(kind))
 
@@ -170,6 +173,50 @@ def create_grid_cosine_symmetric(fov, overlap):
     for dec in decs:
         ras = np.arange(0.0, 360., step_ra/np.cos(dec*RAD))
         ras += (360-ras[-1])/2  # Rotate the strips so they're symmetric
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_minverlap(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method takes the overlaps given as the minimum rather than fixed,
+    and then adjusts the number of tiles in RA and Dec until they overlap
+    at least by the amount given.
+    """
+    fov = fov.copy()
+    overlap = overlap.copy()
+    step = {}
+    for key in ('ra', 'dec'):
+        # Get value of foc
+        if isinstance(fov[key], u.Quantity):
+            fov[key] = fov[key].to('deg').value
+
+        # Limit overlap to between 0 and 0.9
+        overlap[key] = min(max(overlap[key], 0), 0.9)
+
+        # Calculate step sizes
+        step[key] = fov[key] * (1 - overlap[key])
+
+    # Create the dec strips
+    pole = 90
+    n_tiles = math.ceil(pole/((1-overlap['dec'])*fov['dec']))
+    step_dec = pole/n_tiles
+    north_decs = np.arange(pole, 0, step_dec * -1)
+    south_decs = north_decs * -1
+    decs = np.concatenate([south_decs, np.array([0]), north_decs[::-1]])
+
+    # Arrange the tiles in RA
+    alldecs = []
+    allras = []
+    for dec in decs:
+        n_tiles = math.ceil(360/((1-overlap['ra'])*fov['ra']/np.cos(dec*RAD)))
+        step_ra = 360/n_tiles
+        ras = np.arange(0, 360, step_ra)
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
     allras = np.concatenate(allras)
