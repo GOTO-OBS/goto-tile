@@ -61,6 +61,8 @@ def create_grid(fov, overlap, kind):
         return create_grid_product(fov, overlap)
     elif kind == 'minverlap':
         return create_grid_minverlap(fov, overlap)
+    elif kind == 'minverlap_enhanced':
+        return create_grid_minverlap_enhanced(fov, overlap)
     else:
         raise ValueError('Unknown grid tiling method: "{}"'.format(kind))
 
@@ -215,6 +217,68 @@ def create_grid_minverlap(fov, overlap):
     allras = []
     for dec in decs:
         n_tiles = math.ceil(360/((1-overlap['ra'])*fov['ra']/np.cos(dec*RAD)))
+        step_ra = 360/n_tiles
+        ras = np.arange(0, 360, step_ra)
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_minverlap_enhanced(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method takes the overlaps given as the minimum rather than fixed,
+    and then adjusts the number of tiles in RA and Dec until they overlap
+    at least by the amount given.
+
+    This is the second version of the minverlap algorithm.
+    In this version the tiles are placed slightly closer to close some of
+    the gaps in RA.
+    Instead of aligning the tiles based on the declination of the centre
+    the declination of the lower (in the north) / upper (in the south) courners
+    is used.
+    This has the effect of overlapping the courners rather than the centre of
+    the sides of adjacent tiles, thereby reducing the gaps between the tiles.
+    """
+    fov = fov.copy()
+    overlap = overlap.copy()
+    step = {}
+    for key in ('ra', 'dec'):
+        # Get value of foc
+        if isinstance(fov[key], u.Quantity):
+            fov[key] = fov[key].to('deg').value
+
+        # Limit overlap to between 0 and 0.9
+        overlap[key] = min(max(overlap[key], 0), 0.9)
+
+        # Calculate step sizes
+        step[key] = fov[key] * (1 - overlap[key])
+
+    # Create the dec strips
+    pole = 90
+    n_tiles = math.ceil(pole/((1-overlap['dec'])*fov['dec'])) + 1  # Bodge
+    step_dec = pole/n_tiles
+    north_decs = np.arange(pole, 0, step_dec * -1)
+    south_decs = north_decs * -1
+    decs = np.concatenate([south_decs, np.array([0]), north_decs[::-1]])
+
+    # Arrange the tiles in RA
+    alldecs = []
+    allras = []
+    for dec in decs:
+        if 90 > dec > 0:
+            dec2 = dec - fov['dec']/2
+            dec3 = 90 - np.sqrt((90-dec2)**2 + (fov['ra']/2)**2)
+        elif -90 < dec < 0:
+            dec2 = dec + fov['dec']/2
+            dec3 = 90 - np.sqrt((90-dec2)**2 + (fov['ra']/2)**2)
+        else:
+            dec2 = dec
+            dec3 = dec
+        n_tiles = math.ceil(360/((1-overlap['ra'])*fov['ra']/np.cos(dec3*RAD)))
         step_ra = 360/n_tiles
         ras = np.arange(0, 360, step_ra)
         allras.append(ras)
