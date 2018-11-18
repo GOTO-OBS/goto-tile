@@ -172,7 +172,9 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, centre=(0,45), orthoplot=False, filename=None, dpi=300):
+    def plot(self, gridlines=False,
+             centre=(0,45), orthoplot=False,
+             filename=None, dpi=300):
         """Plot the grid."""
         import matplotlib as mpl
         from matplotlib import pyplot as plt
@@ -198,8 +200,8 @@ class SkyGrid(object):
         axes = fig.add_subplot(1, 1, 1, projection=projection)
 
         axes.set_global()
-        #axes.coastlines(linewidth=0.25)
-        #axes.gridlines()
+        if gridlines:
+            axes.gridlines()
 
         read_colormaps()
 
