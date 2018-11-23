@@ -16,90 +16,9 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
-from . import skymaptools as smt
+from .gridtools import create_grid, get_tile_vertices
 from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
-
-
-def get_tile_vertices(coords, delew, delns):
-    ra = coords.ra.value
-    dec = coords.dec.value
-
-    phiew = delew/2*RAD
-    phins = delns/2*RAD
-
-    l, b = ra*RAD, dec*RAD
-    xyz = lb2xyz(l, b)
-
-    poles = {}
-    poles['w'] = l - PI_2, 0 * b
-    poles['e'] = l + PI_2, 0 * b
-    mask = b < 0
-    poles['s'] = l + 0, b-PI_2
-    poles['s'][0][mask], poles['s'][1][mask] = l[mask]+PI, -b[mask]-PI_2
-    poles['n'] = l+PI, PI_2-b
-    poles['n'][0][mask], poles['n'][1][mask] = l[mask], b[mask]+PI_2
-    poles['w'] = lb2xyz(*poles['w'])
-    poles['e'] = lb2xyz(*poles['e'])
-    poles['n'] = lb2xyz(*poles['n'])
-    poles['s'] = lb2xyz(*poles['s'])
-
-    edges = {}
-    fcos, fsin = np.cos(phiew), np.sin(phiew)
-    edges['e'] = xyz * fcos + poles['e'] * fsin
-    le, be = xyz2lb(*edges['e'])
-    edges['w'] = xyz * fcos + poles['w'] * fsin
-    lw, bw = xyz2lb(*edges['w'])
-    ls, bs = l, b-phins
-    edges['s'] = lb2xyz(ls, bs)
-    ln, bn = l, b+phins
-    edges['n'] = lb2xyz(ln, bn)
-
-    for key in edges.keys():
-        edges[key] = edges[key].T
-    for key in poles.keys():
-        poles[key] = poles[key].T
-
-    corners = []
-    corners.append(intersect(edges['n'], poles['w'], edges['w'], poles['n']))
-    corners.append(intersect(edges['n'], poles['e'], edges['e'], poles['n']))
-    corners.append(intersect(edges['s'], poles['e'], edges['e'], poles['s']))
-    corners.append(intersect(edges['s'], poles['w'], edges['w'], poles['s']))
-
-    corners = np.asarray(corners)
-    corners = np.rollaxis(corners, 0, 2)
-    return corners
-
-
-def create_allsky_strips(rastep, decstep):
-    """Calculate strips along RA and stacked in declination to cover the
-    full sky
-
-    The step size in Right Ascension is adjusted with the declination,
-    by a factor of 1/cos(declination).
-
-    Parameters
-    ----------
-
-    rastep : float
-        Step size in Right Ascension, uncorrected for declination.
-    decstep : float
-        Step size in declination.
-
-    """
-
-    pole = 90 // decstep * decstep
-    decs = np.arange(-pole, pole+decstep/2, decstep)
-    alldecs = []
-    allras = []
-    for dec in decs:
-        ras = np.arange(0.0, 360., rastep/np.cos(dec*RAD))
-        allras.append(ras)
-        alldecs.append(dec * np.ones(ras.shape))
-    allras = np.concatenate(allras)
-    alldecs = np.concatenate(alldecs)
-
-    return allras, alldecs
 
 
 class PolygonQuery(object):
@@ -127,9 +46,13 @@ class SkyGrid(object):
         If given as a tuple, the arguments are assumed to be (ra, dec).
         If given as a dict, it should contains the keys 'ra' and 'dec'.
         default is 0.5 in both axes, minimum is 0 and maximum is 0.9
+
+    kind : str, optional
+        The tiling method to use. See `gototile.gridtools.create_grid` for options.
+        Default is 'cosine'.
     """
 
-    def __init__(self, fov, overlap=None):
+    def __init__(self, fov, overlap=None, kind='cosine'):
         # Parse fov
         if isinstance(fov, (list,tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
@@ -153,12 +76,6 @@ class SkyGrid(object):
             overlap[key] = min(max(overlap[key], 0), 0.9)
         self.overlap = overlap
 
-        # Calculate step sizes
-        step = {}
-        for key in ('ra', 'dec'):
-            step[key] = fov[key].value * (1 - overlap[key])
-        self.step = step
-
         # Give the grid a unique name
         self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
                                                 self.fov['dec'].value,
@@ -166,7 +83,7 @@ class SkyGrid(object):
                                                 self.overlap['dec'])
 
         # Create the grid
-        ras, decs = create_allsky_strips(self.step['ra'], self.step['dec'])
+        ras, decs = create_grid(self.fov, self.overlap, kind)
         self.coords = SkyCoord(ras, decs, unit=u.deg)
         self.ntiles = len(self.coords)
 
@@ -224,8 +141,7 @@ class SkyGrid(object):
             The sky map to map onto this grid.
         """
         # Calculate which pixels are within the tiles
-        if not hasattr(self, 'pixels'):
-            self.get_pixels(skymap.nside, skymap.isnested)
+        self.get_pixels(skymap.nside, skymap.isnested)
 
         # Calculate the contained probabilities within each tile
         probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
@@ -256,7 +172,9 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, centre=(0,45), orthoplot=False, filename=None, dpi=300):
+    def plot(self, gridlines=False,
+             centre=(0,45), orthoplot=False,
+             filename=None, dpi=300):
         """Plot the grid."""
         import matplotlib as mpl
         from matplotlib import pyplot as plt
@@ -282,30 +200,78 @@ class SkyGrid(object):
         axes = fig.add_subplot(1, 1, 1, projection=projection)
 
         axes.set_global()
-        axes.coastlines(linewidth=0.25)
-        axes.gridlines()
+        if gridlines:
+            axes.gridlines()
 
         read_colormaps()
 
         # Plot tile areas
         radecs = []
         for i, tile in enumerate(self.vertices):
-
             tile = xyz2radec(*tile.T)
             ra, dec = getshape(tile, steps=5)
             # Need to reverse and transpose to get into format for Polygon
             radec = np.array((ra[::-1], dec[::-1])).T
             radecs.append(radec)
 
-        p = PatchCollection([Polygon(radec) for radec in radecs],
-                            edgecolor='black', facecolor='black', alpha=0.3,
-                            cmap='cylon',
-                            transform=geodetic)
-        if hasattr(self, 'probs'):
-            p.set_array(np.array(self.probs))
-            fig.colorbar(p, ax=axes)
-        axes.add_collection(p)
+        # Create a collection to plot at once
+        polys = PatchCollection([Polygon(radec) for radec in radecs],
+                                 edgecolor='black', facecolor='black', alpha=0.3,
+                                 cmap='cylon',
+                                 transform=geodetic)
 
+        if hasattr(self, 'probs'):
+            # Colour the tiles by contained probability
+            polys.set_array(np.array(self.probs))
+            fig.colorbar(polys, ax=axes)
+
+        else:
+            # Colour in areas based on the number of tiles they are within
+            import healpy
+            import collections
+
+            nside = 128
+            self.get_pixels(nside, True)
+
+            # HealPix for the grid
+            npix = healpy.nside2npix(nside)
+            ipix = np.arange(npix)
+            thetas, phis = healpy.pix2ang(nside, ipix, nest=True)
+            pix_ras = np.rad2deg(phis)%360
+            pix_decs = np.rad2deg(np.pi/2 - thetas%np.pi)
+
+            # Statistics
+            pix_freq = np.array([0]*npix)
+            for tile_pix in self.pixels:
+                for pix in tile_pix:
+                    pix_freq[pix] += 1
+            counter = collections.Counter(pix_freq)
+            print('Number of tiles: {}'.format(self.ntiles))
+            print('Tile statistics:')
+            for i in range(max(counter)+1):
+                print('{:>3.0f}: {:>6.0f} {:>5.1f}%'.format(i, counter[i],
+                                                            counter[i]/npix*100))
+            print('TOT: {:>6.0f} {:>4.1f}%'.format(npix, sum(counter.values())/npix*100))
+
+            # Plot HealPix points coloured by tile count
+            # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
+            cmap = plt.cm.jet
+            cmaplist = [cmap(i) for i in range(cmap.N)]
+            cmaplist[0] = (.5,.5,.5,1.0)
+            cmap = cmap.from_list('Custom cmap', cmaplist, cmap.N)
+
+            bounds = np.linspace(0,6,7)
+            norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+            points = axes.scatter(pix_ras, pix_decs, s=1, transform=geodetic,
+                                  c=pix_freq, cmap='gist_rainbow', norm=norm)
+            fig.colorbar(points)
+            polys.set_facecolor('none')
+
+        # Plot the tiles
+        axes.add_collection(polys)
+
+        # Save or display the plot
         if filename:
             canvas = FigureCanvas(fig)
             canvas.print_figure(filename, dpi=dpi)
