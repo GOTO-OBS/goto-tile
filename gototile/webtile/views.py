@@ -82,7 +82,8 @@ class SkyMapView(FormView):
             if date is None:
                 date = skymap.date_det
             options = {'sun': sun, 'moon': moon}
-            skymap.plot(skymapimage, telescopes, date, pointings,
+            skymap.plot(filename=skymapimage, telescopes=telescopes,
+                        date=date, pointings=pointings,
                         geoplot=geoplot, catalog=catalog,
                         nightsky=nightsky, title=title,
                         objects=objects, options=options)

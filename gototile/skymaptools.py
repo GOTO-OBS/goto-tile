@@ -186,7 +186,7 @@ def get_visiblemap(skymap, sidtimes, telescope, njobs=1):
         njobs = None
     if not sidtimes:
         return maskedmap, np.array([], dtype=np.int)
-    skycoords = skymap.skycoords()
+    skycoords = skymap.coords.copy()
     dtype = getattr(settings, 'IDTYPE')
     ipix = np.arange(len(skymap.skymap), dtype=dtype)
     func = VisibleMap(telescope, skycoords, ipix,
@@ -239,7 +239,7 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
                               njobs=1):
     if njobs == -1 or njobs is None:
         njobs = os.cpu_count()
-    skycoords = skymap.skycoords()
+    skycoords = skymap.coords.copy()
     ipix = np.arange(len(skymap.skymap))
     seenlist = []
     pool = multiprocessing.Pool(njobs)
@@ -279,10 +279,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     tiles, pixlist, sidtimes = {}, {}, {}
     for telescope in telescopes:
         telescope.indices = {}
-        if isinstance(tilespath, dict):
-            telescope.readtiles(tilespath.get(telescope.__class__.__name__))
-        else:
-            telescope.readtiles(tilespath)
+        telescope.get_grid()
         telescope.sidtimes = calc_siderealtimes(
             date, telescope.location, within=within,
             allnight=(nightsky == 'all'))
@@ -373,9 +370,40 @@ def calculate_tiling(skymap, telescopes, date=None,
         while len(indices):
             # Select subset of relevant telescopes
             seltelescopes = [telescopes[i] for i in indices]
+
             # Run best tile calculating on this subset
-            filltiles(seltelescopes, time)
-            ordertiles(seltelescopes)
+            for telescope in seltelescopes:
+                #filltiles
+                telescope.grid.apply_skymap(telescope.skymap)
+                telescope.tileprobs = telescope.grid.probs
+                if time:
+                    telescope.vismask = telescope.is_visible(time,
+                        telescope.grid.coords)
+
+                #ordertiles
+                vismask = telescope.vismask
+                if not len(telescope.tileprobs[vismask]):
+                    telescope.topprob = 0
+                    telescope.toptile = None
+                    telescope.toppixlist = []
+                    telescope.topcenter = None
+                    telescope.topname = ''
+                    continue
+                ins = np.argsort(telescope.tileprobs[vismask])[::-1]
+                itop = np.where(vismask)[0][ins[0]]
+                itops = np.where(vismask)[0][ins[:10]]
+                telescope.topprob = telescope.tileprobs[itop]
+                telescope.toptile = telescope.grid.vertices[itop]
+                telescope.toppixlist = telescope.grid.pixels[itop]
+                telescope.topcenter = telescope.grid.coords[itop]
+                telescope.topname = telescope.grid.tilenames[itop]
+                telescope.topsources = []
+                if hasattr(telescope, 'catsources'):
+                    for pixel in telescope.pixlist[itop]:
+                        sources = telescope.catsources[pixel]
+                        telescope.topsources.extend(sources)
+                telescope.topsources = np.asarray(telescope.topsources)
+
             # Compare first (brightest) tiles of telescopes
             sortindices = np.argsort([telescope.topprob
                                       for telescope in seltelescopes])[::-1]
@@ -427,134 +455,48 @@ def calculate_tiling(skymap, telescopes, date=None,
     return pointings, newskymap.skymap, allskymap.skymap
 
 
-def tile_skymap(skymap, telescopes, catalog=None, tilespath=None,
-                observed=None):
+def tile_skymap(skymap, grid, observed=None):
     '''Return the tile probabilities for a given skymap.
 
     Unlike calculate_tiling this function doesn't consider time and
     visibility, only attributes of the telescope and tiles.
 
-    observed : A list, the same length as the number of telescopes,
-               containing an array of tilenames that have already been
-               observed by each telescope (if any).
+    Parameters
+    ----------
+    skymap : `gototile.skymap.SkyMap`
+        The sky map to apply
+
+    grid : `gototile.skymap.SkyGrid`
+        The all-sky grid to apply the map to
+
+    observed : list of int or str, optional
+        A list containing tile indicies or names that have already been observed (if any).
+        Any tiles in this list will have their probability of any HEALPix pixels
+        within set to zero, thereby reducing the contained probability of any
+        overlapping tiles.
     '''
-
-    if catalog is None:
-        catalog = {'path': None, 'key': None}
-    if observed is None:
-        observed = [None]*len(telescopes)
-
     utils.test_iers()
 
-    allskymap = skymap.copy()
-    tiles, pixlist = {}, {}
-    for telescope in telescopes:
-        telescope.indices = {}
-        if isinstance(tilespath, dict):
-            telescope.readtiles(tilespath.get(telescope.__class__.__name__))
-        else:
-            telescope.readtiles(tilespath)
+    # Get the pixels within each grid tile
+    pixlist = grid.get_pixels(skymap.nside, skymap.isnested)
 
-    if catalog['path']:
-        cattable = read_catalog(**catalog)
-        allskymap, catsources = map2catalog(allskymap, cattable)
+    # Get all the pixels within observed tiles
+    bad_pix = set()
+    for tile in observed:
+        if isinstance(tile, str):
+            tile = grid.tilenames.index(tile)
+        for pix in pixlist[tile]:
+            bad_pix.add(pix)
+    bad_pix = np.array(list(bad_pix))
 
-    # get fractional percentage covered per pix
-    total = allskymap.skymap.sum()
-    # normalise so allskymap.sum() == 1
-    allskymap.skymap /= total
+    # Make sure the skymap is normalised
+    skymap.normalise()
 
-    newskymap = allskymap.copy()
+    # Reduce the bad pixels to zero probability
+    if len(bad_pix) > 0:
+        skymap.skymap[bad_pix] = 0
 
-    # Blank out pixels for observed tiles in all telescope skymaps
-    for obslist, telescope in zip(observed,telescopes):
-        if obslist:
-            obsmask = np.array([tile in obslist
-                                for tile in telescope.tilenames])
-            pixlists = telescope.pixlist[obsmask]
-            for pixlist in pixlists:
-                newskymap.skymap[pixlist] = 0
+    # and apply the skymap
+    grid.apply_skymap(skymap)
 
-    for telescope in telescopes:
-        telescope.skymap = newskymap.copy()
-
-    GWtot = newskymap.skymap.sum()
-    if GWtot < 1e-8:
-        pointings = QTable(names=['fieldname', 'prob', 'telescope'],
-                           dtype=['U20', 'f8', 'U20'])
-        return pointings
-
-    # Run best tile calculating on the telescopes
-    filltiles(telescopes)
-
-    # Check to avoid duplicating tiles for telescopes that use the same grid
-    # For example GOTO-N-4 and GOTO-S-4 have the same FoV, so produce the
-    # same tiling solution.
-    _, unique_indices, unique_inverse = np.unique([t.tiles.tostring()
-                                                   for t in telescopes],
-                                                   return_index=1,
-                                                   return_inverse=1)
-    unique_tilenames = np.array([t.tilenames for t in telescopes])[unique_indices]
-    unique_tileprobs = np.array([t.tileprobs for t in telescopes])[unique_indices]
-    shared_names = ['']*len(unique_indices)
-    for i in range(len(telescopes)):
-        shared_names[unique_inverse[i]] += telescopes[i].name + ';'
-    shared_names = [i[:-1] for i in shared_names] # remove trailing ;
-
-    pointings = []
-    for j in range(len(unique_indices)):
-        tilenames = unique_tilenames[j]
-        tileprobs = unique_tileprobs[j]
-        names = shared_names[j]
-        for i in range(len(tilenames)):
-            pointings.append(np.array([str(tilenames[i]),
-                tileprobs[i], names]))
-
-    names = ['fieldname', 'prob', 'telescope']
-    dtype = ['U20', 'f8', 'U']
-    if len(pointings) == 0:
-        pointings = QTable(names=names, dtype=dtype)
-    else:
-        pointings = QTable(list(zip(*pointings)), names=names, dtype=dtype)
-    return pointings
-
-
-# NB: the telescope instances are modified in-place, so we don't
-# return from this function
-def filltiles(telescopes, time=None):
-    tileprobs = []
-    for telescope in telescopes:
-        telescope.tileprobs = np.array(
-            [telescope.skymap.skymap[pixels].sum()
-             for i, pixels in enumerate(telescope.pixlist)])
-        if time:
-            telescope.vismask = telescope.is_visible(time,
-                telescope.tilecenters)
-
-
-# NB: the telescope instances are modified in-place, so we don't
-# return from this function
-def ordertiles(telescopes):
-    for telescope in telescopes:
-        vismask = telescope.vismask
-        if not len(telescope.tileprobs[vismask]):
-            telescope.topprob = 0
-            telescope.toptile = None
-            telescope.toppixlist = []
-            telescope.topcenter = None
-            telescope.topname = ''
-            continue
-        indices = np.argsort(telescope.tileprobs[vismask])[::-1]
-        itop = np.where(vismask)[0][indices[0]]
-        itops = np.where(vismask)[0][indices[:10]]
-        telescope.topprob = telescope.tileprobs[itop]
-        telescope.toptile = telescope.tiles[itop]
-        telescope.toppixlist = telescope.pixlist[itop]
-        telescope.topcenter = telescope.tilecenters[itop]
-        telescope.topname = telescope.tilenames[itop]
-        telescope.topsources = []
-        if hasattr(telescope, 'catsources'):
-            for pixel in telescope.pixlist[itop]:
-                sources = telescope.catsources[pixel]
-                telescope.topsources.extend(sources)
-        telescope.topsources = np.asarray(telescope.topsources)
+    return grid.get_table()

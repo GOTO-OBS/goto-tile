@@ -2,7 +2,6 @@ recursive-include gototile *.py
 include gototile/GWGC.csv
 include gototile/cylon.csv
 include scripts/gototile
-include scripts/create-grid
 include gototile/webtile/static/gototile/js/skymap.js
 include gototile/webtile/static/gototile/css/skymap.css
 include gototile/webtile/templates/gototile/base.html

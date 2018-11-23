@@ -7,7 +7,8 @@ import numpy as np
 import astropy
 from astropy.time import Time
 from astropy.coordinates import get_sun, SkyCoord, AltAz
-from astropy import units
+from astropy import units as u
+from astropy.table import QTable
 import healpy
 import ephem
 from . import settings
@@ -98,6 +99,29 @@ class SkyMap(object):
         self.mjd_det = self.header.get('mjd-obs', self.mjd)
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
+        # Store the coordinates of the pixels
+        self.npix = len(self.skymap)
+        self.pixnums = np.arange(self.npix)
+        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
+        ras = phi
+        decs = 0.5*np.pi - theta
+        self.coords = SkyCoord(ras, decs, unit=u.rad)
+
+    def __eq__(self, other):
+        try:
+            if len(self.skymap) != len(other.skymap):
+                return False
+            return np.all(self.skymap == other.skymap) and self.header == other.header
+        except AttributeError:
+            return False
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __repr__(self):
+        template = ('SkyMap(objid="{}", date_det="{}", nside={})')
+        return template.format(self.objid, self.date_det.iso, self.nside)
+
     @classmethod
     def from_fits(cls, fits_file):
         """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.
@@ -156,45 +180,45 @@ class SkyMap(object):
         return cls.from_fits(hdulist)
 
     def copy(self):
+        """Return a new instance containing a copy of the sky map data."""
         newmap = SkyMap(self.skymap.copy(), self.header.copy())
-        newmap.object = self.object
-        newmap.order = self.order
-        newmap.isnested = self.isnested
-        newmap.nside = self.nside
-        newmap.objid = self.objid
         return newmap
 
     def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
                 dtype=None):
-        """Up- or downgrade the skymap resolution.
+        """Up- or downgrade the sky map  HEALPix resolution.
 
-        See the healpy.pixelfunc.ud_grade documentation about the options.
-
+        See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
         """
-
         if nside == self.nside and order == self.order:
             return
+
         self.skymap = healpy.ud_grade(self.skymap, nside_out=nside,
                                       order_in=self.order, order_out=order,
                                       power=power, pess=pess, dtype=dtype)
         self.nside = nside
+        self.header['nside'] = nside
         self.order = order
+        self.header['order'] = order
         self.isnested = order == 'NESTED'
 
-    def skycoords(self):
-        """Return the sky coordinates (RA, Dec) for the current map.
+    def normalise(self):
+        """Normalise the sky map so the probability sums to unity."""
+        total = self.skymap.sum()
+        self.skymap /= total
 
-        The returned value is an astropy.coordinates.SkyCoord object,
-        with the number of coordinates equal to the size of the
-        skymap.
-
-        """
+    def get_table(self):
+        """Return an astropy QTable containing infomation on the skymap pixels."""
+        col_names = ['pixel', 'ra', 'dec', 'prob']
+        col_types = ['U', u.deg, u.deg, 'f8']
 
         npix = len(self.skymap)
         ipix = np.arange(npix)
-        theta, phi = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
-        skycoords = SkyCoord(ra=phi*units.rad, dec=(0.5*np.pi - theta)*units.rad)
-        return skycoords
+        coords = self.coords
+
+        table = QTable([ipix, coords.ra, coords.dec, self.skymap],
+                        names=col_names, dtype=col_types)
+        return table
 
     def plot(self, date=None, telescopes=None, pointings=None,
              objects=None, catalog=None, catcolor='#999999',
@@ -237,7 +261,7 @@ class SkyMap(object):
 
         filename : str, optional
             filename to save the plot to
-            default is the object name from `SkyMap.object`
+            if not given then the plot will be displayed with plt.show()
 
         title : str, optional
             title for the plot
@@ -285,8 +309,6 @@ class SkyMap(object):
 
         read_colormaps()
 
-        if filename is None:
-            filename = self.object
         if telescopes is None:
             telescopes = []
         if date is None:
@@ -316,12 +338,14 @@ class SkyMap(object):
         if options.get('moon'):
             moon = ephem.Moon(date.iso)
             phase = moon.phase
-            moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180,
-                            unit=units.degree)
+            moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, unit=u.deg)
             moon.phase = phase/100
 
         if axes is None:
-            figure = Figure()
+            if filename:
+                figure = Figure()
+            else:
+                figure = plt.figure()
             axes = figure.add_subplot(1, 1, 1, projection=ccrs.Mollweide())
         geodetic = ccrs.Geodetic()
 
@@ -426,7 +450,7 @@ class SkyMap(object):
                              "points in time", len(sidtimes))
                 for st in sidtimes:
                     frame = AltAz(obstime=st, location=telescope.location)
-                    radecs = SkyCoord(ra=ras*units.deg, dec=decs*units.deg)
+                    radecs = SkyCoord(ras, decs, unit=u.deg)
                     altaz = radecs.transform_to(frame)
                     visras.extend(ras[np.where(altaz.alt.degree > (90-radius))])
                     visdecs.extend(decs[np.where(altaz.alt.degree > (90-radius))])
@@ -463,3 +487,5 @@ class SkyMap(object):
         if filename:
             canvas = FigureCanvas(figure)
             canvas.print_figure(filename, dpi=dpi)
+        else:
+            plt.show()

@@ -39,18 +39,6 @@ def create_grid(telescopes=None, overlap=None, nside=None):
 
     grid = {}
     for telescope in telescopes:
-        grid[telescope] = gototile.grid.tileallsky(
-            telescope.fov, nside, overlap=overlap, gridcoords=None, nested=True)
+        grid[telescope] = telescope.get_grid(overlap)
 
     return grid
-
-
-def makegrid(tilesdir, name=None):
-    if not os.path.exists(tilesdir):
-        os.makedirs(tilesdir)
-    fp = tempfile.NamedTemporaryFile(prefix='temp__', dir=tilesdir,
-                                     delete=False)
-    path = fp.name
-    fp.close()
-    gototile.grid.tileallsky(path, name, getattr(settings, 'NSIDE'))
-    return path
