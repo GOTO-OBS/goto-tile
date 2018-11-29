@@ -21,7 +21,7 @@ def parse_args(args=None):
 
     parser.add_argument("-gaussian", nargs=3, type=float, action='append',
                         default=[], help="Create a gaussian skymap with the given"
-                        "RA, Dec and statistical error (in degrees).")
+                        "RA, Dec and 68% containment radius (in degrees).")
     parser.add_argument("-skymap", help="Skymap FITS file",)
     parser.add_argument('-o', '--output', help="Output file name")
     parser.add_argument('--latex',

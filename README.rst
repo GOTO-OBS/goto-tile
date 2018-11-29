@@ -50,13 +50,15 @@ Running GOTO-tile
 
 The basic method for calling the script with default settings is:
 
-	$ gototile -s<telescope> -skymap<skymap-file>
+    $ gototile -s<telescope> -skymap<skymap-file>
+
 or
-        $ gototile -s<telescope> -gaussian<gaussian-position>
+
+    $ gototile -s<telescope> -gaussian<gaussian-position>
 
 where <telescope> is one of the predefined telescope,
 <skymap-file> is the LGIO probability skymap,
-and <gaussian-position> is the GRB final position and error reported in GCN Fermi detection.
+and <gaussian-position> is the position and 68% containment radius.
 
 A list of options and telescopes can be seen with:
 
@@ -66,7 +68,9 @@ A list of options and telescopes can be seen with:
 An example command might be:
 
     gototile -s gn4 --night --catalog --plot --sun --moon -skymap bayestar.fits.gz
+
 or
+
     gototile -s gn4 --night --catalog --plot --sun --moon -gaussian 60.640 -15.020 7.16
 
 Notes:
