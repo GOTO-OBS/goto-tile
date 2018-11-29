@@ -9,9 +9,6 @@ from astropy.io import fits
 
 def prob(ra_grid,dec_grid,ra,dec,err):
     """calculate the probability of specific grid (gaussian dist.)"""
-    sys_err = np.sqrt((3.71**2)*0.9+(14.3**2)*0.1)          # quadrature sum of systematic error
-    tot_err = np.sqrt(sys_err**2 + err**2)                  # quadrature sum of total error
-
     # calculate the angular distance between the reported (RA,Dec) and the grid (RA,Dec)
     a = np.sin(np.abs(dec_grid-dec)/2)**2
     b = np.cos(dec)*np.cos(dec_grid)*np.sin(np.abs(ra_grid-ra)/2)**2
@@ -19,8 +16,8 @@ def prob(ra_grid,dec_grid,ra,dec,err):
     ang_dis = np.degrees(d)
 
     # calculate the probability with 2D gaussian function
-    f = ang_dis/tot_err
-    prob = 1/(2*np.pi*tot_err**2)*np.e**(-0.5*f**2)
+    f = ang_dis/err
+    prob = 1/(2*np.pi*err**2)*np.e**(-0.5*f**2)
 
     return prob
 
