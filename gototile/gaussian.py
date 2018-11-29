@@ -32,6 +32,7 @@ def prob(ra_grid,dec_grid,ra,dec,radius):
 
     return prob
 
+
 def gaussian_skymap(ra, dec, radius, nside=64):
     """Calculate the probability for all skymap grids.
 
@@ -52,12 +53,9 @@ def gaussian_skymap(ra, dec, radius, nside=64):
     theta, phi = hp.pix2ang(nside, ipix)
     ra = phi
     dec = 0.5 * np.pi - theta
-    radec = np.column_stack([ra,dec])
 
-    post = np.zeros(npix)
-    for i,coo in enumerate(radec):
-        post[i] = prob(coo[0],coo[1],position_ra,position_dec,radius)
-    post = np.asarray(list(post))
+    post = prob(ra, dec, position_ra, position_dec, radius)
+
     post /= np.sum(post * hp.nside2pixarea(nside))
     postcopy = np.copy(post)
     postcopy *= 4 * np.pi / len(post)
