@@ -203,7 +203,7 @@ class SkyMap(object):
         self.nside = nside
         self.header['nside'] = nside
         self.order = order
-        self.header['order'] = order
+        self.header['ordering'] = order
         self.isnested = order == 'NESTED'
         self._get_coords()
 
