@@ -12,6 +12,10 @@ def prob(ra_grid,dec_grid,ra,dec,radius):
 
     Parameters
     ----------
+    ra_grid : float
+        ra coordinate of the grid position, in degrees
+    dec_grid : float
+        dec coordinate of the grid position, in degrees
     ra : float
         central ra, in degrees
     dec : float
