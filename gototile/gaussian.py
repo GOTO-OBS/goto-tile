@@ -16,8 +16,9 @@ def prob(ra_grid,dec_grid,ra,dec,err):
     ang_dis = np.degrees(d)
 
     # calculate the probability with 2D gaussian function
-    f = ang_dis/err
-    prob = 1/(2*np.pi*err**2)*np.e**(-0.5*f**2)
+    sigma = err/np.sqrt(2.3)
+    f = ang_dis/sigma
+    prob = 1/(2*np.pi*sigma**2)*np.e**(-0.5*f**2)
 
     return prob
 
