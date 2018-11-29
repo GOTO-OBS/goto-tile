@@ -183,7 +183,12 @@ def parse_args(args=None):
     args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}
 
     if args.plot is True:
-        args.plot = os.path.splitext(args.skymap)[0] + '.png'
+        if args.skymap:
+            args.plot = os.path.split(args.skymap)[-1].split('.')[0] + '.png'
+        elif args.gaussian:
+            args.plot = 'gaussian.png'
+        else:
+            args.plot = 'output.png'
 
     return args
 
