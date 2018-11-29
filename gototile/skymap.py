@@ -100,12 +100,7 @@ class SkyMap(object):
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
         # Store the coordinates of the pixels
-        self.npix = len(self.skymap)
-        self.pixnums = np.arange(self.npix)
-        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
-        ras = phi
-        decs = 0.5*np.pi - theta
-        self.coords = SkyCoord(ras, decs, unit=u.rad)
+        self._get_coords()
 
     def __eq__(self, other):
         try:
@@ -121,6 +116,15 @@ class SkyMap(object):
     def __repr__(self):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
         return template.format(self.objid, self.date_det.iso, self.nside)
+
+    def _get_coords(self):
+        """Store the coordinates of the pixels."""
+        self.npix = len(self.skymap)
+        self.pixnums = np.arange(self.npix)
+        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
+        ras = phi
+        decs = 0.5*np.pi - theta
+        self.coords = SkyCoord(ras, decs, unit=u.rad)
 
     @classmethod
     def from_fits(cls, fits_file):
@@ -201,6 +205,7 @@ class SkyMap(object):
         self.order = order
         self.header['order'] = order
         self.isnested = order == 'NESTED'
+        self._get_coords()
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
