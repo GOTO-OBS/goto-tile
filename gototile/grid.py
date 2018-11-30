@@ -250,7 +250,6 @@ class SkyGrid(object):
 
             # Create a collection to plot at once
             polys = PatchCollection([Polygon(radec) for radec in radecs],
-                                    edgecolor='black', alpha=0.3,
                                     cmap='jet',
                                     transform=geodetic)
 
@@ -327,6 +326,13 @@ class SkyGrid(object):
 
         # Plot the tiles
         axes.add_collection(polys)
+
+        # Also plot on the lines over the top
+        polys2 = copy(self._poly_cache)
+        polys2.set_facecolor('none')
+        polys2.set_edgecolor('black')
+        polys2.set_alpha(0.3)
+        axes.add_collection(polys2)
 
         # Save or display the plot
         if filename:
