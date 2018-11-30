@@ -306,6 +306,14 @@ class SkyGrid(object):
 
         else:
             # Colour in tiles with the colour given
+            if isinstance(color, dict):
+                # Should be a dict with keys as tile names
+                color_array = ['none'] * self.ntiles
+                for k in color.keys():
+                    i = self.tilenames.index(k)
+                    color_array[i] = color[k]
+                color = np.array(color_array)
+
             if isinstance(color, (list, tuple, np.ndarray)):
                 # A list-like of colours, should be same length as number of tiles
                 if not len(color) == self.ntiles:
@@ -320,7 +328,6 @@ class SkyGrid(object):
                         fig.colorbar(polys, ax=axes)
                     except:
                         raise ValueError('Invalid entries in color array')
-
             else:
                 polys.set_facecolor(color)
 
