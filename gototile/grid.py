@@ -268,6 +268,7 @@ class SkyGrid(object):
         # Colour the tiles
         if plot_skymap is True:
             # Colour the tiles by contained probability
+            polys.set_cmap('cylon')
             polys.set_array(np.array(self.probs))
             fig.colorbar(polys, ax=axes)
 
