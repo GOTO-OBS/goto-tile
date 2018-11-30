@@ -251,7 +251,7 @@ class SkyGrid(object):
             # Create a collection to plot at once
             polys = PatchCollection([Polygon(radec) for radec in radecs],
                                     edgecolor='black', alpha=0.3,
-                                    cmap='cylon',
+                                    cmap='jet',
                                     transform=geodetic)
 
             # Store the polygons so we don't have to recreate them
@@ -309,7 +309,15 @@ class SkyGrid(object):
                 if not len(color) == self.ntiles:
                     raise ValueError('List of colors must be same length as grid.ntiles')
 
-                polys.set_array(np.array(color))
+                # Could be a list of weights or a list of colours
+                try:
+                    polys.set_facecolor(np.array(color))
+                except:
+                    try:
+                        polys.set_array(np.array(color))
+                        fig.colorbar(polys, ax=axes)
+                    except:
+                        raise ValueError('Invalid entries in color array')
 
             else:
                 polys.set_facecolor(color)
