@@ -263,6 +263,9 @@ class SkyGrid(object):
         if plot_skymap and plot_stats:
             raise ValueError('Can only either plot skymap or stats, not both')
 
+        # Set transparency
+        polys.set_alpha(alpha)
+
         # Colour the tiles
         if plot_skymap is True:
             # Colour the tiles by contained probability
@@ -321,9 +324,6 @@ class SkyGrid(object):
 
             else:
                 polys.set_facecolor(color)
-
-        # Set transparency
-        polys.set_alpha(alpha)
 
         # Plot the tiles
         axes.add_collection(polys)
