@@ -10,7 +10,8 @@ import tempfile
 import logging
 import multiprocessing
 import numpy as np
-import healpy as hp
+import healpy
+import collections
 
 from astropy.coordinates import SkyCoord
 from astropy import units as u
@@ -26,7 +27,7 @@ class PolygonQuery(object):
         self.nside = nside
         self.nested = nested
     def __call__(self, vertices):
-        return hp.query_polygon(self.nside, vertices, nest=self.nested)
+        return healpy.query_polygon(self.nside, vertices, nest=self.nested)
 
 
 class SkyGrid(object):
@@ -171,6 +172,36 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
+    def get_stats(self, nside=128):
+        """Return a table containing grid statistics.
+
+        """
+
+        # Get the pixels within each tile
+        tile_pixels = self.get_pixels(nside, True)
+
+        # Statistics
+        npix = healpy.nside2npix(nside)
+        count = np.array([0] * npix)
+        for tile_pix in tile_pixels:
+            for pix in tile_pix:
+                count[pix] += 1
+        counter = collections.Counter(count)
+
+        # Make table
+        col_names = ['in_tiles', 'pix', 'freq']
+        col_types = ['i', 'i', 'f8']
+
+        in_tiles = [i for i in counter]
+        pix = [counter[i] for i in counter]
+        freq = [counter[i]/npix for i in counter]
+
+        table = QTable([in_tiles, pix, freq],
+                       names=col_names, dtype=col_types)
+        table['freq'].format = '.4f'
+        return table
+
+
     def plot(self, gridlines=False,
              centre=(0,45), orthoplot=False,
              filename=None, dpi=300):
@@ -226,31 +257,21 @@ class SkyGrid(object):
 
         else:
             # Colour in areas based on the number of tiles they are within
-            import healpy
-            import collections
-
             nside = 128
-            tile_pixels = self.get_pixels(nside, True)
 
             # HealPix for the grid
             npix = healpy.nside2npix(nside)
             ipix = np.arange(npix)
             thetas, phis = healpy.pix2ang(nside, ipix, nest=True)
-            pix_ras = np.rad2deg(phis)%360
-            pix_decs = np.rad2deg(np.pi/2 - thetas%np.pi)
+            pix_ras = np.rad2deg(phis) % 360
+            pix_decs = np.rad2deg(np.pi / 2 - thetas % np.pi)
 
             # Statistics
-            pix_freq = np.array([0]*npix)
-            for tile_pix in pixels:
+            tile_pixels = self.get_pixels(nside, True)
+            pix_freq = np.array([0] * npix)
+            for tile_pix in tile_pixels:
                 for pix in tile_pix:
                     pix_freq[pix] += 1
-            counter = collections.Counter(pix_freq)
-            print('Number of tiles: {}'.format(self.ntiles))
-            print('Tile statistics:')
-            for i in range(max(counter)+1):
-                print('{:>3.0f}: {:>6.0f} {:>5.1f}%'.format(i, counter[i],
-                                                            counter[i]/npix*100))
-            print('TOT: {:>6.0f} {:>4.1f}%'.format(npix, sum(counter.values())/npix*100))
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
