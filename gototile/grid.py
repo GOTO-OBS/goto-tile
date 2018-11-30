@@ -204,7 +204,7 @@ class SkyGrid(object):
 
 
     def plot(self, color='None', plot_stats=False, plot_skymap=False,
-             gridlines=False,
+             alpha=0.3, gridlines=False,
              centre=(0,45), orthoplot=False,
              filename=None, dpi=300):
         """Plot the grid."""
@@ -313,6 +313,9 @@ class SkyGrid(object):
 
             else:
                 polys.set_facecolor(color)
+
+        # Set transparency
+        polys.set_alpha(alpha)
 
         # Plot the tiles
         axes.add_collection(polys)
