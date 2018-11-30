@@ -304,7 +304,15 @@ class SkyGrid(object):
 
         else:
             # Colour in tiles with the colour given
-            polys.set_facecolor(color)
+            if isinstance(color, (list, tuple, np.ndarray)):
+                # A list-like of colours, should be same length as number of tiles
+                if not len(color) == self.ntiles:
+                    raise ValueError('List of colors must be same length as grid.ntiles')
+
+                polys.set_array(np.array(color))
+
+            else:
+                polys.set_facecolor(color)
 
         # Plot the tiles
         axes.add_collection(polys)
