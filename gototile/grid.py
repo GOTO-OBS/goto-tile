@@ -203,11 +203,45 @@ class SkyGrid(object):
         return table
 
 
-    def plot(self, color='None', plot_stats=False, plot_skymap=False,
-             alpha=0.3, gridlines=False,
-             centre=(0,45), orthoplot=False,
+    def plot(self, color='None', alpha=0.3,
+             plot_stats=False, plot_skymap=False,
+             gridlines=False,
+             orthoplot=False, centre=(0,45),
              filename=None, dpi=300):
-        """Plot the grid."""
+        """Plot the grid.
+
+        Parameters
+        ----------
+        color : str or list or dict, optional
+
+        alpha : float
+            alpha channel value for the tile facecolours
+
+        plot_stats : bool, default = False
+            use HEALPix to color the plot with the times each pixel is within a tile
+
+        plot_skymap : bool, default = False
+            color tiles based on their contained probability
+            will fail unless a skymap has been applied to the grid using grid.apply_skymap()
+
+        gridlines : bool, default = False
+            show gridlines on the sphere
+
+        orthoplot : bool, default = False
+            plot the sphere in a orthographic projection, centred on centre
+
+        centre : tuple, default = (0,45)
+            coordinates to centre the orthographic plot on
+            only used if orthoplot=True
+
+        filename : str
+            filename to save the plot with
+            if not given, plot will be displayed using matplotlib.pyplot.show()
+
+        dpi : int, defualt=300
+            dpi to save the plot with
+
+        """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
         from matplotlib.figure import Figure
