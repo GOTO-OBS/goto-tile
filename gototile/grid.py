@@ -202,7 +202,8 @@ class SkyGrid(object):
         return table
 
 
-    def plot(self, gridlines=False,
+    def plot(self, color='None',
+             gridlines=False,
              centre=(0,45), orthoplot=False,
              filename=None, dpi=300):
         """Plot the grid."""
@@ -246,17 +247,19 @@ class SkyGrid(object):
 
         # Create a collection to plot at once
         polys = PatchCollection([Polygon(radec) for radec in radecs],
-                                 edgecolor='black', facecolor='black', alpha=0.3,
+                                 edgecolor='black', alpha=0.3,
                                  cmap='cylon',
                                  transform=geodetic)
 
-        if hasattr(self, 'probs'):
+        # Colour the tiles
+        if color == 'probs':
             # Colour the tiles by contained probability
             polys.set_array(np.array(self.probs))
             fig.colorbar(polys, ax=axes)
 
-        else:
+        elif color == 'stats':
             # Colour in areas based on the number of tiles they are within
+            polys.set_facecolor('none')
             nside = 128
 
             # HealPix for the grid
@@ -286,7 +289,10 @@ class SkyGrid(object):
             points = axes.scatter(pix_ras, pix_decs, s=1, transform=geodetic,
                                   c=pix_freq, cmap='gist_rainbow', norm=norm)
             fig.colorbar(points)
-            polys.set_facecolor('none')
+
+        else:
+            # Colour in tiles with the colour given
+            polys.set_facecolor(color)
 
         # Plot the tiles
         axes.add_collection(polys)
