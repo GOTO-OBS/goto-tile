@@ -126,8 +126,7 @@ class SkyGrid(object):
         pixels = pool.map(polygon_query, self.vertices)
         pool.close()
         pool.join()
-        self.pixels = np.array(pixels)
-        return self.pixels
+        return np.array(pixels)
 
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid.
@@ -141,7 +140,7 @@ class SkyGrid(object):
             The sky map to map onto this grid.
         """
         # Calculate which pixels are within the tiles
-        self.get_pixels(skymap.nside, skymap.isnested)
+        self.pixels = self.get_pixels(skymap.nside, skymap.isnested)
 
         # Calculate the contained probabilities within each tile
         probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
@@ -231,7 +230,7 @@ class SkyGrid(object):
             import collections
 
             nside = 128
-            self.get_pixels(nside, True)
+            tile_pixels = self.get_pixels(nside, True)
 
             # HealPix for the grid
             npix = healpy.nside2npix(nside)
@@ -242,7 +241,7 @@ class SkyGrid(object):
 
             # Statistics
             pix_freq = np.array([0]*npix)
-            for tile_pix in self.pixels:
+            for tile_pix in pixels:
                 for pix in tile_pix:
                     pix_freq[pix] += 1
             counter = collections.Counter(pix_freq)

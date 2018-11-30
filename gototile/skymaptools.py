@@ -478,14 +478,14 @@ def tile_skymap(skymap, grid, observed=None):
     utils.test_iers()
 
     # Get the pixels within each grid tile
-    pixlist = grid.get_pixels(skymap.nside, skymap.isnested)
+    tile_pixels = grid.get_pixels(skymap.nside, skymap.isnested)
 
     # Get all the pixels within observed tiles
     bad_pix = set()
     for tile in observed:
         if isinstance(tile, str):
             tile = grid.tilenames.index(tile)
-        for pix in pixlist[tile]:
+        for pix in tile_pixels[tile]:
             bad_pix.add(pix)
     bad_pix = np.array(list(bad_pix))
 
