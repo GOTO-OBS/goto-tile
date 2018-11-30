@@ -203,7 +203,7 @@ class SkyGrid(object):
         return table
 
 
-    def plot(self, color='None',
+    def plot(self, color='None', plot_stats=False, plot_skymap=False,
              gridlines=False,
              centre=(0,45), orthoplot=False,
              filename=None, dpi=300):
@@ -259,13 +259,17 @@ class SkyGrid(object):
         else:
             polys = copy(self._poly_cache)
 
+        # Plot options
+        if plot_skymap and plot_stats:
+            raise ValueError('Can only either plot skymap or stats, not both')
+
         # Colour the tiles
-        if color == 'probs':
+        if plot_skymap is True:
             # Colour the tiles by contained probability
             polys.set_array(np.array(self.probs))
             fig.colorbar(polys, ax=axes)
 
-        elif color == 'stats':
+        elif plot_stats is True:
             # Colour in areas based on the number of tiles they are within
             polys.set_facecolor('none')
             nside = 128
