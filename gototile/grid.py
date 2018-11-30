@@ -12,6 +12,7 @@ import multiprocessing
 import numpy as np
 import healpy
 import collections
+from copy import copy
 
 from astropy.coordinates import SkyCoord
 from astropy import units as u
@@ -236,20 +237,27 @@ class SkyGrid(object):
 
         read_colormaps()
 
-        # Plot tile areas
-        radecs = []
-        for i, tile in enumerate(self.vertices):
-            tile = xyz2radec(*tile.T)
-            ra, dec = getshape(tile, steps=5)
-            # Need to reverse and transpose to get into format for Polygon
-            radec = np.array((ra[::-1], dec[::-1])).T
-            radecs.append(radec)
+        # Create the polygons, or load them if already made
+        if not hasattr(self, '_poly_cache'):
+            # Find tile areas
+            radecs = []
+            for i, tile in enumerate(self.vertices):
+                tile = xyz2radec(*tile.T)
+                ra, dec = getshape(tile, steps=5)
+                # Need to reverse and transpose to get into format for Polygon
+                radec = np.array((ra[::-1], dec[::-1])).T
+                radecs.append(radec)
 
-        # Create a collection to plot at once
-        polys = PatchCollection([Polygon(radec) for radec in radecs],
-                                 edgecolor='black', alpha=0.3,
-                                 cmap='cylon',
-                                 transform=geodetic)
+            # Create a collection to plot at once
+            polys = PatchCollection([Polygon(radec) for radec in radecs],
+                                    edgecolor='black', alpha=0.3,
+                                    cmap='cylon',
+                                    transform=geodetic)
+
+            # Store the polygons so we don't have to recreate them
+            self._poly_cache = copy(polys)
+        else:
+            polys = copy(self._poly_cache)
 
         # Colour the tiles
         if color == 'probs':
