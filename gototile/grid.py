@@ -207,7 +207,7 @@ class SkyGrid(object):
              plot_stats=False, plot_skymap=False,
              gridlines=False, tilenames=False,
              orthoplot=False, centre=None,
-             filename=None, dpi=300):
+             filename=None, title="", axes=None, dpi=300):
         """Plot the grid.
 
         Parameters
@@ -245,6 +245,14 @@ class SkyGrid(object):
             filename to save the plot with
             if not given, plot will be displayed using matplotlib.pyplot.show()
 
+        title : str, optional
+            title for the plot
+            default is created based on grid name
+
+        axes : `matplotlib.pyplot.Axes`, optional
+            axes to create the plot on
+            default is None, new axes will be created
+
         dpi : int, defualt=300
             dpi to save the plot with
 
@@ -261,26 +269,36 @@ class SkyGrid(object):
         from .skymap import read_colormaps
         from .skymaptools import getshape
 
-        if filename:
-            fig = Figure()
-        else:
-            fig = plt.figure()
-        if orthoplot:
-            if centre is None:
-                centre = (0, 45)
-            projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
-        else:
-            if centre is None:
-                centre = 0
-            projection = ccrs.Mollweide(central_longitude=centre)
-        geodetic = ccrs.Geodetic()
-        axes = fig.add_subplot(1, 1, 1, projection=projection)
+        if axes is None:
+            if filename:
+                fig = Figure()
+            else:
+                fig = plt.figure()
+            if orthoplot:
+                if centre is None:
+                    centre = (0, 45)
+                projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
+            else:
+                if centre is None:
+                    centre = 0
+                projection = ccrs.Mollweide(central_longitude=centre)
+            geodetic = ccrs.Geodetic()
+            axes = fig.add_subplot(1, 1, 1, projection=projection)
+            axes.set_global()
 
-        axes.set_global()
         if gridlines:
             axes.gridlines()
 
         read_colormaps()
+
+        if not title:
+            title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
+                                                                     self.fov['dec'],
+                                                                     self.overlap['ra'],
+                                                                     self.overlap['dec'])
+            if plot_skymap:
+                title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
+        axes.set_title(title, y=1.05)
 
         # Create the polygons, or load them if already made
         if not hasattr(self, '_poly_cache'):
