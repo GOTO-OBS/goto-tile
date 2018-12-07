@@ -10,7 +10,9 @@ import tempfile
 import logging
 import multiprocessing
 import numpy as np
-import healpy as hp
+import healpy
+import collections
+from copy import copy
 
 from astropy.coordinates import SkyCoord
 from astropy import units as u
@@ -26,7 +28,7 @@ class PolygonQuery(object):
         self.nside = nside
         self.nested = nested
     def __call__(self, vertices):
-        return hp.query_polygon(self.nside, vertices, nest=self.nested)
+        return healpy.query_polygon(self.nside, vertices, nest=self.nested)
 
 
 class SkyGrid(object):
@@ -126,8 +128,7 @@ class SkyGrid(object):
         pixels = pool.map(polygon_query, self.vertices)
         pool.close()
         pool.join()
-        self.pixels = np.array(pixels)
-        return self.pixels
+        return np.array(pixels)
 
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid.
@@ -141,7 +142,7 @@ class SkyGrid(object):
             The sky map to map onto this grid.
         """
         # Calculate which pixels are within the tiles
-        self.get_pixels(skymap.nside, skymap.isnested)
+        self.pixels = self.get_pixels(skymap.nside, skymap.isnested)
 
         # Calculate the contained probabilities within each tile
         probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
@@ -172,10 +173,90 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, gridlines=False,
-             centre=(0,45), orthoplot=False,
-             filename=None, dpi=300):
-        """Plot the grid."""
+    def get_stats(self, nside=128):
+        """Return a table containing grid statistics.
+
+        """
+
+        # Get the pixels within each tile
+        tile_pixels = self.get_pixels(nside, True)
+
+        # Statistics
+        npix = healpy.nside2npix(nside)
+        count = np.array([0] * npix)
+        for tile_pix in tile_pixels:
+            for pix in tile_pix:
+                count[pix] += 1
+        counter = collections.Counter(count)
+
+        # Make table
+        col_names = ['in_tiles', 'pix', 'freq']
+        col_types = ['i', 'i', 'f8']
+
+        in_tiles = [i for i in counter]
+        pix = [counter[i] for i in counter]
+        freq = [counter[i]/npix for i in counter]
+
+        table = QTable([in_tiles, pix, freq],
+                       names=col_names, dtype=col_types)
+        table['freq'].format = '.4f'
+        return table
+
+
+    def plot(self, color='None', alpha=0.3,
+             plot_stats=False, plot_skymap=False,
+             gridlines=False, tilenames=False,
+             orthoplot=False, centre=None,
+             filename=None, title="", axes=None, dpi=300):
+        """Plot the grid.
+
+        Parameters
+        ----------
+        color : str or list or dict, optional
+
+        alpha : float
+            alpha channel value for the tile facecolours
+
+        plot_stats : bool, default = False
+            use HEALPix to color the plot with the times each pixel is within a tile
+
+        plot_skymap : bool, default = False
+            color tiles based on their contained probability
+            will fail unless a skymap has been applied to the grid using grid.apply_skymap()
+
+        gridlines : bool, default = False
+            show gridlines on the sphere
+
+        tilenames : bool, default = False
+            plot the name of each tile in its centre
+            WARNING: plots can take a long time to render
+
+        orthoplot : bool, default = False
+            plot the sphere in a orthographic projection, centred on centre
+
+        centre : float or tuple, default = 0 or (0,45)
+            coordinates to centre the orthographic plot on (longitude, latitude)
+            if orthoplot=False then the plot will be in the Mollweide projection,
+                centred on this float (long=0 by default)
+            if orthoplot=True then the sphere will be centred on these coordiantes
+             (long=0, lat=45 by default)
+
+        filename : str
+            filename to save the plot with
+            if not given, plot will be displayed using matplotlib.pyplot.show()
+
+        title : str, optional
+            title for the plot
+            default is created based on grid name
+
+        axes : `matplotlib.pyplot.Axes`, optional
+            axes to create the plot on
+            default is None, new axes will be created
+
+        dpi : int, defualt=300
+            dpi to save the plot with
+
+        """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
         from matplotlib.figure import Figure
@@ -188,70 +269,90 @@ class SkyGrid(object):
         from .skymap import read_colormaps
         from .skymaptools import getshape
 
-        if filename:
-            fig = Figure()
-        else:
-            fig = plt.figure()
-        if orthoplot:
-            projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
-        else:
-            projection = ccrs.Mollweide(central_longitude=0)
-        geodetic = ccrs.Geodetic()
-        axes = fig.add_subplot(1, 1, 1, projection=projection)
+        if axes is None:
+            if filename:
+                fig = Figure()
+            else:
+                fig = plt.figure()
+            if orthoplot:
+                if centre is None:
+                    centre = (0, 45)
+                projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
+            else:
+                if centre is None:
+                    centre = 0
+                projection = ccrs.Mollweide(central_longitude=centre)
+            geodetic = ccrs.Geodetic()
+            axes = fig.add_subplot(1, 1, 1, projection=projection)
+            axes.set_global()
 
-        axes.set_global()
         if gridlines:
             axes.gridlines()
 
         read_colormaps()
 
-        # Plot tile areas
-        radecs = []
-        for i, tile in enumerate(self.vertices):
-            tile = xyz2radec(*tile.T)
-            ra, dec = getshape(tile, steps=5)
-            # Need to reverse and transpose to get into format for Polygon
-            radec = np.array((ra[::-1], dec[::-1])).T
-            radecs.append(radec)
+        if not title:
+            title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
+                                                                     self.fov['dec'],
+                                                                     self.overlap['ra'],
+                                                                     self.overlap['dec'])
+            if plot_skymap:
+                title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
+        axes.set_title(title, y=1.05)
 
-        # Create a collection to plot at once
-        polys = PatchCollection([Polygon(radec) for radec in radecs],
-                                 edgecolor='black', facecolor='black', alpha=0.3,
-                                 cmap='cylon',
-                                 transform=geodetic)
+        # Create the polygons, or load them if already made
+        if not hasattr(self, '_poly_cache'):
+            # Find tile areas
+            radecs = []
+            for i, tile in enumerate(self.vertices):
+                tile = xyz2radec(*tile.T)
+                ra, dec = getshape(tile, steps=5)
+                # Need to reverse and transpose to get into format for Polygon
+                radec = np.array((ra[::-1], dec[::-1])).T
+                radecs.append(radec)
 
-        if hasattr(self, 'probs'):
+            # Create a collection to plot at once
+            polys = PatchCollection([Polygon(radec) for radec in radecs],
+                                    cmap='jet',
+                                    transform=geodetic)
+
+            # Store the polygons so we don't have to recreate them
+            self._poly_cache = copy(polys)
+        else:
+            polys = copy(self._poly_cache)
+
+        # Plot options
+        if plot_skymap and plot_stats:
+            raise ValueError('Can only either plot skymap or stats, not both')
+
+        # Set transparency
+        polys.set_alpha(alpha)
+
+        # Colour the tiles
+        if plot_skymap is True:
             # Colour the tiles by contained probability
+            polys.set_cmap('cylon')
             polys.set_array(np.array(self.probs))
             fig.colorbar(polys, ax=axes)
 
-        else:
+        elif plot_stats is True:
             # Colour in areas based on the number of tiles they are within
-            import healpy
-            import collections
-
+            polys.set_facecolor('none')
             nside = 128
-            self.get_pixels(nside, True)
 
             # HealPix for the grid
             npix = healpy.nside2npix(nside)
             ipix = np.arange(npix)
             thetas, phis = healpy.pix2ang(nside, ipix, nest=True)
-            pix_ras = np.rad2deg(phis)%360
-            pix_decs = np.rad2deg(np.pi/2 - thetas%np.pi)
+            pix_ras = np.rad2deg(phis) % 360
+            pix_decs = np.rad2deg(np.pi / 2 - thetas % np.pi)
 
             # Statistics
-            pix_freq = np.array([0]*npix)
-            for tile_pix in self.pixels:
+            tile_pixels = self.get_pixels(nside, True)
+            pix_freq = np.array([0] * npix)
+            for tile_pix in tile_pixels:
                 for pix in tile_pix:
                     pix_freq[pix] += 1
-            counter = collections.Counter(pix_freq)
-            print('Number of tiles: {}'.format(self.ntiles))
-            print('Tile statistics:')
-            for i in range(max(counter)+1):
-                print('{:>3.0f}: {:>6.0f} {:>5.1f}%'.format(i, counter[i],
-                                                            counter[i]/npix*100))
-            print('TOT: {:>6.0f} {:>4.1f}%'.format(npix, sum(counter.values())/npix*100))
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
@@ -266,10 +367,51 @@ class SkyGrid(object):
             points = axes.scatter(pix_ras, pix_decs, s=1, transform=geodetic,
                                   c=pix_freq, cmap='gist_rainbow', norm=norm)
             fig.colorbar(points)
-            polys.set_facecolor('none')
+
+        else:
+            # Colour in tiles with the colour given
+            if isinstance(color, dict):
+                # Should be a dict with keys as tile names
+                color_array = ['none'] * self.ntiles
+                for k in color.keys():
+                    i = self.tilenames.index(k)
+                    color_array[i] = color[k]
+                color = np.array(color_array)
+
+            if isinstance(color, (list, tuple, np.ndarray)):
+                # A list-like of colours, should be same length as number of tiles
+                if not len(color) == self.ntiles:
+                    raise ValueError('List of colors must be same length as grid.ntiles')
+
+                # Could be a list of weights or a list of colours
+                try:
+                    polys.set_facecolor(np.array(color))
+                except:
+                    try:
+                        polys.set_array(np.array(color))
+                        fig.colorbar(polys, ax=axes)
+                    except:
+                        raise ValueError('Invalid entries in color array')
+            else:
+                polys.set_facecolor(color)
 
         # Plot the tiles
         axes.add_collection(polys)
+
+        # Also plot on the lines over the top
+        polys2 = copy(self._poly_cache)
+        polys2.set_facecolor('none')
+        polys2.set_edgecolor('black')
+        polys2.set_alpha(0.3)
+        axes.add_collection(polys2)
+
+        # Plot text (if asked to)
+        if tilenames:
+            for name, coord in zip(self.tilenames, self.coords):
+                plt.text(coord.ra.deg, coord.dec.deg, name,
+                         color='k', weight='bold', fontsize=6,
+                         ha='center', va='center', clip_on=True,
+                         transform=geodetic)
 
         # Save or display the plot
         if filename:

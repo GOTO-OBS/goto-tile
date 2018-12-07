@@ -12,10 +12,10 @@ def test_gridding():
     nside = 512
     for overlap in [0.0, 0.5, 0.8]:
         grid = SkyGrid(fov, overlap=overlap)
-        grid.get_pixels(nside)
+        tile_pixels = grid.get_pixels(nside)
 
-        assert len(grid.pixels) == grid.ntiles
-        tile_pixcount = np.array([len(pixlist) for pixlist in grid.pixels])
+        assert len(tile_pixels) == grid.ntiles
+        tile_pixcount = np.array([len(pixlist) for pixlist in tile_pixels])
         tile_areas = tile_pixcount/(12*nside**2)*41253
         if nside >= 512:
             assert np.min(tile_areas) > 7
