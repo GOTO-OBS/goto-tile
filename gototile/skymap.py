@@ -47,7 +47,7 @@ class SkyMap(object):
             `fits_file` can be a string (the .FITS file to be loaded) or an
             already-loaded `astropy.io.fits.HDU` or `HDUList`.
 
-        - SkyMap.from_position(ra, dec, error)
+        - SkyMap.from_position(ra, dec, radius)
             Will create the SkyMap from the given coordinates.
             The arguments should be in decimal degrees.
             The sky map will be calculated as a 2D Gaussian distribution
@@ -100,12 +100,7 @@ class SkyMap(object):
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
         # Store the coordinates of the pixels
-        self.npix = len(self.skymap)
-        self.pixnums = np.arange(self.npix)
-        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
-        ras = phi
-        decs = 0.5*np.pi - theta
-        self.coords = SkyCoord(ras, decs, unit=u.rad)
+        self._get_coords()
 
     def __eq__(self, other):
         try:
@@ -121,6 +116,15 @@ class SkyMap(object):
     def __repr__(self):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
         return template.format(self.objid, self.date_det.iso, self.nside)
+
+    def _get_coords(self):
+        """Store the coordinates of the pixels."""
+        self.npix = len(self.skymap)
+        self.pixnums = np.arange(self.npix)
+        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
+        ras = phi
+        decs = 0.5*np.pi - theta
+        self.coords = SkyCoord(ras, decs, unit=u.rad)
 
     @classmethod
     def from_fits(cls, fits_file):
@@ -156,8 +160,8 @@ class SkyMap(object):
         return cls(skymap, header)
 
     @classmethod
-    def from_position(cls, ra, dec, error, nside=64):
-        """Initialize a `~gototile.skymap.SkyMap` object from a sky position and error.
+    def from_position(cls, ra, dec, radius, nside=64):
+        """Initialize a `~gototile.skymap.SkyMap` object from a sky position and radius.
 
         Parameters
         ----------
@@ -165,8 +169,8 @@ class SkyMap(object):
             ra in decimal degrees
         dec : float
             declination in decimal degrees
-        error : float
-            uncertainty in the position in decimal degrees
+        radius : float
+            68% containment radius in decimal degrees
         nside : int, optional
             healpix nside parameter (must be a power of 2)
             default is 64
@@ -176,7 +180,7 @@ class SkyMap(object):
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        hdulist = gaussian_skymap(ra, dec, error, nside)
+        hdulist = gaussian_skymap(ra, dec, radius, nside)
         return cls.from_fits(hdulist)
 
     def copy(self):
@@ -199,8 +203,9 @@ class SkyMap(object):
         self.nside = nside
         self.header['nside'] = nside
         self.order = order
-        self.header['order'] = order
+        self.header['ordering'] = order
         self.isnested = order == 'NESTED'
+        self._get_coords()
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
