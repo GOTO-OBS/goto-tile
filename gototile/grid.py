@@ -205,7 +205,7 @@ class SkyGrid(object):
 
     def plot(self, color='None', alpha=0.3,
              plot_stats=False, plot_skymap=False,
-             gridlines=False,
+             gridlines=False, tilenames=False,
              orthoplot=False, centre=None,
              filename=None, dpi=300):
         """Plot the grid.
@@ -226,6 +226,10 @@ class SkyGrid(object):
 
         gridlines : bool, default = False
             show gridlines on the sphere
+
+        tilenames : bool, default = False
+            plot the name of each tile in its centre
+            WARNING: plots can take a long time to render
 
         orthoplot : bool, default = False
             plot the sphere in a orthographic projection, centred on centre
@@ -382,6 +386,14 @@ class SkyGrid(object):
         polys2.set_edgecolor('black')
         polys2.set_alpha(0.3)
         axes.add_collection(polys2)
+
+        # Plot text (if asked to)
+        if tilenames:
+            for name, coord in zip(self.tilenames, self.coords):
+                plt.text(coord.ra.deg, coord.dec.deg, name,
+                         color='k', weight='bold', fontsize=6,
+                         ha='center', va='center', clip_on=True,
+                         transform=geodetic)
 
         # Save or display the plot
         if filename:
