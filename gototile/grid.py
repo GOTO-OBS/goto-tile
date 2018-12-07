@@ -206,7 +206,7 @@ class SkyGrid(object):
     def plot(self, color='None', alpha=0.3,
              plot_stats=False, plot_skymap=False,
              gridlines=False,
-             orthoplot=False, centre=(0,45),
+             orthoplot=False, centre=None,
              filename=None, dpi=300):
         """Plot the grid.
 
@@ -230,9 +230,12 @@ class SkyGrid(object):
         orthoplot : bool, default = False
             plot the sphere in a orthographic projection, centred on centre
 
-        centre : tuple, default = (0,45)
-            coordinates to centre the orthographic plot on
-            only used if orthoplot=True
+        centre : float or tuple, default = 0 or (0,45)
+            coordinates to centre the orthographic plot on (longitude, latitude)
+            if orthoplot=False then the plot will be in the Mollweide projection,
+                centred on this float (long=0 by default)
+            if orthoplot=True then the sphere will be centred on these coordiantes
+             (long=0, lat=45 by default)
 
         filename : str
             filename to save the plot with
@@ -259,9 +262,13 @@ class SkyGrid(object):
         else:
             fig = plt.figure()
         if orthoplot:
+            if centre is None:
+                centre = (0, 45)
             projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
         else:
-            projection = ccrs.Mollweide(central_longitude=0)
+            if centre is None:
+                centre = 0
+            projection = ccrs.Mollweide(central_longitude=centre)
         geodetic = ccrs.Geodetic()
         axes = fig.add_subplot(1, 1, 1, projection=projection)
 
