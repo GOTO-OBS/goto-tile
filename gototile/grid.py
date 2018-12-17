@@ -51,10 +51,10 @@ class SkyGrid(object):
 
     kind : str, optional
         The tiling method to use. See `gototile.gridtools.create_grid` for options.
-        Default is 'cosine'.
+        Default is 'minverlap'.
     """
 
-    def __init__(self, fov, overlap=None, kind='cosine'):
+    def __init__(self, fov, overlap=None, kind='minverlap'):
         # Parse fov
         if isinstance(fov, (list,tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
