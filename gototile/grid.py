@@ -78,6 +78,10 @@ class SkyGrid(object):
             overlap[key] = min(max(overlap[key], 0), 0.9)
         self.overlap = overlap
 
+        # Save kind
+        self.kind = kind
+        self.algorithm = kind
+
         # Give the grid a unique name
         self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
                                                 self.fov['dec'].value,
