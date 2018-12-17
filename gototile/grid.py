@@ -113,9 +113,10 @@ class SkyGrid(object):
         return not self == other
 
     def __repr__(self):
-        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}))')
+        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
         return template.format(self.fov['ra'].value, self.fov['dec'].value,
-                               self.overlap['ra'], self.overlap['dec'])
+                               self.overlap['ra'], self.overlap['dec'],
+                               self.kind)
 
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
