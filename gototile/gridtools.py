@@ -22,7 +22,7 @@ from .math import lb2xyz, xyz2lb, intersect
 from .math import RAD, PI, PI_2
 
 
-def create_grid(fov, overlap, kind):
+def create_grid(fov, overlap, kind='minverlap'):
     """Create grid coordinates.
 
     Calculate strips along RA and stacked in declination to cover the full sky.
@@ -43,8 +43,14 @@ def create_grid(fov, overlap, kind):
 
     kind : str
         The tiling method to use. Options are:
+        - 'minverlap' (default):
+                The latest algorithm, uses the overlap as a minimum parameter to fit an integer
+                number of evenly-spaced tiles into each row.
+        - 'minverlap_enhanced':
+                An attempted enhnaced version of the `minverlap` algorithm which minimises gaps
+                at high altitudes. Currently not very efficient, so 'minverlap' is reccomended.
         - 'cosine':
-                Newer algorithm which adjusts RA spacing based on dec.
+                Intermediate algorithm which adjusts RA spacing based on dec.
         - 'cosine_symmetric':
                 An alternate version of 'cosine' which rotates each dec stripe
                 to be symmetric about the meridian.

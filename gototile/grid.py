@@ -51,10 +51,10 @@ class SkyGrid(object):
 
     kind : str, optional
         The tiling method to use. See `gototile.gridtools.create_grid` for options.
-        Default is 'cosine'.
+        Default is 'minverlap'.
     """
 
-    def __init__(self, fov, overlap=None, kind='cosine'):
+    def __init__(self, fov, overlap=None, kind='minverlap'):
         # Parse fov
         if isinstance(fov, (list,tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
@@ -77,6 +77,10 @@ class SkyGrid(object):
             # limit overlap to between 0 and 0.9
             overlap[key] = min(max(overlap[key], 0), 0.9)
         self.overlap = overlap
+
+        # Save kind
+        self.kind = kind
+        self.algorithm = kind
 
         # Give the grid a unique name
         self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
@@ -101,7 +105,9 @@ class SkyGrid(object):
 
     def __eq__(self, other):
         try:
-            return self.fov == other.fov and self.overlap == other.overlap
+            return (self.fov == other.fov and
+                    self.overlap == other.overlap and
+                    self.kind == other.kind)
         except AttributeError:
             return False
 
@@ -109,9 +115,10 @@ class SkyGrid(object):
         return not self == other
 
     def __repr__(self):
-        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}))')
+        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
         return template.format(self.fov['ra'].value, self.fov['dec'].value,
-                               self.overlap['ra'], self.overlap['dec'])
+                               self.overlap['ra'], self.overlap['dec'],
+                               self.kind)
 
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
