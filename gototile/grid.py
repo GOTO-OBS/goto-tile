@@ -105,7 +105,9 @@ class SkyGrid(object):
 
     def __eq__(self, other):
         try:
-            return self.fov == other.fov and self.overlap == other.overlap
+            return (self.fov == other.fov and
+                    self.overlap == other.overlap and
+                    self.kind == other.kind)
         except AttributeError:
             return False
 
