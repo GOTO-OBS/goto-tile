@@ -1,6 +1,6 @@
 recursive-include gototile *.py
-include gototile/GWGC.csv
-include gototile/cylon.csv
+include gototile/data/GWGC.csv
+include gototile/data/cylon.csv
 include scripts/gototile
 include gototile/webtile/static/gototile/js/skymap.js
 include gototile/webtile/static/gototile/css/skymap.css
