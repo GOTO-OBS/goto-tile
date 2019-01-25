@@ -1,3 +1,6 @@
+# Compiled python files
 *.pyc
-*.log
-*build*
+
+# Visual Studio Code files
+*.browse*
+*.vscode*
