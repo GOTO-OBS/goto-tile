@@ -2,10 +2,12 @@ import os
 import numpy as np
 from astropy import units
 from astropy.time import TimeDelta
+import pkg_resources
 
 NSIDE = 64
 TILESDIR = 'tiles'
-GWGC_PATH = os.path.join(os.path.dirname(__file__), 'GWGC.csv')
+DATA_DIR = pkg_resources.resource_filename('gototile', 'data')
+GWGC_PATH = os.path.join(DATA_DIR, 'GWGC.csv')
 TIMESTEP = TimeDelta(300 * units.second)
 SUNALTITUDE = -18 * units.degree
 COVERAGE = {'min': 0.05, 'max': 0.95}

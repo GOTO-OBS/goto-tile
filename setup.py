@@ -71,31 +71,30 @@ class sdist(_sdist):
         _sdist.run(self)
         reset_version_file(versionlines)
 
+PACKAGES = ['gototile',
+            'gototile.webtile',
+            ]
 
-setup(
-    name="gototile",
-    version=VERSION,
-    description=("Create a set of tiled observation pointings to "
-                 "cover an extended sky area, for one or more telescopes"),
-    author="Darren White, Evert Rol",
-    author_email="Darren.White@warwick.ac.uk, evert.rol@monash.edu",
-    url="http://goto-observatory.org",
-    scripts=["scripts/gototile"],
-    packages=["gototile", "gototile.webtile"],
-    package_dir={'gototile': "gototile"},
-    install_requires=["numpy", "astropy", "healpy", "pyephem", "PyYAML",
-                      "cartopy", "scipy"],
-    data_files=[
-        ('gototile', ["gototile/GWGC.csv",
-                      "gototile/cylon.csv"]),
-        ('gototile/webtile/templates/webtile',
-         ["gototile/webtile/templates/webtile/base.html",
-          "gototile/webtile/templates/webtile/skymap.html"]),
-        ('gototile/webtile/static/webtile/css',
-         ["gototile/webtile/static/webtile/css/skymap.css"]),
-        ('gototile/webtile/static/webtile/js',
-         ["gototile/webtile/static/webtile/js/skymap.js"]),
-    ],
-    cmdclass={'build_py': build_py,
-              'sdist': sdist},
-)
+REQUIRES = ['numpy',
+            'astropy',
+            'healpy',
+            'pyephem',
+            'PyYAML',
+            'cartopy',
+            'scipy',
+            ]
+
+setup(name='gototile',
+      version=VERSION,
+      description=('Create sky grids and tiles to cover extended sky maps'),
+      url='http://github.com/GOTO/goto-tile',
+      author='Martin Dyer, Darren White, Evert Rol',
+      author_email='martin.dyer@sheffield.ac.uk',
+      install_requires=REQUIRES,
+      packages=PACKAGES,
+      package_dir={'gototile': 'gototile'},
+      package_data={'': ['data/*']},
+      include_package_data=True,
+      scripts=['scripts/gototile'],
+      cmdclass={'build_py': build_py, 'sdist': sdist},
+      )

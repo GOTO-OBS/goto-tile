@@ -26,7 +26,7 @@ def read_colormaps(name='cylon'):
     """Read special color maps, such as 'cylon'"""
     from matplotlib import cm
     from matplotlib.colors import LinearSegmentedColormap
-    filename = os.path.join(os.path.dirname(__file__), name + '.csv')
+    filename = os.path.join(settings.DATA_DIR, name + '.csv')
     data = np.loadtxt(filename, delimiter=',')
     cmap = LinearSegmentedColormap.from_list(name, data)
     cm.register_cmap(cmap=cmap)
