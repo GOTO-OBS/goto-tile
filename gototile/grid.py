@@ -162,6 +162,18 @@ class SkyGrid(object):
 
         return probs
 
+    def get_probability(self, tilename):
+        """Return the contained probability within the given tile."""
+        if not hasattr(self, 'probs'):
+            raise ValueError('Grid does not have a SkyMap applied')
+
+        # Get the probability of an individual tile
+        index = self.tilenames.index(tilename)
+        pixels = self.pixels[index]
+        prob = self.skymap.skymap[pixels].sum()
+
+        return prob
+
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.
 
@@ -208,7 +220,6 @@ class SkyGrid(object):
                        names=col_names, dtype=col_types)
         table['freq'].format = '.4f'
         return table
-
 
     def plot(self, color='None', alpha=0.3,
              plot_stats=False, plot_skymap=False,
