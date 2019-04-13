@@ -162,15 +162,32 @@ class SkyGrid(object):
 
         return probs
 
-    def get_probability(self, tilename):
-        """Return the contained probability within the given tile."""
+    def get_probability(self, tilenames):
+        """Return the contained probability within the given tile(s).
+
+        If multiple tiles are given, the probability only be included once in any overlaps.
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the probability within.
+        """
         if not hasattr(self, 'probs'):
             raise ValueError('Grid does not have a SkyMap applied')
 
-        # Get the probability of an individual tile
-        index = self.tilenames.index(tilename)
-        pixels = self.pixels[index]
-        prob = self.skymap.skymap[pixels].sum()
+        if isinstance(tilenames, list):
+            # Get the probability of multiple tiles
+            indexes = [self.tilenames.index(tile) for tile in tilenames]
+            pixels = []
+            for i in indexes:
+                pixels += list(self.pixels[i])
+            pixels = list(set(pixels))  # remove duplicates
+            prob = self.skymap.skymap[pixels].sum()
+        else:
+            # Get the probability of an individual tile
+            index = self.tilenames.index(tilenames)
+            pixels = self.pixels[index]
+            prob = self.skymap.skymap[pixels].sum()
 
         return prob
 
