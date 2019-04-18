@@ -212,6 +212,30 @@ class SkyMap(object):
         total = self.skymap.sum()
         self.skymap /= total
 
+    def get_probability(self, coord, radius=0):
+        """Return the probability at a given sky coordinate.
+
+        Parameters
+        ----------
+        coord : `astropy.coordinates.SkyCoord`
+            The point to find the probability at.
+        radius : float, optional
+            If given, the radius in degrees of a circle to integrate the probability within.
+        """
+        # Find distance to points
+        sep = np.array(coord.separation(self.coords))
+
+        if radius == 0:
+            # Just get the radius of the nearest pixel (not very useful)
+            index = np.where(sep == (min(sep)))[0][0]
+            prob = self.skymap[index]
+        else:
+            # Find all the pixels within the radius and sum them (more useful)
+            indexes = np.where(sep < radius)[0]
+            prob = self.skymap[indexes].sum()
+
+        return prob
+
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'prob']
