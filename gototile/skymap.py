@@ -127,6 +127,14 @@ class SkyMap(object):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
         return template.format(self.objid, self.date_det.iso, self.nside)
 
+    def _pix2coord(self, pix):
+        """Convert HEALpy pixel indexes to SkyCoords."""
+        return smt.pix2coord(self.nside, pix, nest=self.isnested)
+
+    def _coord2pix(self, coord):
+        """Convert SkyCoords to HEALpy pixel indexes."""
+        return smt.coord2pix(self.nside, coord, nest=self.isnested)
+
     def _save_skymap(self, skymap, order):
         """Save the skymap data and add attributes."""
         self.skymap = skymap
@@ -136,35 +144,12 @@ class SkyMap(object):
         self.order = order
         self.isnested = order == 'NESTED'
 
-        # Calculate the coordinates of each skymap pixel
-        self._get_coords()
+        # Save the coordinates of each skymap pixel
+        all_pixels = range(self.npix)
+        self.coords = self._pix2coord(all_pixels)
 
         # Calculate the probability contours
         self._get_contours()
-
-    def _get_coords(self):
-        """Store the coordinates of all the pixels."""
-        # Get the angles of every pixel
-        all_pixels = range(self.npix)
-        theta, phi = healpy.pix2ang(self.nside, all_pixels, nest=self.isnested)
-
-        # Convert angles to sky coordinates
-        ras = phi
-        decs = 0.5 * np.pi - theta
-
-        # Store as a SkyCoord object on the SkyMap
-        self.coords = SkyCoord(ras, decs, unit=u.rad)
-
-    def _coord_pixel(self, coord):
-        """Find the HEALPix pixel(s) the given coordinate(s) are within."""
-        # Convert sky coordinates to angles
-        theta = 0.5 * np.pi - np.deg2rad(coord.dec.value)
-        phi = np.deg2rad(coord.ra.value)
-
-        # Find the pixel numbers
-        pixels = healpy.ang2pix(self.nside, theta, phi, nest=self.isnested)
-
-        return pixels
 
     def _get_contours(self):
         """Store the contour infomation of each pixel.
@@ -366,7 +351,7 @@ class SkyMap(object):
             The point to find the probability at.
         """
         # Get the pixel that the coordinates are within
-        pixel = self._coord_pixel(coord)
+        pixel = self._coord2pix(coord)
 
         return self.contours[pixel]
 
@@ -550,12 +535,7 @@ class SkyMap(object):
 
             dlon = 0  # longitude correction
 
-        npix = healpy.nside2npix(self.nside)
-        ipix = np.arange(npix)
-        thetas, phis = healpy.pix2ang(self.nside, ipix, nest=self.isnested)
-        ras = np.rad2deg(phis-dlon)%360
-        decs = np.rad2deg(np.pi/2 - thetas%np.pi)
-        axes.scatter(ras, decs, s=1, c=self.skymap,
+        axes.scatter(self.coords.ra.value, self.coords.dec.value, s=1, c=self.skymap,
                      cmap='cylon', alpha=0.5, linewidths=0, zorder=1,
                      transform=geodetic)
 
