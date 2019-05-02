@@ -284,6 +284,48 @@ class SkyMap(object):
 
         return prob
 
+    def get_contour(self, coord):
+        """Return the lowest probability contor the given sky coordinate is within.
+
+        Parameters
+        ----------
+        coord : `astropy.coordinates.SkyCoord`
+            The point to find the probability at.
+        """
+        # Get the indixes sorted by probability (reversed, so highest first)
+        sort = self.skymap.argsort()[::-1]
+
+        # Create cumulative array of elements within the skymap
+        cumsum = np.cumsum(self.skymap[sort])
+
+        # Get the index of the pixel that the coordinates are within
+        index = self._coord_pixel(coord)
+
+        # Find the index of the pixel in the sorted array
+        sorted_index = np.where(sort == index)[0][0]
+
+        # Get the cumulative probability for that pixel
+        contour = cumsum[sorted_index]
+
+        return contour
+
+    def within_contour(self, coord, percentage):
+        """Find if the given position is within the given confidence level.
+
+        Parameters
+        ----------
+        coord : `astropy.coordinates.SkyCoord`
+            The point to find the probability at.
+        percentage : float
+            The confidence level, percentage in the range 0-1.
+        """
+        if not 0 <= percentage <= 1:
+            raise ValueError('Percentage must be in range 0-1')
+
+        contour = self.get_contour(coord)
+
+        return contour < percentage
+
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'prob']
