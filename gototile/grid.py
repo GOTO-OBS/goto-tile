@@ -162,6 +162,22 @@ class SkyGrid(object):
 
         return probs
 
+    def _pixels_from_tilenames(self, tilenames):
+        """Get the unique pixels contained within the given tile(s)."""
+        if isinstance(tilenames, list):
+            # Multiple tiles
+            indexes = [self.tilenames.index(tile) for tile in tilenames]
+            pixels = []
+            for i in indexes:
+                pixels += list(self.pixels[i])
+            pixels = list(set(pixels))  # remove duplicates
+        else:
+            # An individual tile
+            index = self.tilenames.index(tilenames)
+            pixels = self.pixels[index]
+
+        return pixels
+
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
 
@@ -175,17 +191,8 @@ class SkyGrid(object):
         if not hasattr(self, 'probs'):
             raise ValueError('Grid does not have a SkyMap applied')
 
-        if isinstance(tilenames, list):
-            # Multiple tiles
-            indexes = [self.tilenames.index(tile) for tile in tilenames]
-            pixels = []
-            for i in indexes:
-                pixels += list(self.pixels[i])
-            pixels = list(set(pixels))  # remove duplicates
-        else:
-            # An individual tile
-            index = self.tilenames.index(tilenames)
-            pixels = self.pixels[index]
+        # Get pixels
+        pixels = self._pixels_from_tilenames(tilenames)
 
         # Sum the probability within those pixels
         prob = self.skymap.skymap[pixels].sum()
@@ -202,17 +209,8 @@ class SkyGrid(object):
         tilenames : str or list of str
             The name(s) of the tile(s) to find the area of.
         """
-        if isinstance(tilenames, list):
-            # Multiple tiles
-            indexes = [self.tilenames.index(tile) for tile in tilenames]
-            pixels = []
-            for i in indexes:
-                pixels += list(self.pixels[i])
-            pixels = list(set(pixels))  # remove duplicates
-        else:
-            # An individual tile
-            index = self.tilenames.index(tilenames)
-            pixels = self.pixels[index]
+        # Get pixels
+        pixels = self._pixels_from_tilenames(tilenames)
 
         # Get the area of a single pixel, in degrees
         pixel_area = healpy.nside2pixarea(self.nside, degrees=True)
