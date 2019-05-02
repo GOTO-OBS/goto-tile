@@ -387,7 +387,7 @@ class SkyMap(object):
 
     def plot(self, date=None, telescopes=None, pointings=None,
              objects=None, catalog=None, catcolor='#999999',
-             nightsky=False, geoplot=False,
+             nightsky=False, geoplot=False, contours=False,
              filename=None, title="", axes=None, dpi=300,
              options=None):
         """Plot the skymap in a Moll-Weide projection.
@@ -422,6 +422,10 @@ class SkyMap(object):
 
         geoplot : bool, optional
             plot in geographic coordinates (lat, lon) instead of (RA, Dec)
+            default is False
+
+        contours : bool, optional
+            plot 50% and 90% confidence regions
             default is False
 
         filename : str, optional
@@ -538,6 +542,12 @@ class SkyMap(object):
         axes.scatter(self.coords.ra.value, self.coords.dec.value, s=1, c=self.skymap,
                      cmap='cylon', alpha=0.5, linewidths=0, zorder=1,
                      transform=geodetic)
+
+        if contours:
+            axes.tricontour(self.coords.ra.value, self.coords.dec.value, self.contours,
+                            levels=[0.5,0.9],
+                            colors='black', linewidths=0.5, zorder=99,
+                            transform=geodetic)
 
         # Set up colorscheme for telescopes
         colors = itertools.cycle(
