@@ -212,11 +212,9 @@ class SkyGrid(object):
         # Get pixels
         pixels = self._pixels_from_tilenames(tilenames)
 
-        # Get the area of a single pixel, in degrees
-        pixel_area = healpy.nside2pixarea(self.nside, degrees=True)
-
-        # Each pixel has the same area (HEALPix definition), so just multiply by number of pixels
-        area = len(pixels) * pixel_area
+        # Each pixel in the skymap has the same area (HEALPix definition)
+        # So just multiply that by number of pixels
+        area = self.skymap.pixel_area * len(pixels)
 
         return area
 

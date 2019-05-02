@@ -122,6 +122,11 @@ class SkyMap(object):
         """Number of pixels in the skymap, useful for HEALPix calculations."""
         return len(self.skymap)
 
+    @property
+    def pixel_area(self):
+        """The area of each pixel in degrees."""
+        return healpy.nside2pixarea(self.nside, degrees=True)
+
     def _get_coords(self):
         """Store the coordinates of all the pixels."""
         # Get the angles of every pixel
