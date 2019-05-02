@@ -55,29 +55,42 @@ class SkyMap(object):
     """
 
     def __init__(self, skymap, header):
-        # Check if types
+        # Check types
         if not isinstance(skymap, np.ndarray):
             raise TypeError("skymap should be an array, use SkyMap.from_fits()")
         if not isinstance(header, dict):
             raise TypeError("header should be a dict")
 
-        # Store the skymap as the requested type
+        # Convert the skymap to the requested type from settings
         dtype = getattr(settings, 'DTYPE')
-        self.skymap = skymap.astype(dtype)
+        skymap = skymap.astype(dtype)
 
-        # Store the header, and make sure the header cards are lowercase
-        self.header = {key.lower(): header[key] for key in header}
+        # Make sure the header cards are lowercase
+        header = {key.lower(): header[key] for key in header}
 
-        # Parse the header dict and store the key attributes
-        self.order = self.header.get('ordering')
-        if self.order not in ('NESTED', 'RING'):
-            raise ValueError('ORDERING card in header has unknown value: {}'.format(self.order))
-        self.isnested = self.order == 'NESTED'
+        # Check the header NSIDE matches the skymap data
+        try:
+            header_nside = header['nside']
+        except KeyError:
+            raise ValueError('No NSIDE value in the header')
+        skymap_nside = healpy.npix2nside(len(skymap))
+        if not header_nside == skymap_nside:
+            raise ValueError("NSIDE from header ({:.0f}) doesn't match skymap ({:.0f})".format(
+                             header_nside, skymap_nside))
 
-        self.nside = self.header.get('nside')
-        if not self.nside == healpy.npix2nside(len(skymap)):
-            raise ValueError("Skymap length ({:.0f}) should be 12*nside**2 ({:.0f})".format(
-                             len(skymap), self.nside))
+        # Get the data ordering from the header
+        try:
+            order = header['ordering']
+        except KeyError:
+            raise ValueError('No ORDERING value in the header')
+        if order not in ('NESTED', 'RING'):
+            raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
+
+        # Parse and store the skymap
+        self._save_skymap(skymap, order)
+
+        # Store the header and key infomation as attributes
+        self.header = header
 
         self.filename = self.header.get('filename')
 
@@ -99,12 +112,6 @@ class SkyMap(object):
         self.mjd_det = self.header.get('mjd-obs', self.mjd)
         self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
 
-        # Store the coordinates of the pixels
-        self._get_coords()
-
-        # Calculate the probability contours
-        self._get_contours()
-
     def __eq__(self, other):
         try:
             if len(self.skymap) != len(other.skymap):
@@ -120,15 +127,20 @@ class SkyMap(object):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
         return template.format(self.objid, self.date_det.iso, self.nside)
 
-    @property
-    def npix(self):
-        """Number of pixels in the skymap, useful for HEALPix calculations."""
-        return len(self.skymap)
+    def _save_skymap(self, skymap, order):
+        """Save the skymap data and add attributes."""
+        self.skymap = skymap
+        self.npix = len(skymap)
+        self.nside = healpy.npix2nside(self.npix)
+        self.pixel_area = healpy.nside2pixarea(self.nside, degrees=True)
+        self.order = order
+        self.isnested = order == 'NESTED'
 
-    @property
-    def pixel_area(self):
-        """The area of each pixel in degrees."""
-        return healpy.nside2pixarea(self.nside, degrees=True)
+        # Calculate the coordinates of each skymap pixel
+        self._get_coords()
+
+        # Calculate the probability contours
+        self._get_contours()
 
     def _get_coords(self):
         """Store the coordinates of all the pixels."""
@@ -291,25 +303,30 @@ class SkyMap(object):
         newmap = SkyMap(self.skymap.copy(), self.header.copy())
         return newmap
 
-    def regrade(self, nside=None, order='NESTED', power=-2, pess=False,
-                dtype=None):
+    def regrade(self, nside=None, order='NESTED',
+                power=-2, pess=False, dtype=None):
         """Up- or downgrade the sky map  HEALPix resolution.
 
         See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
         """
+        if not nside:
+            nside = self.nside
+        if order not in ['NESTED', 'RING']:
+            raise ValueError('Pixel order must be NESTED or RING, not {}'.format(order))
         if nside == self.nside and order == self.order:
             return
 
-        self.skymap = healpy.ud_grade(self.skymap, nside_out=nside,
-                                      order_in=self.order, order_out=order,
-                                      power=power, pess=pess, dtype=dtype)
-        self.nside = nside
+        # Regrade the current skymap
+        new_skymap = healpy.ud_grade(self.skymap, nside_out=nside,
+                                     order_in=self.order, order_out=order,
+                                     power=power, pess=pess, dtype=dtype)
+
+        # Save the new skymap
+        self._save_skymap(new_skymap, order)
+
+        # Update the header
         self.header['nside'] = nside
-        self.order = order
         self.header['ordering'] = order
-        self.isnested = order == 'NESTED'
-        self._get_coords()
-        self._get_contours()
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
