@@ -130,8 +130,8 @@ class SkyMap(object):
     def _get_coords(self):
         """Store the coordinates of all the pixels."""
         # Get the angles of every pixel
-        all_indexes = range(self.npix)
-        theta, phi = healpy.pix2ang(self.nside, all_indexes, nest=self.isnested)
+        all_pixels = range(self.npix)
+        theta, phi = healpy.pix2ang(self.nside, all_pixels, nest=self.isnested)
 
         # Convert angles to sky coordinates
         ras = phi
@@ -146,10 +146,10 @@ class SkyMap(object):
         theta = 0.5 * np.pi - np.deg2rad(coord.dec.value)
         phi = np.deg2rad(coord.ra.value)
 
-        # Find the indexes of the pixels
-        indexes = healpy.ang2pix(self.nside, theta, phi, nest=self.isnested)
+        # Find the pixel numbers
+        pixels = healpy.ang2pix(self.nside, theta, phi, nest=self.isnested)
 
-        return indexes
+        return pixels
 
     def _pixels_within_contour(self, percentage):
         """Find pixel indices confined in a given percentage contour (range 0-1).
@@ -174,10 +174,10 @@ class SkyMap(object):
         cumsum_sub = abs(cumsum - percentage)
         cutoff = np.where(cumsum_sub == min(cumsum_sub))[0][-1]
 
-        # Get all the indexes above the cutoff
-        indexes = sort[0:cutoff+1]
+        # Get all the pixels above the cutoff
+        pixels = sort[0:cutoff+1]
 
-        return sorted(indexes)
+        return sorted(pixels)
 
     @classmethod
     def from_fits(cls, fits_file):
@@ -280,12 +280,12 @@ class SkyMap(object):
 
         if radius == 0:
             # Just get the radius of the nearest pixel (not very useful)
-            index = np.where(sep == (min(sep)))[0][0]
-            prob = self.skymap[index]
+            pixel = np.where(sep == (min(sep)))[0][0]
+            prob = self.skymap[pixel]
         else:
             # Find all the pixels within the radius and sum them (more useful)
-            indexes = np.where(sep < radius)[0]
-            prob = self.skymap[indexes].sum()
+            pixels = np.where(sep < radius)[0]
+            prob = self.skymap[pixels].sum()
 
         return prob
 
@@ -303,14 +303,14 @@ class SkyMap(object):
         # Create cumulative array of elements within the skymap
         cumsum = np.cumsum(self.skymap[sort])
 
-        # Get the index of the pixel that the coordinates are within
-        index = self._coord_pixel(coord)
+        # Get the pixel that the coordinates are within
+        pixel = self._coord_pixel(coord)
 
         # Find the index of the pixel in the sorted array
-        sorted_index = np.where(sort == index)[0][0]
+        index = np.where(sort == pixel)[0][0]
 
         # Get the cumulative probability for that pixel
-        contour = cumsum[sorted_index]
+        contour = cumsum[index]
 
         return contour
 
