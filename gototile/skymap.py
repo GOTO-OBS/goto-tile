@@ -117,14 +117,62 @@ class SkyMap(object):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
         return template.format(self.objid, self.date_det.iso, self.nside)
 
+    @property
+    def npix(self):
+        """Number of pixels in the skymap, useful for HEALPix calculations."""
+        return len(self.skymap)
+
     def _get_coords(self):
-        """Store the coordinates of the pixels."""
-        self.npix = len(self.skymap)
-        self.pixnums = np.arange(self.npix)
-        theta, phi = healpy.pix2ang(self.nside, self.pixnums, nest=self.isnested)
+        """Store the coordinates of all the pixels."""
+        # Get the angles of every pixel
+        all_indexes = range(self.npix)
+        theta, phi = healpy.pix2ang(self.nside, all_indexes, nest=self.isnested)
+
+        # Convert angles to sky coordinates
         ras = phi
-        decs = 0.5*np.pi - theta
+        decs = 0.5 * np.pi - theta
+
+        # Store as a SkyCoord object on the SkyMap
         self.coords = SkyCoord(ras, decs, unit=u.rad)
+
+    def _coord_pixel(self, coord):
+        """Find the HEALPix pixel(s) the given coordinate(s) are within."""
+        # Convert sky coordinates to angles
+        theta = 0.5 * np.pi - np.deg2rad(coord.dec.value)
+        phi = np.deg2rad(coord.ra.value)
+
+        # Find the indexes of the pixels
+        indexes = healpy.ang2pix(self.nside, theta, phi, nest=self.isnested)
+
+        return indexes
+
+    def _pixels_within_contour(self, percentage):
+        """Find pixel indices confined in a given percentage contour (range 0-1).
+        See http://www.virgo-gw.eu/skymap.html
+        """
+
+        if not 0 <= percentage <= 1:
+            raise ValueError('Percentage must be in range 0-1')
+
+        # Get the indixes sorted by probability (reversed, so highest first)
+        sort = self.skymap.argsort()[::-1]
+
+        # Create cumulative array of elements within the skymap
+        cumsum = np.cumsum(self.skymap[sort])
+
+        # Return early if the percentage is too low
+        # (we do this to stop some weirdness due to the cutoff+1 and what cutoff=0 means)
+        if percentage < cumsum[0]:
+            return []
+
+        # Find the index of the first point outside the contour
+        cumsum_sub = abs(cumsum - percentage)
+        cutoff = np.where(cumsum_sub == min(cumsum_sub))[0][-1]
+
+        # Get all the indexes above the cutoff
+        indexes = sort[0:cutoff+1]
+
+        return sorted(indexes)
 
     @classmethod
     def from_fits(cls, fits_file):
