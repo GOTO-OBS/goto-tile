@@ -102,6 +102,9 @@ class SkyMap(object):
         # Store the coordinates of the pixels
         self._get_coords()
 
+        # Calculate the probability contours
+        self._get_contours()
+
     def __eq__(self, other):
         try:
             if len(self.skymap) != len(other.skymap):
@@ -151,33 +154,80 @@ class SkyMap(object):
 
         return pixels
 
-    def _pixels_within_contour(self, percentage):
-        """Find pixel indices confined in a given percentage contour (range 0-1).
-        See http://www.virgo-gw.eu/skymap.html
+    def _get_contours(self):
+        """Store the contour infomation of each pixel.
+
+        The cumulative probability of the pixels sorted in order corresponds to the
+        minimum probability contour that that pixel is within.
+
+        For example, a very small skymap has the following table:
+
+        pix | prob
+          1 |  0.1
+          2 |  0.4
+          3 |  0.2
+          4 |  0.3
+
+        Sorted by probability, and finding the cumulative sum:
+
+        pix | prob | cumprob
+          2 |  0.4 |  0.4
+          4 |  0.3 |  0.7
+          3 |  0.2 |  0.9
+          1 |  0.1 |  1.0
+
+        So only pixel 2 is within the 50% probability contour (== confidence region),
+        while 2, 4 and 3 are within the 90% region.
+        Obviously all 4 pixels are within the 100% region.
+
+        This means if we sort back to the origional order the minimum confidence region each
+        pixel is in is easy to find by seeing if cumprob(pixel) < percentage:
+
+        pix | prob | cumprob | in 90%? | in 50%?
+          1 |  0.1 |  1.0    | False   | False
+          2 |  0.4 |  0.4    | True    | True
+          3 |  0.2 |  0.9    | True    | False
+          4 |  0.3 |  0.7    | True    | False
+
+        See also:
+            SkyMap._pixels_within_contour(percentage)
+            SkyMap.get_contour(coord)
+            SkyMap.within_contour(coord, percentage)
+
+        This is (vaguely) based on code from http://www.virgo-gw.eu/skymap.html
         """
+        # Get the indixes sorted by probability (reversed, so highest first)
+        # Note what we call the 'pixels' are really just the index numbers of the skymap,
+        # i.e. probability of pixel X = self.skymap[X]
+        sorted_pixels = self.skymap.argsort()[::-1]
+
+        # Sort the skymap using this mapping
+        sorted_skymap = self.skymap[sorted_pixels]
+
+        # Create cumulative sum array of each pixel in the skymap
+        cumprob = np.cumsum(sorted_skymap)
+
+        # "Un-sort" the cumulative array back to the normal pixel order
+        contours = cumprob[sorted_pixels.argsort()]
+
+        # And save the contours on the SkyMap
+        self.contours = contours
+
+    def _pixels_within_contour(self, percentage):
+        """Find pixel indices confined in a given percentage contour (range 0-1)."""
 
         if not 0 <= percentage <= 1:
             raise ValueError('Percentage must be in range 0-1')
 
-        # Get the indixes sorted by probability (reversed, so highest first)
-        sort = self.skymap.argsort()[::-1]
-
-        # Create cumulative array of elements within the skymap
-        cumsum = np.cumsum(self.skymap[sort])
-
         # Return early if the percentage is too low
-        # (we do this to stop some weirdness due to the cutoff+1 and what cutoff=0 means)
-        if percentage < cumsum[0]:
+        # NB for the record min(self.contours) == max(self.skymap)
+        if percentage < min(self.contours):
             return []
 
-        # Find the index of the first point outside the contour
-        cumsum_sub = abs(cumsum - percentage)
-        cutoff = np.where(cumsum_sub == min(cumsum_sub))[0][-1]
+        # Find the pixels within the given contour
+        mask = self.contours < percentage
 
-        # Get all the pixels above the cutoff
-        pixels = sort[0:cutoff+1]
-
-        return sorted(pixels)
+        return np.arange(self.npix)[mask]
 
     @classmethod
     def from_fits(cls, fits_file):
@@ -259,6 +309,7 @@ class SkyMap(object):
         self.header['ordering'] = order
         self.isnested = order == 'NESTED'
         self._get_coords()
+        self._get_contours()
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
@@ -297,22 +348,10 @@ class SkyMap(object):
         coord : `astropy.coordinates.SkyCoord`
             The point to find the probability at.
         """
-        # Get the indixes sorted by probability (reversed, so highest first)
-        sort = self.skymap.argsort()[::-1]
-
-        # Create cumulative array of elements within the skymap
-        cumsum = np.cumsum(self.skymap[sort])
-
         # Get the pixel that the coordinates are within
         pixel = self._coord_pixel(coord)
 
-        # Find the index of the pixel in the sorted array
-        index = np.where(sort == pixel)[0][0]
-
-        # Get the cumulative probability for that pixel
-        contour = cumsum[index]
-
-        return contour
+        return self.contours[pixel]
 
     def within_contour(self, coord, percentage):
         """Find if the given position is within the given confidence level.
