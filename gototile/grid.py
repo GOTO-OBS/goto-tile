@@ -176,20 +176,51 @@ class SkyGrid(object):
             raise ValueError('Grid does not have a SkyMap applied')
 
         if isinstance(tilenames, list):
-            # Get the probability of multiple tiles
+            # Multiple tiles
             indexes = [self.tilenames.index(tile) for tile in tilenames]
             pixels = []
             for i in indexes:
                 pixels += list(self.pixels[i])
             pixels = list(set(pixels))  # remove duplicates
-            prob = self.skymap.skymap[pixels].sum()
         else:
-            # Get the probability of an individual tile
+            # An individual tile
             index = self.tilenames.index(tilenames)
             pixels = self.pixels[index]
-            prob = self.skymap.skymap[pixels].sum()
+
+        # Sum the probability within those pixels
+        prob = self.skymap.skymap[pixels].sum()
 
         return prob
+
+    def get_area(self, tilenames):
+        """Return the sky area contained within the given tile(s) in square degrees.
+
+        If multiple tiles are given, the area only be included once in any overlaps.
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the area of.
+        """
+        if isinstance(tilenames, list):
+            # Multiple tiles
+            indexes = [self.tilenames.index(tile) for tile in tilenames]
+            pixels = []
+            for i in indexes:
+                pixels += list(self.pixels[i])
+            pixels = list(set(pixels))  # remove duplicates
+        else:
+            # An individual tile
+            index = self.tilenames.index(tilenames)
+            pixels = self.pixels[index]
+
+        # Get the area of a single pixel, in degrees
+        pixel_area = healpy.nside2pixarea(self.nside, degrees=True)
+
+        # Each pixel has the same area (HEALPix definition), so just multiply by number of pixels
+        area = len(pixels) * pixel_area
+
+        return area
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.
