@@ -162,6 +162,22 @@ class SkyGrid(object):
 
         return probs
 
+    def _pixels_from_tilenames(self, tilenames):
+        """Get the unique pixels contained within the given tile(s)."""
+        if isinstance(tilenames, list):
+            # Multiple tiles
+            indexes = [self.tilenames.index(tile) for tile in tilenames]
+            pixels = []
+            for i in indexes:
+                pixels += list(self.pixels[i])
+            pixels = list(set(pixels))  # remove duplicates
+        else:
+            # An individual tile
+            index = self.tilenames.index(tilenames)
+            pixels = self.pixels[index]
+
+        return pixels
+
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
 
@@ -175,21 +191,32 @@ class SkyGrid(object):
         if not hasattr(self, 'probs'):
             raise ValueError('Grid does not have a SkyMap applied')
 
-        if isinstance(tilenames, list):
-            # Get the probability of multiple tiles
-            indexes = [self.tilenames.index(tile) for tile in tilenames]
-            pixels = []
-            for i in indexes:
-                pixels += list(self.pixels[i])
-            pixels = list(set(pixels))  # remove duplicates
-            prob = self.skymap.skymap[pixels].sum()
-        else:
-            # Get the probability of an individual tile
-            index = self.tilenames.index(tilenames)
-            pixels = self.pixels[index]
-            prob = self.skymap.skymap[pixels].sum()
+        # Get pixels
+        pixels = self._pixels_from_tilenames(tilenames)
+
+        # Sum the probability within those pixels
+        prob = self.skymap.skymap[pixels].sum()
 
         return prob
+
+    def get_area(self, tilenames):
+        """Return the sky area contained within the given tile(s) in square degrees.
+
+        If multiple tiles are given, the area only be included once in any overlaps.
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the area of.
+        """
+        # Get pixels
+        pixels = self._pixels_from_tilenames(tilenames)
+
+        # Each pixel in the skymap has the same area (HEALPix definition)
+        # So just multiply that by number of pixels
+        area = self.skymap.pixel_area * len(pixels)
+
+        return area
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.

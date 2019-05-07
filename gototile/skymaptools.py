@@ -6,15 +6,82 @@ from astropy.coordinates import SkyCoord, AltAz, EarthLocation
 from astropy.time import Time, TimeDelta
 from astropy.table import QTable
 from astropy import units
+from astropy import units as u
 from astropy.utils import iers
 import ephem
 import sys
 import multiprocessing
 import numpy as np
+import healpy as hp
 from . import settings
 from .catalog import visible_catalog, read_catalog, map2catalog
 from . import math
 from . import utils
+
+
+def coord2pix(nside, coord, nest=False):
+    """Convert sky coordinates to pixel indices.
+
+    Parameters
+    ----------
+    nside : int or array-like
+        The healpix nside parameter, must be a power of 2, less than 2**30
+    coord : `astropy.coordinates.SkyCoord`
+        The coordinates of the point(s) in the sky
+    nest : bool, optional
+        if True, assume NESTED pixel ordering, otherwise, RING pixel ordering
+
+    Returns
+    -------
+    pix : int or array of int
+        The healpix pixel numbers. Scalar if all input are scalar, array otherwise.
+
+    See Also
+    --------
+    pix2coord, `healpy.ang2pix`
+    """
+    # Convert sky coordinates to angles
+    theta = 0.5 * np.pi - coord.dec.rad
+    phi = coord.ra.rad
+
+    # Get pixel numbers from healpy
+    pix = hp.ang2pix(nside, theta, phi, nest)
+
+    # Return pixels
+    return pix
+
+
+def pix2coord(nside, ipix, nest=False):
+    """Convert pixel index or indices to sky coordinates.
+
+    Parameters
+    ----------
+    nside : int or array-like
+        The healpix nside parameter, must be a power of 2, less than 2**30
+    ipix : int or array-like
+        Pixel indices
+    nest : bool, optional
+        if True, assume NESTED pixel ordering, otherwise, RING pixel ordering
+
+    Returns
+    -------
+    coord : `astropy.coordinates.SkyCoord`
+        The coordinates corresponding to ipix, as an Astropy SkyCoord.
+        Scalar if all input are scalar, array otherwise.
+
+    See Also
+    --------
+    coord2pix, `healpy.pix2ang`
+    """
+    # Get angular coordinates from healpy
+    theta, phi = hp.pix2ang(nside, ipix, nest)
+
+    # Convert angles to sky coordinates
+    ra = phi
+    dec = 0.5 * np.pi - theta
+
+    # Return a SkyCoord object
+    return SkyCoord(ra, dec, unit=u.rad)
 
 
 def getshape(tile, steps=50):
