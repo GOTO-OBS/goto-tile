@@ -5,7 +5,8 @@ from astropy.table import Table
 import healpy as hp
 from astropy import units as u
 from astropy.io import fits
-
+from astropy.coordinates import SkyCoord 
+from astropy.coordinates import Angle
 
 def prob(ra_grid,dec_grid,ra,dec,radius):
     """calculate the probability of specific grid (gaussian dist.)
@@ -24,15 +25,16 @@ def prob(ra_grid,dec_grid,ra,dec,radius):
         68% containment radius, in degrees
     """
     # calculate the angular distance between the reported (RA,Dec) and the grid (RA,Dec)
-    a = np.sin(np.abs(dec_grid-dec)/2)**2
-    b = np.cos(dec)*np.cos(dec_grid)*np.sin(np.abs(ra_grid-ra)/2)**2
-    d = 2*np.arcsin(np.sqrt(a+b))
-    ang_dis = np.degrees(d)
+    source_coor = SkyCoord(ra*u.deg, dec*u.deg, frame='fk5')
+    goto_grid = SkyCoord(ra_grid*u.deg, dec_grid*u.deg, frame='fk5')
+    ang_dis = source_coor.separation(goto_grid)
+    ang_dis = ang_dis.degree
 
     # calculate the probability with 2D gaussian function
     sigma = radius/np.sqrt(2.3)
-    f = ang_dis/sigma
-    prob = 1/(2*np.pi*sigma**2)*np.e**(-0.5*f**2)
+    prob = np.exp(-ang_dis**2/(2*sigma**2))
+    norm = np.sum(prob)
+    prob /= norm
 
     return prob
 
@@ -49,16 +51,16 @@ def gaussian_skymap(ra, dec, radius, nside=64):
     radius : float
         68% containment radius, in degrees
     """
-    position_ra = np.radians(ra)                                     # convert RA_detect to radian
-    position_dec = np.radians(dec)                                   # convert Dec_detect to radian
-
+    
     npix = hp.nside2npix(nside)
     ipix = range(npix)
     theta, phi = hp.pix2ang(nside, ipix)
-    ra = phi
-    dec = 0.5 * np.pi - theta
+    ra_grid = phi
+    dec_grid = 0.5 * np.pi - theta
+    ra_grid = Angle(ra_grid, u.radian).degree
+    dec_grid = Angle(dec_grid, u.radian).degree
 
-    post = prob(ra, dec, position_ra, position_dec, radius)
+    post = prob(ra_grid, dec_grid, ra, dec, radius)
 
     post /= np.sum(post * hp.nside2pixarea(nside))
     postcopy = np.copy(post)
