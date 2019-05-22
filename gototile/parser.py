@@ -177,7 +177,7 @@ def parse_args(args=None):
 
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
 
-    if args.catalog is True:
+    if args.catalog:
         if args.catalog == 'GWGC':
             args.catalog = settings.GWGC_PATH
             if not args.catalog_weight_key:
