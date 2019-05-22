@@ -65,7 +65,7 @@ def parse_args(args=None):
     parser.add_argument('-c', '--catalog', 
                         choices=['GLADE','GWGC'],
                         help="Use a catalog to convolve with; specify as an "
-                        "astropy readable table format (default catalog: GLADE)")
+                        "astropy readable table format")
     parser.add_argument('--catalog-weight-key',
                         help="Field name to serve as a catalog weight. "
                         "Default is no weighting (spatial density only)")
