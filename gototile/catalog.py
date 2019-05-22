@@ -84,17 +84,17 @@ def catalog2skymap(path, GW_dist_info, key=None, nside=64, smooth=True):
     table = read_catalog(path=path, GW_dist_info=GW_dist_info, key=key)
     ra, dec = table['ra'].values, table['dec'].values
     npix = 12*nside*nside
-    prob = np.zeros(npix)
+    w = np.zeros(npix)
 
     c = SkyCoord(ra*units.deg, dec*units.deg, frame='fk5')
     ipix = skymaptools.coord2pix(nside, c)
-    prob[ipix] = table['weight'].values
+    w[ipix] = table['weight'].values
 
     if smooth:
-        prob = hp.smoothing(prob, sigma=np.deg2rad(0.005))
-        prob = (prob-np.min(prob))/(np.max(prob)-np.min(prob))
+        w = hp.smoothing(w, sigma=np.deg2rad(0.005))
+        w = (w-np.min(w))/(np.max(w)-np.min(w))
 
-    return prob
+    return w
 
 
 
