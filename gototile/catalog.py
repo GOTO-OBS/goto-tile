@@ -7,6 +7,53 @@ import healpy
 from astropy.coordinates import SkyCoord, AltAz
 from astropy import units
 from astropy.table import Table
+import sys
+import requests
+from urllib.request import urlretrieve
+import pkg_resources
+import time
+import pandas as pd
+
+class download():
+
+    @staticmethod
+    def reporthook(count, block_size, total_size):
+        global start_time
+        if count == 0:
+            start_time = time.time()
+            return
+        duration = time.time() - start_time
+        progress_size = int(count * block_size)
+        speed = int(progress_size / (1024 * duration))
+        percent = int(count * block_size * 100 / total_size)
+        sys.stdout.write("\r...%d%%, %d MB, %d KB/s, %d seconds passed" %
+                        (percent, progress_size / (1024 * 1024), speed, duration))
+        sys.stdout.flush()
+
+    @staticmethod
+    def glade(url="http://glade.elte.hu/GLADE_2.3.txt", local_path=None, cutoff_dist=10000):
+        print("Downloading GLADE galaxy catalog ...")
+        if local_path==None:
+            local_path = pkg_resources.resource_filename('gototile', 'data')
+            if not os.path.exists(local_path):
+                os.makedirs(local_path)
+        
+        out_txt = os.path.join(local_path,'GLADE.txt')
+        urlretrieve(url, out_txt, download.reporthook)
+
+        print("Coverting .txt to .csv ...")
+        col = ['PGC','GWGC name','HyperLEDA name',
+                '2MASS name','SDSS-DR12 name','flag1',
+                'RA','dec','dist','dist_err','z','B',
+                'B_err','B_Abs','J','J_err','H','H_err',
+                'K','K_err','flag2','flag3']
+        outfile = os.path.join(local_path,'GLADE.csv')
+        df = pd.DataFrame(np.genfromtxt(out_txt), columns=col)
+        df = df[df.dist < cutoff_dist]
+        df.to_csv(outfile, index=False)
+
+        os.remove(out_txt)
+
 
 
 def visible_catalog(catalog, sidtimes, telescope):
