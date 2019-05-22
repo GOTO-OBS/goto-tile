@@ -13,6 +13,7 @@ from urllib.request import urlretrieve
 import pkg_resources
 import time
 import pandas as pd
+from . import settings
 
 class download():
 
@@ -44,7 +45,7 @@ class download():
         print("Coverting .txt to .csv ...")
         col = ['PGC','GWGC name','HyperLEDA name',
                 '2MASS name','SDSS-DR12 name','flag1',
-                'RA','dec','dist','dist_err','z','B',
+                'ra','dec','Dist','Dist_err','z','B',
                 'B_err','B_Abs','J','J_err','H','H_err',
                 'K','K_err','flag2','flag3']
         outfile = os.path.join(local_path,'GLADE.csv')
@@ -67,12 +68,13 @@ def visible_catalog(catalog, sidtimes, telescope):
     return catalog[mask], np.where(mask)[0]
 
 
-def read_catalog(path, key=None):
+def read_catalog(path, GW_dist_info, key=None):
     table = Table.read(path)
     if key:
         table['weight'] = table[key]
     else:
-        table['weight'] = np.ones(len(table), dtype=np.float)
+        dist, dist_err = GW_dist_info[0], GW_dist_info[0]
+        table['weight'] = np.exp(-(table['Dist'] - dist)**2/(2*dist_err**2))
     return table
 
 
