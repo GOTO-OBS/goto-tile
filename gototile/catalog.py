@@ -14,6 +14,8 @@ import pkg_resources
 import time
 import pandas as pd
 from . import settings
+from . import skymaptools
+import healpy as hp
 
 class download():
 
@@ -50,7 +52,7 @@ class download():
                 'K','K_err','flag2','flag3']
         outfile = os.path.join(local_path,'GLADE.csv')
         df = pd.DataFrame(np.genfromtxt(out_txt), columns=col)
-        df = df[df.dist < cutoff_dist]
+        df = df[df.Dist < cutoff_dist]
         df.to_csv(outfile, index=False)
 
         os.remove(out_txt)
@@ -69,13 +71,31 @@ def visible_catalog(catalog, sidtimes, telescope):
 
 
 def read_catalog(path, GW_dist_info, key=None):
-    table = Table.read(path)
+    table = pd.read_csv(path)
     if key:
         table['weight'] = table[key]
     else:
         dist, dist_err = GW_dist_info[0], GW_dist_info[1]
         table['weight'] = np.exp(-(table['Dist'] - dist)**2/(2*dist_err**2))
     return table
+
+
+def catalog2skymap(path, GW_dist_info, key=None, nside=64, smooth=True):
+    table = read_catalog(path=path, GW_dist_info=GW_dist_info, key=key)
+    ra, dec = table['ra'].values, table['dec'].values
+    npix = 12*nside*nside
+    prob = np.zeros(npix)
+
+    c = SkyCoord(ra*units.deg, dec*units.deg, frame='fk5')
+    ipix = skymaptools.coord2pix(nside, c)
+    prob[ipix] = table['weight'].values
+
+    if smooth:
+        prob = hp.smoothing(prob, sigma=np.deg2rad(0.005))
+        prob = (prob-np.min(prob))/(np.max(prob)-np.min(prob))
+
+    return prob
+
 
 
 def map2catalog(skymap, catalog, key='weight'):
