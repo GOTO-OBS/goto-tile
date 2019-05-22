@@ -73,7 +73,7 @@ def read_catalog(path, GW_dist_info, key=None):
     if key:
         table['weight'] = table[key]
     else:
-        dist, dist_err = GW_dist_info[0], GW_dist_info[0]
+        dist, dist_err = GW_dist_info[0], GW_dist_info[1]
         table['weight'] = np.exp(-(table['Dist'] - dist)**2/(2*dist_err**2))
     return table
 
