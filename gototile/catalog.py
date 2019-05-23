@@ -50,9 +50,12 @@ class download():
                 'ra','dec','Dist','Dist_err','z','B',
                 'B_err','B_Abs','J','J_err','H','H_err',
                 'K','K_err','flag2','flag3']
+
+        df = pd.read_csv(out_txt, sep=" ", header=None)
+        df.columns = col
+        df = df[(df.Dist < cutoff_dist) & (df.flag1=='G')]
+
         outfile = os.path.join(local_path,'GLADE.csv')
-        df = pd.DataFrame(np.genfromtxt(out_txt), columns=col)
-        df = df[df.Dist < cutoff_dist]
         df.to_csv(outfile, index=False)
 
         os.remove(out_txt)
