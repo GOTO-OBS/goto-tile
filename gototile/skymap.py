@@ -283,6 +283,42 @@ class SkyMap(object):
         hdulist = gaussian_skymap(ra, dec, radius, nside)
         return cls.from_fits(hdulist)
 
+    @classmethod
+    def from_data(cls, data, nested):
+        """Initialize a `~gototile.skymap.SkyMap` object from an array of data.
+
+        Parameters
+        ----------
+        data : list or `numpy.array`
+            an array of data to map onto a HEALPix sphere
+            the length of the data must match one of the valid HEALPix resolutions
+
+        nested : bool
+            if True the data has order=NESTED, if False then order=RING
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        if not isinstance(data, np.ndarray):
+            data = np.array(data)
+
+        # Check the data is a valid length
+        try:
+            nside = healpy.npix2nside(len(data))
+        except ValueError:
+            raise ValueError('Length of data is invalid')
+
+        header = {'PIXTYPE': 'HEALPIX',
+                  'ordering': 'NESTED' if nested else 'RING',
+                  'COORDSYS': 'C',
+                  'NSIDE': nside,
+                  'INDXSCHM': 'IMPLICIT',
+                  }
+
+        return cls(data, header)
+
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
         newmap = SkyMap(self.skymap.copy(), self.header.copy())
