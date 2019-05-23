@@ -123,6 +123,20 @@ class SkyMap(object):
     def __ne__(self, other):
         return not self == other
 
+    def __mul__(self, other):
+        if not isinstance(other, self.__class__):
+            raise ValueError('SkyMaps can only be multipled by other SkyMaps')
+
+        result = self.copy()
+        other_copy = other.copy()
+
+        if self.nside != other_copy.nside or self.order != other_copy.order:
+            other_copy.regrade(self.nside, self.order)
+
+        result.skymap = result.skymap * other_copy.skymap
+
+        return result
+
     def __repr__(self):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
         return template.format(self.objid, self.date_det.iso, self.nside)
