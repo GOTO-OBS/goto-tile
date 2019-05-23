@@ -82,6 +82,7 @@ REQUIRES = ['numpy',
             'PyYAML',
             'cartopy',
             'scipy',
+            'ligo.skymap',
             ]
 
 setup(name='gototile',

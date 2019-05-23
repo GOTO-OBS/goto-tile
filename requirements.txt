@@ -6,3 +6,4 @@ healpy
 cartopy
 PyYAML
 scipy
+ligo.skymap

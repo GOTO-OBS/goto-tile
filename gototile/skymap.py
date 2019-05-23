@@ -15,6 +15,8 @@ from . import settings
 from . import skymaptools as smt
 from .catalog import read_catalog
 from .gaussian import gaussian_skymap
+from matplotlib import pyplot as plt
+import ligo.skymap.plot
 
 try:
     stringtype = basestring  # Python 2
@@ -385,277 +387,56 @@ class SkyMap(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, date=None, telescopes=None, pointings=None,
-             objects=None, catalog=None, catcolor='#999999',
-             nightsky=False, geoplot=False, contours=False,
-             filename=None, title="", axes=None, dpi=300,
-             options=None):
-        """Plot the skymap in a Moll-Weide projection.
+    def plot(self, filename=None, dpi=300, coordinates=None):
+        """Plot the skymap.
 
         Parameters
         ----------
-        date : `~astropy.time.Time`, optional
-            date to plot the skymap at
-            default is the date of the detection from `SkyMap.date_det`
-
-        telescopes : list of `~gototile.telescope.Telescope`, optional
-            visible telescopes to plot
-
-        pointings : list of pointings, optional
-            tile pointings to plot
-            needs `telescopes` to be >= 1
-
-        objects : list, optional
-            overplot an object, requires RA, Dec and object name
-
-        catalog : dict, optional
-            catalog of objects to overplot
-
-        catcolor : str, optional
-            color for catalog objects to be plotted
-            default is #999999
-
-        nightsky : bool, optional
-            plot the night sky visibility of each telescope in `telescopes`
-            only valid if `telescopes` and `catalog` is given
-            default is False
-
-        geoplot : bool, optional
-            plot in geographic coordinates (lat, lon) instead of (RA, Dec)
-            default is False
-
-        contours : bool, optional
-            plot 50% and 90% confidence regions
-            default is False
-
         filename : str, optional
             filename to save the plot to
             if not given then the plot will be displayed with plt.show()
-
-        title : str, optional
-            title for the plot
-            default is created based on object name and time observed
-
-        axes : `matplotlib.pyplot.Axes`, optional
-            axes to create the plot on
-            default is none, new axes will be created
 
         dpi : int, optional
             DPI to save the plot at
             default is 300
 
-        options : dict, optional
-            various extra plotting options as keys, each with a `True` or `False` value
-            all are False by default
-
-            - moon : plot the moon position. The illumination is shown
-                  between black (new moon) and white (full moon). Note
-                  that the moon outline is always black.
-
-            - sun : plot the sun position
-
-            - coverage : show % probability covered by the thickness
-                  of the tile outline. 1 percent is the normal
-                  thickness.
-
-            - delay : show the delay time as transparency of the tile.
-                  0 hours is fully transparent, 24 hours is fully
-                  opaque.
+        coordinates : `astropy.coordinates.SkyCoord`, optional
+            any coordinates to also plot on the image
 
         """
+        figure = plt.figure(figsize=(8,6))
+        axes = plt.axes(projection='astro hours mollweide')
+        axes.grid()
+        transform = axes.get_transform('world')
 
-        from matplotlib import pyplot as plt
-        from matplotlib.backends.backend_agg import FigureCanvasAgg as\
-            FigureCanvas
-        from matplotlib.figure import Figure
-        from matplotlib.colors import colorConverter
-        import cartopy.crs as ccrs
-        import cartopy
+        # Plot the skymap data
+        axes.imshow_hpx(self.skymap, cmap='cylon', nested=self.isnested)
 
-        datadir = os.environ.get('CARTOPY_DATADIR')
-        if datadir:
-            cartopy.config['data_dir'] = datadir
+        # Plot 50% and 90% contours
+        cs = axes.contour_hpx(self.contours*100 , nested=self.isnested,
+                            levels = [50, 90],
+                            colors='black', linewidths=0.5, zorder=99,)
+        #axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
 
-        read_colormaps()
-
-        if telescopes is None:
-            telescopes = []
-        if date is None:
-            date = self.date_det
-        if pointings is None:
-            pointings = []
-        if catalog is None:
-            catalog = {'path': None, 'key': None}
-        if options is None:
-            options = {}
-        if not title:
-            title = "Skymap"
-            if catalog['path']:
-                if len(telescopes) > 0:
-                    title += ", catalogue {}".format(os.path.basename(catalog['path']))
-                else:
-                    title += "and catalogue {}".format(os.path.basename(catalog['path']))
-            if len(telescopes) > 0:
-                telescope_names = ", ".join([telescope.name for telescope in telescopes])
-                telescope_names = ' and '.join(telescope_names.rsplit(', ', 1))
-                title += " and {} tiling".format(telescope_names)
-            title += " for trigger {}".format(self.objid)
-            title += "\n{}".format(Time(date).datetime.strftime("%Y-%m-%d %H:%M:%S"))
-
-        sun = get_sun(date) if options.get('sun') else None
-        moon = None
-        if options.get('moon'):
-            moon = ephem.Moon(date.iso)
-            phase = moon.phase
-            moon = SkyCoord(moon.ra/np.pi*180, moon.dec/np.pi*180, unit=u.deg)
-            moon.phase = phase/100
-
-        if axes is None:
-            if filename:
-                figure = Figure()
-            else:
-                figure = plt.figure()
-            axes = figure.add_subplot(1, 1, 1, projection=ccrs.Mollweide())
-        geodetic = ccrs.Geodetic()
-
-        if geoplot:
-            t = Time(date, location=('0d', '0d'))
-            t.delta_ut1_utc = 0
-            st = t.sidereal_time('mean')
-            dlon = st.radian
-            axes.coastlines(linewidth=0.25)
-            axes.gridlines(linewidth=0.25, color='grey',
-                           linestyle='--')
-            axes.set_global()
-            #m.nightshade(date=date.datetime, ax=axes)
-            if len(telescopes) > 0:
-                longs, lats = zip(*[(telescope.location.lon.deg,
-                                telescope.location.lat.deg)
-                                for telescope in telescopes])
-                axes.plot(longs, lats, color='#BBBBBB', marker='8', #markersize=10,
-                        linestyle='none', transform=geodetic)
-        else:
-            axes.set_global()
-
-            dlon = 0  # longitude correction
-
-        axes.scatter(self.coords.ra.value, self.coords.dec.value, s=1, c=self.skymap,
-                     cmap='cylon', alpha=0.5, linewidths=0, zorder=1,
-                     transform=geodetic)
-
-        if contours:
-            axes.tricontour(self.coords.ra.value, self.coords.dec.value, self.contours,
-                            levels=[0.5,0.9],
-                            colors='black', linewidths=0.5, zorder=99,
-                            transform=geodetic)
-
-        # Set up colorscheme for telescopes
-        colors = itertools.cycle(
-            ['#C44677', '#71CE48', '#7EB4BF', '#4F5C31', '#6670BC',
-             '#BE5433', '#513447', '#C9BB46', '#80CD93', '#BC56C8',
-             '#C6A586', '#C996BD'])
-        colors = dict([(telescope.name, color)
-                       for telescope, color in zip(telescopes, colors)])
-        # Plot FoVs
-        for i, pointing in enumerate(pointings):
-            # use pointings.tilelist[i] instead of pointing['tile']
-            # the latter has dtype 'object' (containg floats), the
-            # former 'float64'
-            ra, dec = smt.getshape(pointings.tilelist[i], steps=10)
-            ra = ra - np.rad2deg(dlon)
-            color = colors[pointing['telescope']]
-            alpha = 0
-            if options.get('delay'):
-                # show delay time as transparency
-                alpha = pointing['dt'].jd
-                alpha = max(0, min(1, alpha))  # clip to 0 -- 1 range
-            acolor = colorConverter.to_rgba(color, alpha=alpha)
-            linewidth = 1
-            if options.get('coverage'):
-                # show % coverage as outline thickness
-                linewidth = 100 * pointing['prob']
-            ra2 = ra + 180
-            # Work around an issue with cartopy-Proj.4, where polygons
-            # aren't drawn >= abs(89) latitude. Since the M-W
-            # projection is bad near the poles anyway, we can probably
-            # safely cheat. See
-            # https://github.com/SciTools/cartopy/issues/724
-            dec = np.array(dec)
-            dec[dec >= 88.99] = 88.99
-            dec[dec <= -88.99] = -88.99
-            if np.any(ra2 > 0) and np.any(ra2 <= 0):
-                mask = ra2 > 0
-                axes.fill(ra[mask], dec[mask],
-                          fill=True, facecolor=acolor,
-                          linewidth=linewidth, linestyle='solid',
-                          edgecolor='black', transform=geodetic)
-                mask = ~mask
-                axes.fill(ra[mask], dec[mask],
-                          fill=True, facecolor=acolor,
-                          linewidth=linewidth, linestyle='solid',
-                          edgecolor='black', transform=geodetic)
-            else:
-                axes.fill(ra, dec,
-                          fill=True, facecolor=acolor,
-                          linewidth=linewidth, linestyle='solid',
-                          edgecolor='black',
-                          transform=geodetic)
-
-        if catalog['path']:
-            logging.info("Reading catalog data for plot")
-            table = read_catalog(**catalog)
-
-            ras = table['ra']
-            decs = table['dec']
-
-            if nightsky:
-                sidtimes = []
-                for telescope in telescopes:
-                    visras, visdecs = [], []
-                    sidtimes.append(smt.calc_siderealtimes(
-                        date, telescope.location))
-                sidtimes = np.hstack(sidtimes)
-                radius = 75
-                logging.info("Calculating night sky coverage for %d "
-                             "points in time", len(sidtimes))
-                for st in sidtimes:
-                    frame = AltAz(obstime=st, location=telescope.location)
-                    radecs = SkyCoord(ras, decs, unit=u.deg)
-                    altaz = radecs.transform_to(frame)
-                    visras.extend(ras[np.where(altaz.alt.degree > (90-radius))])
-                    visdecs.extend(decs[np.where(altaz.alt.degree > (90-radius))])
-                xcat, ycat = np.array(visras) - np.rad2deg(dlon), visdecs
-            else:
-                xcat, ycat = np.array(ras) - np.rad2deg(dlon), decs
-            logging.info("Overplotting catalog")
-            axes.scatter(xcat, ycat, s=0.5, c=catcolor, alpha=0.5, linewidths=0,
-                         transform=geodetic)
-
-        if objects:
-            ra = [obj.ra.value - np.rad2deg(dlon) for obj in objects]
-            dec = [obj.dec.value for obj in objects]
-            axes.plot(ra, dec, linestyle='None', marker='p',
-                      color=(0, 1, 1, 0.5), zorder=5,
-                      transform=geodetic)
-            for obj, xpos, ypos in zip(objects, ra, dec):
-                axes.text(xpos, ypos, obj.name, ha='center', va='top',
+        # Plot coordinates if given
+        if coordinates:
+            axes.scatter(coordinates.ra.value, coordinates.dec.value,
+                         transform=transform,
+                         s=99, c='blue', marker='*', zorder=9)
+            for coord in coordinates:
+                text = axes.text(coord.ra.value, coord.dec.value,
+                          coord.to_string('hmsdms').replace(' ','\n')+'\n',
+                          transform=transform,
+                          ha='center', va='bottom',
                           size='x-small', zorder=12,
-                          transform=geodetic)
-        if sun:
-            axes.plot(sun.ra.value-np.rad2deg(dlon), sun.dec.value,
-                      color=(1, 1, 0, 0.5), marker='o',
-                      markerfacecolor=(1, 1, 0, 0.5), markersize=12,
-                      transform=geodetic)
-        if moon:
-            phase = moon.phase
-            axes.plot(moon.ra.value, moon.dec.value,
-                      marker='o', markersize=10, markeredgecolor='black',
-                      markerfacecolor=(phase, phase, phase, 0.5),
-                      transform=geodetic)
+                          )
+
+        # Set title
+        title = 'Skymap for trigger {}'.format(self.objid)
         axes.set_title(title, y=1.05)
 
+        # Save or show
         if filename:
-            canvas = FigureCanvas(figure)
-            canvas.print_figure(filename, dpi=dpi)
+            plt.savefig(filename, dpi=dpi)
         else:
             plt.show()
