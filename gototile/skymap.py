@@ -423,13 +423,15 @@ class SkyMap(object):
             axes.scatter(coordinates.ra.value, coordinates.dec.value,
                          transform=transform,
                          s=99, c='blue', marker='*', zorder=9)
+            if coordinates.isscalar:
+                coordinates = SkyCoord([coordinates])
             for coord in coordinates:
-                text = axes.text(coord.ra.value, coord.dec.value,
-                          coord.to_string('hmsdms').replace(' ','\n')+'\n',
-                          transform=transform,
-                          ha='center', va='bottom',
-                          size='x-small', zorder=12,
-                          )
+                axes.text(coord.ra.value, coord.dec.value,
+                            coord.to_string('hmsdms').replace(' ','\n')+'\n',
+                            transform=transform,
+                            ha='center', va='bottom',
+                            size='x-small', zorder=12,
+                            )
 
         # Set title
         title = 'Skymap for trigger {}'.format(self.objid)
