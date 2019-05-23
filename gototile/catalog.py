@@ -44,7 +44,7 @@ class download():
         out_txt = os.path.join(local_path,'GLADE.txt')
         urlretrieve(url, out_txt, download.reporthook)
 
-        print("Coverting .txt to .csv ...")
+        print("\nCoverting .txt to .csv ...")
         col = ['PGC','GWGC name','HyperLEDA name',
                 '2MASS name','SDSS-DR12 name','flag1',
                 'ra','dec','Dist','Dist_err','z','B',
