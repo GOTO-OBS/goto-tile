@@ -95,7 +95,9 @@ def catalog2skymap(path, GW_dist_info, key=None, nside=64, smooth=True):
 
     if smooth:
         w = hp.smoothing(w, sigma=np.deg2rad(0.005), verbose=False)
-        w = (w-np.min(w))/(np.max(w)-np.min(w))
+
+    # Scale between 0-1
+    w = (w-np.min(w))/(np.max(w)-np.min(w))
 
     return w
 
