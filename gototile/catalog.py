@@ -40,7 +40,7 @@ class download():
             local_path = pkg_resources.resource_filename('gototile', 'data')
             if not os.path.exists(local_path):
                 os.makedirs(local_path)
-        
+
         out_txt = os.path.join(local_path,'GLADE.txt')
         urlretrieve(url, out_txt, download.reporthook)
 
@@ -91,7 +91,7 @@ def catalog2skymap(path, GW_dist_info, key=None, nside=64, smooth=True):
 
     c = SkyCoord(ra*units.deg, dec*units.deg, frame='fk5')
     ipix = skymaptools.coord2pix(nside, c)
-    w[ipix] = table['weight'].values
+    np.add.at(w, ipix, table['weight'].values)
 
     if smooth:
         w = hp.smoothing(w, sigma=np.deg2rad(0.005))
