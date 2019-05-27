@@ -309,7 +309,7 @@ class SkyMap(object):
         return cls.from_fits(hdulist)
 
     @classmethod
-    def from_data(cls, data, nested, coordsys='E'):
+    def from_data(cls, data, nested, coordsys='C'):
         """Initialize a `~gototile.skymap.SkyMap` object from an array of data.
 
         Parameters
