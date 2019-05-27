@@ -86,6 +86,15 @@ class SkyMap(object):
         if order not in ('NESTED', 'RING'):
             raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
 
+        # Get the coordinate system from the header
+        try:
+            coordsys = header['coordsys'][0]
+        except KeyError:
+            raise ValueError('No COORDSYS value in the header')
+        if coordsys not in ('G', 'E', 'C'):
+            raise ValueError('COORDSYS card in header has unknown value: {}'.format(coordsys))
+        self.coordsys = coordsys
+
         # Parse and store the skymap
         self._save_skymap(skymap, order)
 
@@ -132,6 +141,8 @@ class SkyMap(object):
 
         if self.nside != other_copy.nside or self.order != other_copy.order:
             other_copy.regrade(self.nside, self.order)
+        if self.coordsys != other_copy.coordsys:
+            other_copy.rotate(self.coordsys)
 
         result.skymap = result.skymap * other_copy.skymap
 
@@ -298,7 +309,7 @@ class SkyMap(object):
         return cls.from_fits(hdulist)
 
     @classmethod
-    def from_data(cls, data, nested):
+    def from_data(cls, data, nested, coordsys='E'):
         """Initialize a `~gototile.skymap.SkyMap` object from an array of data.
 
         Parameters
@@ -309,6 +320,10 @@ class SkyMap(object):
 
         nested : bool
             if True the data has order=NESTED, if False then order=RING
+
+        coordsys : str
+            The coordinate system the data uses.
+            'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
 
         Returns
         -------
@@ -326,7 +341,7 @@ class SkyMap(object):
 
         header = {'PIXTYPE': 'HEALPIX',
                   'ordering': 'NESTED' if nested else 'RING',
-                  'COORDSYS': 'C',
+                  'COORDSYS': coordsys[0],
                   'NSIDE': nside,
                   'INDXSCHM': 'IMPLICIT',
                   }
@@ -362,6 +377,41 @@ class SkyMap(object):
         # Update the header
         self.header['nside'] = nside
         self.header['ordering'] = order
+
+    def rotate(self, coordsys='E'):
+        """Convert coordinate systems.
+
+        Parameters
+        ------------
+        coordsys : str
+            First character is the coordinate system to convert to.
+            As in HEALPIX, allowed coordinate systems are:
+            'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
+        """
+        rotator = healpy.Rotator(coord=(self.coordsys, coordsys))
+
+        # NOTE: rotator expectes order=RING in and returns order=RING out
+        # If this skymap is NESTED we need to regrade before and after
+        if self.order == 'NESTED':
+            in_skymap = healpy.ud_grade(self.skymap, nside_out=self.nside,
+                                        order_in='NESTED', order_out='RING')
+        else:
+            in_skymap = self.skymap.copy()
+
+        # Rotate the skymap, now we're sure it's in RING order
+        out_skymap = rotator.rotate_map(in_skymap)
+
+        # Convert back to NESTED if needed
+        if self.order == 'NESTED':
+            out_skymap = healpy.ud_grade(out_skymap, nside_out=self.nside,
+                                         order_in='RING', order_out='NESTED')
+
+        # Save the new skymap
+        self._save_skymap(out_skymap, self.order)
+
+        # Update the header
+        self.header['coordsys'] = coordsys
+        self.coordsys = coordsys
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
