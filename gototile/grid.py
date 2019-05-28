@@ -422,7 +422,7 @@ class SkyGrid(object):
             polys0.set_alpha(0.5)
             polys0.set_zorder(1)
             axes.add_collection(polys0)
-            fig.colorbar(polys0, ax=axes)
+            fig.colorbar(polys0, ax=axes, fraction=0.02, pad=0.05)
             polys.set_facecolor('none')
 
         # Plot tile colors
@@ -443,7 +443,7 @@ class SkyGrid(object):
                             i = [i for i, x in enumerate(tilenames) if x == k]
                             color_array[i] = color[k]
                         polys.set_array(np.array(color_array))
-                        fig.colorbar(polys, ax=axes)
+                        fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
                     except:
                         raise ValueError('Invalid entries in color array')
 
@@ -458,7 +458,7 @@ class SkyGrid(object):
                 except:
                     try:
                         polys.set_array(np.array(color[new_indexes]))
-                        fig.colorbar(polys, ax=axes)
+                        fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
                     except:
                         raise ValueError('Invalid entries in color array')
 
