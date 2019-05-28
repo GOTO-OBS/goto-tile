@@ -6,7 +6,7 @@ Note this module is Python3 only and has been developed for Linux, otherwise use
 
 ## Requirements
 
-GOTO-tile requires several Python modules, which should be included during installation. Notably [Cartopy](https://scitools.org.uk/cartopy/docs/latest/installing.html#installing) has several requirements: you'll need Cython3, [Proj](https://proj4.org/install.html) and the C package [GEOS](https://trac.osgeo.org/geos/) installed too.
+GOTO-tile requires several Python modules, which should be included during installation.
 
 It should not require any other GOTO-specific modules to be installed.
 

@@ -21,7 +21,6 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as\
     FigureCanvas
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
-import cartopy.crs as ccrs
 from .math import cartesian_to_celestial
 from .skymap import read_colormaps
 

@@ -80,7 +80,6 @@ REQUIRES = ['numpy',
             'healpy',
             'pyephem',
             'PyYAML',
-            'cartopy',
             'scipy',
             'ligo.skymap',
             ]
