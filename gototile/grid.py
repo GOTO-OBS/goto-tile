@@ -277,7 +277,7 @@ class SkyGrid(object):
 
     def plot(self, filename=None, dpi=300, orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
-             highlight=None, coordinates=None,
+             highlight=None, highlight_color=None, coordinates=None,
              plot_skymap=False, plot_tilenames=False):
         """Plot the grid.
 
@@ -298,9 +298,12 @@ class SkyGrid(object):
             coordinates to center the orthographic plot on
             if given as a tuple units will be considered to be degrees
 
-        highlight : list or lsit of list, optional
+        highlight : list of str or list of list or str, optional
             a list of tile names (as in SkyGrid.tilenames) to highlight
             if a 2d list each set will be highlighted with a different color
+
+        highlight_color : str or list of str, optional
+            a list of colors to use when highlighting
 
         color : str or list or dict, optional
             if str all tiles will be colored using that string
@@ -529,11 +532,13 @@ class SkyGrid(object):
             if isinstance(highlight[0], str):
             # Should be a list with keys as tile names
                 try:
+                    if highlight_color is None:
+                        highlight_color = 'blue'
                     linecolor_array = np.array(['none'] * len(tilenames), dtype=object)
                     linewidth_array = np.array([0] * len(tilenames))
                     for k in highlight:
                         i = [i for i, x in enumerate(tilenames) if x == k]
-                        linecolor_array[i] = 'blue'
+                        linecolor_array[i] = highlight_color
                         linewidth_array[i] = 1.5
                     polys3 = copy(polys2)
                     polys3.set_edgecolor(np.array(linecolor_array))
@@ -546,13 +551,18 @@ class SkyGrid(object):
             else:
                 # Should be a list of lists
                 try:
-                    colors = ['blue','red','lime','purple','yellow']
+                    if highlight_color is None:
+                        colors = ['blue','red','lime','purple','yellow']
+                    elif isinstance(highlight_color, str):
+                        colors = [highlight_color]
+                    else:
+                        colors = highlight_color
                     for j, tilelist in enumerate(highlight):
                         linecolor_array = np.array(['none'] * len(tilenames), dtype=object)
                         linewidth_array = np.array([0] * len(tilenames))
                         for k in tilelist:
                             i = [i for i, x in enumerate(tilenames) if x == k]
-                            linecolor_array[i] = colors[j % 5]
+                            linecolor_array[i] = colors[j % len(colors)]
                             linewidth_array[i] = 1.5
                         polys4 = copy(polys2)
                         polys4.set_edgecolor(np.array(linecolor_array))
