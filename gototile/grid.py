@@ -546,7 +546,7 @@ class SkyGrid(object):
             else:
                 # Should be a list of lists
                 try:
-                    colors = ['blue','lime','red','yellow','purple']
+                    colors = ['blue','red','lime','purple','yellow']
                     for j, tilelist in enumerate(highlight):
                         linecolor_array = np.array(['none'] * len(tilenames), dtype=object)
                         linewidth_array = np.array([0] * len(tilenames))
