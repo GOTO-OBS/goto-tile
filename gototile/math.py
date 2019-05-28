@@ -2,37 +2,44 @@
 
 import numpy as np
 
-
-PI2 = np.pi * 2
-PI_2 = np.pi / 2
 PI = np.pi
 DEG = 180/PI
 RAD = PI/180
 
 
-def xyz2radec(x, y, z):
-    l, b = xyz2lb(x, y, z)
-    return np.array([l*DEG, b*DEG])
+def cartesian_to_celestial(x, y, z):
+    """Convert cartesian coordinates (x,y,z) to celestial (ra,dec)."""
+    # First convert cartesian to spherical
+    lon, lat = cartesian_to_spherical(x, y, z)
+
+    # Then spherical to celestial
+    ra, dec = np.rad2deg(lon), np.rad2deg(lat)
+
+    # Make sure they're within the valid range
+    ra[ra < 0] = ra[ra < 0] + 360
+
+    return np.array([ra, dec])
 
 
-def radec2xyz(ra, dec):
-    l, b = np.deg2rad(ra), np.deg2rad(dec)
-    return lb2xyz(l, b)
+def celestial_to_cartesian(ra, dec):
+    """Convert celestial coordinates (ra,dec) to cartesian (x,y,z)."""
+    lon, lat = np.deg2rad(ra), np.deg2rad(dec)
+    return spherical_to_cartesian(lon, lat)
 
 
-def lb2xyz(l, b):
-    x = np.cos(l) * np.cos(b)
-    y = np.sin(l) * np.cos(b)
-    z = np.sin(b)
+def spherical_to_cartesian(lon, lat):
+    """Convert spherical coordinates (lon,lat) to cartesian (x,y,z)."""
+    x = np.cos(lon) * np.cos(lat)
+    y = np.sin(lon) * np.cos(lat)
+    z = np.sin(lat)
     return np.array([x, y, z])
 
 
-def xyz2lb(x, y, z):
-    # Using arctan2 for b instead of b = np.arcsin(z), allows for [x,
-    # y, z] to be unnormalized
-    b = np.arctan2(z, np.sqrt(y*y+x*x))
-    l = np.arctan2(y, x)
-    return np.array([l, b])
+def cartesian_to_spherical(x, y, z):
+    """Convert cartesian coordinates (x,y,z) to spherical (lon,lat)."""
+    lat = np.arctan2(z, np.sqrt(y ** 2 + x ** 2))
+    lon = np.arctan2(y, x)
+    return np.array([lon, lat])
 
 
 def cross(x, y):
@@ -66,3 +73,25 @@ def intersect(x1, x2, y1, y2):
     sign[mask, ...] = -1
     t = t * sign
     return t
+
+def interpolate(point1, point2, steps=50):
+    """Interpolate along the great circle arc between two points.
+
+    Code from `spherical_geometry.great_circle_arc.interpolate`,
+    (https://spacetelescope.github.io/spherical_geometry/),
+    which uses Slerp (spherical linear interpolation).
+
+    point1 and point2 should be length 3 (x,y,z) lists or arrays.
+    """
+
+    steps = int(max(steps, 2))
+    t = np.linspace(0.0, 1.0, steps, endpoint=True).reshape((steps, 1))
+
+    omega = np.arccos(np.clip(dot(point1, point2), -1, 1))
+    if omega == 0.0:
+        offsets = t
+    else:
+        sin_omega = np.sin(omega)
+        offsets = np.sin(t * omega) / sin_omega
+
+    return offsets[::-1] * point1 + offsets * point2

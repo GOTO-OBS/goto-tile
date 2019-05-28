@@ -14,13 +14,26 @@ import healpy
 import collections
 from copy import copy
 
+
+from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as\
+    FigureCanvas
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
+import cartopy.crs as ccrs
+from .math import cartesian_to_celestial
+from .skymap import read_colormaps
+
+
+
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
-from .gridtools import create_grid, get_tile_vertices
-from .math import lb2xyz, xyz2lb, intersect
-from .math import RAD, PI, PI_2
+from .skymaptools import pix2coord
+from .gridtools import create_grid, get_tile_vertices, get_tile_edges
+from .math import RAD, PI
 
 
 class PolygonQuery(object):
@@ -94,9 +107,7 @@ class SkyGrid(object):
         self.ntiles = len(self.coords)
 
         # Get the tile vertices
-        self.vertices = get_tile_vertices(self.coords,
-                                          self.fov['ra'].value,
-                                          self.fov['dec'].value)
+        self.vertices = get_tile_vertices(self.coords, self.fov)
 
         # Give the tiles unique ids
         self.tilenums = np.arange(self.ntiles) + 1
@@ -265,219 +276,320 @@ class SkyGrid(object):
         table['freq'].format = '.4f'
         return table
 
-    def plot(self, color='None', alpha=0.3,
-             plot_stats=False, plot_skymap=False,
-             gridlines=False, tilenames=False,
-             orthoplot=False, centre=None,
-             filename=None, title="", axes=None, dpi=300):
+    def plot(self, filename=None, dpi=300, orthoplot=False, center=(0,45),
+             color=None, linecolor=None, linewidth=None, alpha=0.3,
+             highlight=None, coordinates=None,
+             plot_skymap=False, plot_tilenames=False):
         """Plot the grid.
 
         Parameters
         ----------
+        filename : str, optional
+            filename to save the plot to
+            if not given then the plot will be displayed with plt.show()
+
+        dpi : int, optional
+            DPI to save the plot at
+            default is 300
+
+        orthoplot : bool, default = False
+            plot the sphere in a orthographic projection, centred on `centre`
+
+        center : tuple or `astropy.coordinates.SkyCoord`, default (0,45)
+            coordinates to center the orthographic plot on
+            if given as a tuple units will be considered to be degrees
+
+        highlight : list or lsit of list, optional
+            a list of tile names (as in SkyGrid.tilenames) to highlight
+            if a 2d list each set will be highlighted with a different color
+
         color : str or list or dict, optional
+            if str all tiles will be colored using that string
+            if list must have length of SkyGrid.ntiles
+            if dict the keys should be tile names (as in SkyGrid.tilenames)
 
-        alpha : float
-            alpha channel value for the tile facecolours
+        linecolor : str or list or dict, optional
+            if str all tiles' outlines will be colored using that string
+            if list must have length of SkyGrid.ntiles
+            if dict the keys should be tile names (as in SkyGrid.tilenames)
 
-        plot_stats : bool, default = False
-            use HEALPix to color the plot with the times each pixel is within a tile
+        linewidth : float or list or dict, optional
+            if float all tiles' outlines will be set to that width
+            if list must have length of SkyGrid.ntiles
+            if dict the keys should be tile names (as in SkyGrid.tilenames)
+
+        alpha : float, optional
+            all tiles will be set to that alpha
+            default = 0.3
+
+        coordinates : `astropy.coordinates.SkyCoord`, optional
+            any coordinates to also plot on the image
 
         plot_skymap : bool, default = False
             color tiles based on their contained probability
-            will fail unless a skymap has been applied to the grid using grid.apply_skymap()
+            will fail unless a skymap has been applied to the grid using SkyGrid.apply_skymap()
 
-        gridlines : bool, default = False
-            show gridlines on the sphere
-
-        tilenames : bool, default = False
+        plot_tilenames : bool, default = False
             plot the name of each tile in its centre
             WARNING: plots can take a long time to render
 
-        orthoplot : bool, default = False
-            plot the sphere in a orthographic projection, centred on centre
-
-        centre : float or tuple, default = 0 or (0,45)
-            coordinates to centre the orthographic plot on (longitude, latitude)
-            if orthoplot=False then the plot will be in the Mollweide projection,
-                centred on this float (long=0 by default)
-            if orthoplot=True then the sphere will be centred on these coordiantes
-             (long=0, lat=45 by default)
-
-        filename : str
-            filename to save the plot with
-            if not given, plot will be displayed using matplotlib.pyplot.show()
-
-        title : str, optional
-            title for the plot
-            default is created based on grid name
-
-        axes : `matplotlib.pyplot.Axes`, optional
-            axes to create the plot on
-            default is None, new axes will be created
-
-        dpi : int, defualt=300
-            dpi to save the plot with
-
         """
-        import matplotlib as mpl
-        from matplotlib import pyplot as plt
-        from matplotlib.figure import Figure
-        from matplotlib.backends.backend_agg import FigureCanvasAgg as\
-            FigureCanvas
-        from matplotlib.patches import Polygon
-        from matplotlib.collections import PatchCollection
-        import cartopy.crs as ccrs
-        from .math import xyz2radec
-        from .skymap import read_colormaps
-        from .skymaptools import getshape
-
-        if axes is None:
-            if filename:
-                fig = Figure()
-            else:
-                fig = plt.figure()
-            if orthoplot:
-                if centre is None:
-                    centre = (0, 45)
-                projection = ccrs.Orthographic(central_longitude=centre[0], central_latitude=centre[1])
-            else:
-                if centre is None:
-                    centre = 0
-                projection = ccrs.Mollweide(central_longitude=centre)
-            geodetic = ccrs.Geodetic()
-            axes = fig.add_subplot(1, 1, 1, projection=projection)
-            axes.set_global()
-
-        if gridlines:
-            axes.gridlines()
-
-        read_colormaps()
-
-        if not title:
-            title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
-                                                                     self.fov['dec'],
-                                                                     self.overlap['ra'],
-                                                                     self.overlap['dec'])
-            if plot_skymap:
-                title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
-        axes.set_title(title, y=1.05)
-
-        # Create the polygons, or load them if already made
-        if not hasattr(self, '_poly_cache'):
-            # Find tile areas
-            radecs = []
-            for i, tile in enumerate(self.vertices):
-                tile = xyz2radec(*tile.T)
-                ra, dec = getshape(tile, steps=5)
-                # Need to reverse and transpose to get into format for Polygon
-                radec = np.array((ra[::-1], dec[::-1])).T
-                radecs.append(radec)
-
-            # Create a collection to plot at once
-            polys = PatchCollection([Polygon(radec) for radec in radecs],
-                                    cmap='jet',
-                                    transform=geodetic)
-
-            # Store the polygons so we don't have to recreate them
-            self._poly_cache = copy(polys)
+        fig = plt.figure(figsize=(8,6))
+        if not orthoplot:
+            axes = plt.axes(projection='astro hours mollweide')
         else:
-            polys = copy(self._poly_cache)
+            if isinstance(center, tuple):
+                center = SkyCoord(center[0], center[1], unit='deg')
+            axes = plt.axes(projection='astro globe', center=center)
+        axes.grid()
+        transform = axes.get_transform('world')
 
-        # Plot options
-        if plot_skymap and plot_stats:
-            raise ValueError('Can only either plot skymap or stats, not both')
+        # Create the tile polygons
+        polygons = []
+        tilenames = []
+        for vertices, tilename in zip(self.vertices, self.tilenames):
+            # vertices is a (4,3) numpy array - 4 vertices each with x,y,z cartesian coordinates
+            # Just plotting those courners with Polygons will draw straight lines between them,
+            # which isn't correct since we're on a sphere.
+            # Instead, get some intermediate points along the edges by drawing great circles.
+            points = get_tile_edges(vertices, steps=5)
 
-        # Set transparency
-        polys.set_alpha(alpha)
+            # Convert point coordinates to ra,dec
+            ra, dec = cartesian_to_celestial(*points.T)
 
-        # Colour the tiles
-        if plot_skymap is True:
-            # Colour the tiles by contained probability
-            polys.set_cmap('cylon')
-            polys.set_array(np.array(self.probs))
-            fig.colorbar(polys, ax=axes)
-
-        elif plot_stats is True:
-            # Colour in areas based on the number of tiles they are within
-            polys.set_facecolor('none')
-            nside = 128
-
-            # HealPix for the grid
-            npix = healpy.nside2npix(nside)
-            ipix = np.arange(npix)
-            thetas, phis = healpy.pix2ang(nside, ipix, nest=True)
-            pix_ras = np.rad2deg(phis) % 360
-            pix_decs = np.rad2deg(np.pi / 2 - thetas % np.pi)
-
-            # Statistics
-            tile_pixels = self.get_pixels(nside, True)
-            pix_freq = np.array([0] * npix)
-            for tile_pix in tile_pixels:
-                for pix in tile_pix:
-                    pix_freq[pix] += 1
-
-            # Plot HealPix points coloured by tile count
-            # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
-            cmap = plt.cm.jet
-            cmaplist = [cmap(i) for i in range(cmap.N)]
-            cmaplist[0] = (.5,.5,.5,1.0)
-            cmap = cmap.from_list('Custom cmap', cmaplist, cmap.N)
-
-            bounds = np.linspace(0,6,7)
-            norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
-
-            points = axes.scatter(pix_ras, pix_decs, s=1, transform=geodetic,
-                                  c=pix_freq, cmap='gist_rainbow', norm=norm)
-            fig.colorbar(points)
-
-        else:
-            # Colour in tiles with the colour given
-            if isinstance(color, dict):
-                # Should be a dict with keys as tile names
-                color_array = ['none'] * self.ntiles
-                for k in color.keys():
-                    i = self.tilenames.index(k)
-                    color_array[i] = color[k]
-                color = np.array(color_array)
-
-            if isinstance(color, (list, tuple, np.ndarray)):
-                # A list-like of colours, should be same length as number of tiles
-                if not len(color) == self.ntiles:
-                    raise ValueError('List of colors must be same length as grid.ntiles')
-
-                # Could be a list of weights or a list of colours
-                try:
-                    polys.set_facecolor(np.array(color))
-                except:
-                    try:
-                        polys.set_array(np.array(color))
-                        fig.colorbar(polys, ax=axes)
-                    except:
-                        raise ValueError('Invalid entries in color array')
+            # Check if the tile passes over the RA=0 line:
+            overlaps_meridian = any(ra<90) and any(ra>270)
+            if (not overlaps_meridian) or orthoplot:
+                # Need to reverse and transpose to get into the correct format for Polygon
+                polygons.append(Polygon(np.array((ra[::-1], dec[::-1])).T))
+                tilenames.append(tilename)
             else:
-                polys.set_facecolor(color)
+                # Annoyingly tiles that pass over the edge of the plot won't be filled
+                # This only applies in 'astro hours mollweide' mode
+                # The best workaround is to plot two Polygons, one on each side
+                ra1 = ra.copy()
+                ra1[ra<180] = 360
+                polygons.append(Polygon(np.array((ra1[::-1], dec[::-1])).T))
+                ra2 = ra.copy()
+                ra2[ra>180] = 0
+                polygons.append(Polygon(np.array((ra2[::-1], dec[::-1])).T))
+                # The reason for the tilename array is so we can colour both at once
+                # See where we deal with colours below, it hopefully makes sense there
+                tilenames.extend((tilename, tilename))
+        self._polygons = polygons
+        self._tilenames = tilenames
+
+        # Create a map between the origional tiles and the polygons
+        new_indexes = [np.where(np.array(self.tilenames)==name)[0][0] for name in tilenames]
+
+        # Create a collection to plot all at once
+        polys = PatchCollection(polygons, transform=transform)
 
         # Plot the tiles
+        polys.set_facecolor('blue')
+        polys.set_edgecolor('none')
+        polys.set_linewidth(0)
+        polys.set_alpha(alpha)
+        polys.set_zorder(2)
         axes.add_collection(polys)
 
         # Also plot on the lines over the top
-        polys2 = copy(self._poly_cache)
+        polys2 = copy(polys)
         polys2.set_facecolor('none')
         polys2.set_edgecolor('black')
-        polys2.set_alpha(0.3)
+        polys2.set_linewidth(1)
+        polys2.set_alpha(alpha)
+        polys2.set_zorder(3)
         axes.add_collection(polys2)
 
-        # Plot text (if asked to)
-        if tilenames:
+        # Plot tile names
+        if plot_tilenames:
             for name, coord in zip(self.tilenames, self.coords):
                 plt.text(coord.ra.deg, coord.dec.deg, name,
                          color='k', weight='bold', fontsize=6,
                          ha='center', va='center', clip_on=True,
-                         transform=geodetic)
+                         transform=transform)
 
-        # Save or display the plot
+        # Plot skymap probabilities
+        if plot_skymap is True:
+            if not hasattr(self, 'skymap'):
+                raise ValueError('SkyGrid does not have a SkyMap applied')
+
+            # Set the probability array to the color array, and use the LIGO colormap
+            # Plot underneath the other polys, so you can overlay the other tiles (e.g. visibility)
+            polys0 = copy(polys)
+            polys0.set_array(np.array(self.probs[new_indexes]))
+            polys0.set_cmap('cylon')
+            polys0.set_alpha(0.5)
+            polys0.set_zorder(1)
+            axes.add_collection(polys0)
+            fig.colorbar(polys0, ax=axes)
+            polys.set_facecolor('none')
+
+        # Plot tile colors
+        if color is not None:
+            if isinstance(color, dict):
+                # Should be a dict with keys as tile names
+                try:
+                    color_array = np.array(['none'] * len(tilenames), dtype=object)
+                    for k in color.keys():
+                        # Thanks to the edge tiles there may be multiple Polygonswith the same name
+                        i = [i for i, x in enumerate(tilenames) if x == k]
+                        color_array[i] = color[k]
+                    polys.set_facecolor(np.array(color_array))
+                except:
+                    try:
+                        color_array = np.array([0] * len(tilenames))
+                        for k in color.keys():
+                            i = [i for i, x in enumerate(tilenames) if x == k]
+                            color_array[i] = color[k]
+                        polys.set_array(np.array(color_array))
+                        fig.colorbar(polys, ax=axes)
+                    except:
+                        raise ValueError('Invalid entries in color array')
+
+            elif isinstance(color, (list, tuple, np.ndarray)):
+                # A list-like of colors, should be same length as number of tiles
+                if not len(color) == self.ntiles:
+                    raise ValueError('List of colors must be same length as grid.ntiles')
+
+                # Could be a list of weights or a list of colors
+                try:
+                    polys.set_facecolor(np.array(color[new_indexes]))
+                except:
+                    try:
+                        polys.set_array(np.array(color[new_indexes]))
+                        fig.colorbar(polys, ax=axes)
+                    except:
+                        raise ValueError('Invalid entries in color array')
+
+            else:
+                # Might just be a string color name
+                polys.set_facecolor(color)
+
+        # Plot tile linecolors
+        if linecolor is not None:
+            if isinstance(linecolor, dict):
+                # Should be a dict with keys as tile names
+                try:
+                    linecolor_array = np.array(['black'] * len(tilenames), dtype=object)
+                    for k in linecolor.keys():
+                        # Thanks to the edge tiles there may be multiple Polygons with the same name
+                        i = [i for i, x in enumerate(tilenames) if x == k]
+                        linecolor_array[i] = linecolor[k]
+                    polys2.set_edgecolor(np.array(linecolor_array))
+                except:
+                    raise ValueError('Invalid entries in linecolor array')
+
+            elif isinstance(linecolor, (list, tuple, np.ndarray)):
+                # A list-like of colors, should be same length as number of tiles
+                if not len(linecolor) == self.ntiles:
+                    raise ValueError('List of linecolors must be same length as grid.ntiles')
+
+                # Sould be a list of color string
+                try:
+                    polys2.set_edgecolor(np.array(linecolor[new_indexes]))
+                except:
+                    raise ValueError('Invalid entries in linecolor array')
+
+            else:
+                # Might just be a string color name
+                polys2.set_edgecolor(linecolor)
+
+        # Plot tile linewidths
+        if linewidth is not None:
+            if isinstance(linewidth, dict):
+                # Should be a dict with keys as tile names
+                try:
+                    linewidth_array = np.array([1] * len(tilenames))
+                    for k in linewidth.keys():
+                        # Thanks to the edge tiles there may be multiple Polygons with the same name
+                        i = [i for i, x in enumerate(tilenames) if x == k]
+                        linewidth_array[i] = linewidth[k]
+                    polys2.set_linewidth(np.array(linewidth_array))
+                except:
+                    raise ValueError('Invalid entries in linewidth array')
+
+            elif isinstance(linewidth, (list, tuple, np.ndarray)):
+                # A list-like of floats, should be same length as number of tiles
+                if not len(linewidth) == self.ntiles:
+                    raise ValueError('List of linewidths must be same length as grid.ntiles')
+
+                # Sould be a list of floats
+                try:
+                    polys2.set_linewidth(np.array(linewidth[new_indexes]))
+                except:
+                    raise ValueError('Invalid entries in linewidth array')
+
+            else:
+                # Might just be a float
+                polys2.set_linewidth(linewidth)
+
+        # Highlight paticular tiles
+        if highlight is not None:
+            if isinstance(highlight[0], str):
+            # Should be a list with keys as tile names
+                try:
+                    linecolor_array = np.array(['none'] * len(tilenames), dtype=object)
+                    linewidth_array = np.array([0] * len(tilenames))
+                    for k in highlight:
+                        i = [i for i, x in enumerate(tilenames) if x == k]
+                        linecolor_array[i] = 'blue'
+                        linewidth_array[i] = 3
+                    polys3 = copy(polys2)
+                    polys3.set_edgecolor(np.array(linecolor_array))
+                    polys3.set_linewidth(np.array(linewidth_array))
+                    polys3.set_alpha(0.5)
+                    polys3.set_zorder(9)
+                    axes.add_collection(polys3)
+                except:
+                    raise ValueError('Invalid entries in highlight list')
+            else:
+                # Should be a list of lists
+                try:
+                    colors = ['blue','lime','red','yellow','purple']
+                    for j, tilelist in enumerate(highlight):
+                        linecolor_array = np.array(['none'] * len(tilenames), dtype=object)
+                        linewidth_array = np.array([0] * len(tilenames))
+                        for k in tilelist:
+                            i = [i for i, x in enumerate(tilenames) if x == k]
+                            linecolor_array[i] = colors[j % 5]
+                            linewidth_array[i] = 3
+                        polys4 = copy(polys2)
+                        polys4.set_edgecolor(np.array(linecolor_array))
+                        polys4.set_linewidth(np.array(linewidth_array))
+                        polys4.set_alpha(0.5)
+                        polys4.set_zorder(9 + len(highlight) - j)
+                        axes.add_collection(polys4)
+                except:
+                    raise ValueError('Invalid entries in highlight list')
+
+        # Plot coordinates
+        if coordinates:
+            axes.scatter(coordinates.ra.value, coordinates.dec.value,
+                         transform=transform,
+                         s=99, c='blue', marker='*', zorder=9)
+            if coordinates.isscalar:
+                coordinates = SkyCoord([coordinates])
+            for coord in coordinates:
+                axes.text(coord.ra.value, coord.dec.value,
+                            coord.to_string('hmsdms').replace(' ','\n')+'\n',
+                            transform=transform,
+                            ha='center', va='bottom',
+                            size='x-small', zorder=12,
+                            )
+
+        # Set title
+        title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
+                                                                 self.fov['dec'],
+                                                                 self.overlap['ra'],
+                                                                 self.overlap['dec'])
+        if plot_skymap and hasattr(self, 'skymap'):
+            title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
+        axes.set_title(title, y=1.05)
+
+        # Save or show
         if filename:
-            canvas = FigureCanvas(fig)
-            canvas.print_figure(filename, dpi=dpi)
+            plt.savefig(filename, dpi=dpi)
         else:
             plt.show()
