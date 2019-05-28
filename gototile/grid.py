@@ -396,7 +396,7 @@ class SkyGrid(object):
         polys2 = copy(polys)
         polys2.set_facecolor('none')
         polys2.set_edgecolor('black')
-        polys2.set_linewidth(1)
+        polys2.set_linewidth(0.5)
         polys2.set_alpha(alpha)
         polys2.set_zorder(3)
         axes.add_collection(polys2)
@@ -500,7 +500,7 @@ class SkyGrid(object):
             if isinstance(linewidth, dict):
                 # Should be a dict with keys as tile names
                 try:
-                    linewidth_array = np.array([1] * len(tilenames))
+                    linewidth_array = np.array([0.5] * len(tilenames))
                     for k in linewidth.keys():
                         # Thanks to the edge tiles there may be multiple Polygons with the same name
                         i = [i for i, x in enumerate(tilenames) if x == k]
@@ -534,7 +534,7 @@ class SkyGrid(object):
                     for k in highlight:
                         i = [i for i, x in enumerate(tilenames) if x == k]
                         linecolor_array[i] = 'blue'
-                        linewidth_array[i] = 3
+                        linewidth_array[i] = 1.5
                     polys3 = copy(polys2)
                     polys3.set_edgecolor(np.array(linecolor_array))
                     polys3.set_linewidth(np.array(linewidth_array))
@@ -553,7 +553,7 @@ class SkyGrid(object):
                         for k in tilelist:
                             i = [i for i, x in enumerate(tilenames) if x == k]
                             linecolor_array[i] = colors[j % 5]
-                            linewidth_array[i] = 3
+                            linewidth_array[i] = 1.5
                         polys4 = copy(polys2)
                         polys4.set_edgecolor(np.array(linecolor_array))
                         polys4.set_linewidth(np.array(linewidth_array))
