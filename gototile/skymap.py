@@ -146,7 +146,8 @@ class SkyMap(object):
         if self.coordsys != other_copy.coordsys:
             other_copy.rotate(self.coordsys)
 
-        result.skymap = result.skymap * other_copy.skymap
+        new_skymap = result.skymap * other_copy.skymap
+        result._save_skymap(new_skymap, order=self.order)
 
         return result
 
