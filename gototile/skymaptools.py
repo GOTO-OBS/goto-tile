@@ -84,29 +84,6 @@ def pix2coord(nside, ipix, nest=False):
     return SkyCoord(ra, dec, unit=u.rad)
 
 
-def getshape(tile, steps=50):
-    """Interpolate a tile with corners to a full shape to be drawn.
-
-    tile is a two dimensional array of [ra-array, dec-array] in degrees.
-
-    """
-    # Code adopted from spherical_geometry.great_circle_arc
-
-    x, y, z = math.radec2xyz(tile[0], tile[1])
-    xyz = np.array(math.radec2xyz(tile[0], tile[1])).T
-    points = []
-    for corner1, corner2 in zip(xyz, np.roll(xyz, 1, axis=0)):
-        # Could retrieve the lengths from the telescope info
-        length = np.arccos(np.clip(math.dot(corner1, corner2), -1, 1))
-        offsets = np.linspace(0, 1, steps, endpoint=True).reshape((steps, 1))
-        if length > 0:
-            offsets = np.sin(offsets * length) / np.sin(length)
-        point = offsets[::-1] * corner1 + offsets * corner2
-        points.extend(offsets[::-1] * corner2 + offsets * corner1)
-    ra, dec = math.xyz2radec(*np.asarray(points).T)
-    return ra, dec
-
-
 def getvectors(tile):
 
     points = np.array(list(tile.points)[0])
@@ -477,7 +454,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             index = indices[sortindices][0]
             indices = indices[sortindices][1:]
             telescope = telescopes[index]
-            tile = math.xyz2radec(*telescope.toptile.T)
+            tile = math.cartesian_to_celestial(*telescope.toptile.T)
             prob = telescope.topprob
             sources = telescope.topsources
             GWobs += prob

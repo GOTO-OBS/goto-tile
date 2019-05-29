@@ -3,6 +3,6 @@ matplotlib
 astropy
 pyephem
 healpy
-cartopy
 PyYAML
 scipy
+ligo.skymap
