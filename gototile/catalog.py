@@ -4,8 +4,8 @@ import os.path
 from collections import defaultdict
 import numpy as np
 import healpy
-from astropy.coordinates import SkyCoord, AltAz
-from astropy import units
+import astropy.units as u
+from astropy.coordinates import SkyCoord, AltAz, Angle
 from astropy.table import Table
 import sys
 import requests
@@ -13,9 +13,12 @@ from urllib.request import urlretrieve
 import pkg_resources
 import time
 import pandas as pd
+import healpy as hp
+
 from . import settings
 from . import skymaptools
-import healpy as hp
+from .skymap import SkyMap
+
 
 class download():
 
@@ -59,9 +62,9 @@ class download():
         df.to_csv(outfile, index=False)
 
         os.remove(out_txt)
-    
+
     @staticmethod
-    def ext_skymap(url="https://irsa.ipac.caltech.edu/data/Planck/release_1/all-sky-maps/maps/COM_CompMap_dust-commrul_0256_R1.00.fits", 
+    def ext_skymap(url="https://irsa.ipac.caltech.edu/data/Planck/release_1/all-sky-maps/maps/COM_CompMap_dust-commrul_0256_R1.00.fits",
         local_path=None, outfile='ext_map.fits'):
         print("Downloading Extinction Skymap...")
         if local_path==None:
@@ -79,7 +82,7 @@ class download():
 def visible_catalog(catalog, sidtimes, telescope):
 
     mask = np.zeros(len(catalog), dtype=np.bool)
-    coords = SkyCoord(ra=catalog['ra']*units.deg, dec=catalog['dec']*units.deg)
+    coords = SkyCoord(ra=catalog['ra']*u.deg, dec=catalog['dec']*u.deg)
     for st in sidtimes:
         frame = AltAz(obstime=st, location=telescope.location)
         altaz = coords.transform_to(frame)
@@ -87,34 +90,114 @@ def visible_catalog(catalog, sidtimes, telescope):
     return catalog[mask], np.where(mask)[0]
 
 
-def read_catalog(path, GW_dist_info, key=None):
+def read_catalog(path):
+    """Read a catalog and return a Pandas dataframe."""
     table = pd.read_csv(path)
-    if key:
-        table['weight'] = table[key]
-    else:
-        dist, dist_err = GW_dist_info[0], GW_dist_info[1]
-        table['weight'] = np.exp(-(table['Dist'] - dist)**2/(2*dist_err**2))
     return table
 
 
-def catalog2skymap(path, GW_dist_info, key=None, nside=64, smooth=True):
-    table = read_catalog(path=path, GW_dist_info=GW_dist_info, key=key)
-    ra, dec = table['ra'].values, table['dec'].values
-    npix = 12*nside*nside
-    w = np.zeros(npix)
+def catalog2skymap(name, key='weight', dist_mean=None, dist_err=None,
+                   nside=64, nest=True, smooth=True, sigma=15, min_weight=0):
+    """Create a skymap of weighted galaxy positions from a given catalog.
 
-    c = SkyCoord(ra*units.deg, dec*units.deg, frame='fk5')
-    ipix = skymaptools.coord2pix(nside, c)
-    np.add.at(w, ipix, table['weight'].values)
+    Parameters
+    ----------
+    name : str
+        name of the catalog to use
+        options now are 'GWGC' or 'GLADE'
+        if 'GLADE' the catalog will need to be downloaded the first time, as it's a big file
+
+    key : str, optional
+        table key to use to weight the catalog
+        default is 'weight'
+        if dist_mean and dist_err are given then the weighting will use the 'Dist' key by default
+
+    dist_mean : float, optional
+        mean signal distance, used to weight the catalog sources based on distance
+        if given, dist_err should also be given
+
+    dist_err : float, optional
+        error on the signal distance, used to weight the catalog sources based on distance
+        if given, dist_mean should also be given
+
+    nside : int, optional
+        HEALPix Nside parameter for the resulting skymap
+        default is 64
+
+    nest : bool, optional
+        if True, the resulting skymap will use the HEALPix NESTED order
+        otherwise use the RING order
+        default is True
+
+    smooth : bool, optional
+        if True, smooth the skymap using the `sigma` parameter
+        default is True
+
+    sigma : float, optional
+        the gaussian sigma used when smoothing the skymap, in arcseconds
+        default is 15 arcsec
+
+    min_weight : float, optional
+        minimum weight to scale the skymap
+        default is 0
+
+    Returns
+    -------
+    skymap : `gototile.skymap.SkyMap`
+        the data in a SkyMap class
+
+    """
+    # Find the catalog path
+    data_path = pkg_resources.resource_filename('gototile', 'data')
+    filename = name + '.csv'
+    if os.path.isfile(os.path.join(data_path, filename)):
+        # The catalog already exists
+        filepath = os.path.join(data_path, filename)
+    else:
+        if name == 'GLADE':
+            # Can download the GLADE catalog if it doesn't exist
+            download.glade()
+            filepath = os.path.join(data_path, filename)
+        else:
+            raise ValueError('Catalog name not recognized')
+
+    # Read the catalog
+    table = read_catalog(filepath)
+
+    # Calculate the weight for each galaxy based on its reported distance
+    if dist_mean and dist_err:
+        table['weighted_distance'] = np.exp(-(table['Dist'] - dist_mean)**2/(2*dist_err**2))
+        key = 'weighted_distance'
+
+    # Get ra,dec coords of the entries in the table
+    ra, dec = table['ra'].values, table['dec'].values
+    coord = SkyCoord(ra, dec, unit='deg', frame='fk5')
+
+    # Convert coordinates into HEALPix pixels
+    ipix = skymaptools.coord2pix(nside, coord, nest=False)
+
+    # Create skymap weight array by summing weights of each pixel
+    # Note there may be multiple galaxies within each HEALPix pixel,
+    # np.add.at takes care of that
+    npix = hp.nside2npix(nside)
+    weights = np.zeros(npix)
+    np.add.at(weights, ipix, table[key].values)
 
     if smooth:
-        w = hp.smoothing(w, sigma=np.deg2rad(0.005), verbose=False)
+        # Smooth the skymap by the given sigma
+        sigma = Angle(sigma, unit=u.arcsec).degree
+        weights = hp.smoothing(weights, sigma=np.deg2rad(sigma), verbose=False)
 
-    # Scale between 0-1
-    w = (w-np.min(w))/(np.max(w)-np.min(w))
+    # Scale weight between `min_weight` and 1
+    weights = (weights - np.min(weights)) / (np.max(weights) - np.min(weights))
+    weights = (1 - min_weight) * weights + min_weight
 
-    return w
+    # Create a SkyMap class
+    skymap = SkyMap.from_data(weights, nested=False, coordsys='C')
+    if nest is True:
+        skymap.regrade(order='NESTED')
 
+    return skymap
 
 
 def map2catalog(skymap, catalog, key='weight'):
