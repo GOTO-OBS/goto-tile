@@ -18,8 +18,8 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
-from .math import lb2xyz, xyz2lb, intersect
-from .math import RAD, PI, PI_2
+from .math import spherical_to_cartesian, cartesian_to_spherical, intersect, interpolate, cartesian_to_celestial
+from .math import RAD, PI
 
 
 def create_grid(fov, overlap, kind='minverlap'):
@@ -234,46 +234,71 @@ def create_grid_minverlap_enhanced(fov, overlap):
 
     return allras, alldecs
 
+def get_tile_vertices(coords, fov):
+    """Get points defining the tile vertices from a list of coordinates and field of view.
 
-def get_tile_vertices(coords, delew, delns):
-    ra = coords.ra.value
-    dec = coords.dec.value
+    Understanding this is a work in progress...
 
-    phiew = delew/2*RAD
-    phins = delns/2*RAD
+    Returns a numpy array of shape (4,3) - 4 vertices (courners) each with x,y,z coordinates
 
-    l, b = ra*RAD, dec*RAD
-    xyz = lb2xyz(l, b)
+    NB: ew = RA
+        ns = Dec
+        l = lon = longitude = RA
+        b = lat = latitude = Dec
+        """
+    # Get latitude/longitude arrays in radians
+    # (NB this isn't tecnically latitude/longitude, but it's what spherical coordinate formulae use)
+    lon = coords.ra.to('radian').value
+    lat = coords.dec.to('radian').value
 
+    # Poles???
     poles = {}
-    poles['w'] = l - PI_2, 0 * b
-    poles['e'] = l + PI_2, 0 * b
-    mask = b < 0
-    poles['s'] = l + 0, b-PI_2
-    poles['s'][0][mask], poles['s'][1][mask] = l[mask]+PI, -b[mask]-PI_2
-    poles['n'] = l+PI, PI_2-b
-    poles['n'][0][mask], poles['n'][1][mask] = l[mask], b[mask]+PI_2
-    poles['w'] = lb2xyz(*poles['w'])
-    poles['e'] = lb2xyz(*poles['e'])
-    poles['n'] = lb2xyz(*poles['n'])
-    poles['s'] = lb2xyz(*poles['s'])
+    poles['w'] = lon - (np.pi / 2), 0 * lat
+    poles['e'] = lon + (np.pi / 2), 0 * lat
+    mask = lat < 0
+    poles['s'] = lon + 0, lat - (np.pi / 2)
+    poles['s'][0][mask], poles['s'][1][mask] = lon[mask] + np.pi, -lat[mask] - (np.pi / 2)
 
+    poles['n'] = lon + np.pi, (np.pi / 2) - lat
+    poles['n'][0][mask], poles['n'][1][mask] = lon[mask], lat[mask] + (np.pi / 2)
+
+    poles['w'] = spherical_to_cartesian(*poles['w'])
+    poles['e'] = spherical_to_cartesian(*poles['e'])
+    poles['n'] = spherical_to_cartesian(*poles['n'])
+    poles['s'] = spherical_to_cartesian(*poles['s'])
+
+
+    # Get phi angles in radians
+    # (NB divided by 2, since angle from centre to edge is half the FoV)
+    phi_ra = fov['ra'].to('radian').value / 2
+    phi_dec = fov['dec'].to('radian').value / 2
+
+    # Convert lat/lon to cartesian
+    xyz = spherical_to_cartesian(lon, lat)
+
+    # Edges
     edges = {}
-    fcos, fsin = np.cos(phiew), np.sin(phiew)
-    edges['e'] = xyz * fcos + poles['e'] * fsin
-    le, be = xyz2lb(*edges['e'])
-    edges['w'] = xyz * fcos + poles['w'] * fsin
-    lw, bw = xyz2lb(*edges['w'])
-    ls, bs = l, b-phins
-    edges['s'] = lb2xyz(ls, bs)
-    ln, bn = l, b+phins
-    edges['n'] = lb2xyz(ln, bn)
+    fcos, fsin = np.cos(phi_ra), np.sin(phi_ra)
 
+    edges['e'] = xyz * fcos + poles['e'] * fsin
+    le, be = cartesian_to_spherical(*edges['e'])
+
+    edges['w'] = xyz * fcos + poles['w'] * fsin
+    lw, bw = cartesian_to_spherical(*edges['w'])
+
+    ls, bs = lon, lat-phi_dec
+    edges['s'] = spherical_to_cartesian(ls, bs)
+
+    ln, bn = lon, lat+phi_dec
+    edges['n'] = spherical_to_cartesian(ln, bn)
+
+    # Something
     for key in edges.keys():
         edges[key] = edges[key].T
     for key in poles.keys():
         poles[key] = poles[key].T
 
+    # Corners
     corners = []
     corners.append(intersect(edges['n'], poles['w'], edges['w'], poles['n']))
     corners.append(intersect(edges['n'], poles['e'], edges['e'], poles['n']))
@@ -283,3 +308,19 @@ def get_tile_vertices(coords, delew, delns):
     corners = np.asarray(corners)
     corners = np.rollaxis(corners, 0, 2)
     return corners
+
+
+def get_tile_edges(vertices, steps=5):
+    """Interpolate a tile with corners to a full shape to be drawn.
+
+    Parameters
+    ----------
+    vertices : `numpy.ndarray`
+        An array of shape (4,3) defining 4 vertices in cartesian coordinates.
+    """
+    all_points = []
+    # Loop through all four edges by rolling through the array of vertices and taking each pair
+    for corner1, corner2 in zip(vertices, np.roll(vertices, 1, axis=0)):
+        points = interpolate(corner2, corner1, steps)  # Note the order is flipped
+        all_points.extend(points[:-1])  # We remove the final point, since it's duplicated
+    return np.array(all_points)
