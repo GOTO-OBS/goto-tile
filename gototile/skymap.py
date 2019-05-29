@@ -390,6 +390,9 @@ class SkyMap(object):
             As in HEALPIX, allowed coordinate systems are:
             'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
         """
+        if self.coordsys == coordsys:
+            return
+
         rotator = healpy.Rotator(coord=(self.coordsys, coordsys))
 
         # NOTE: rotator expectes order=RING in and returns order=RING out
