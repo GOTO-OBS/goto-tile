@@ -158,16 +158,21 @@ class SkyGrid(object):
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
         """
+        # Make sure the skymap is in equatorial coordinates
+        new_skymap = skymap.copy()
+        if new_skymap.coordsys != 'C':
+            new_skymap.rotate('C')
+
         # Calculate which pixels are within the tiles
-        self.pixels = self.get_pixels(skymap.nside, skymap.isnested)
+        self.pixels = self.get_pixels(new_skymap.nside, new_skymap.isnested)
 
         # Calculate the contained probabilities within each tile
-        probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
+        probs = np.array([new_skymap.skymap[pix].sum() for pix in self.pixels])
 
         # Store skymap details on the class
-        self.skymap = skymap.copy()
-        self.nside = skymap.nside
-        self.isnested = skymap.isnested
+        self.skymap = new_skymap
+        self.nside = new_skymap.nside
+        self.isnested = new_skymap.isnested
         self.probs = probs
 
         return probs
