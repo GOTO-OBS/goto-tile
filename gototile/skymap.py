@@ -380,7 +380,7 @@ class SkyMap(object):
         self.header['nside'] = nside
         self.header['ordering'] = order
 
-    def rotate(self, coordsys='E'):
+    def rotate(self, coordsys='C'):
         """Convert coordinate systems.
 
         Parameters
@@ -505,6 +505,15 @@ class SkyMap(object):
 
         """
         figure = plt.figure(figsize=(8,6))
+
+        # Can only plot in equatorial coordinates
+        # If it's not, temporarily rotate into equatorial and then go back afterwards
+        if not self.coordsys == 'C':
+            old_coordsys = self.coordsys
+            self.rotate('C')
+        else:
+            old_coordsys = None
+
         axes = plt.axes(projection='astro hours mollweide')
         axes.grid()
         transform = axes.get_transform('world')
@@ -532,6 +541,10 @@ class SkyMap(object):
                             ha='center', va='bottom',
                             size='x-small', zorder=12,
                             )
+
+        # Remember to rotate back!
+        if old_coordsys:
+            self.rotate(old_coordsys)
 
         # Set title
         title = 'Skymap for trigger {}'.format(self.objid)
