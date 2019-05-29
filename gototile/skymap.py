@@ -491,7 +491,7 @@ class SkyMap(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, filename=None, dpi=300, coordinates=None):
+    def plot(self, filename=None, dpi=300, coordinates=None, plot_contours=True):
         """Plot the skymap.
 
         Parameters
@@ -506,6 +506,9 @@ class SkyMap(object):
 
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
+
+        plot_contours : bool, default = True
+            plot the 50% and 90% contour areas
 
         """
         figure = plt.figure(figsize=(8,6))
@@ -526,9 +529,11 @@ class SkyMap(object):
         axes.imshow_hpx(self.skymap, cmap='cylon', nested=self.isnested)
 
         # Plot 50% and 90% contours
-        cs = axes.contour_hpx(self.contours*100 , nested=self.isnested,
-                            levels = [50, 90],
-                            colors='black', linewidths=0.5, zorder=99,)
+        if plot_contours:
+            cs = axes.contour_hpx(self.contours , nested=self.isnested,
+                                  levels = [0.5 * self.skymap.sum(),
+                                            0.9 * self.skymap.sum()],
+                                  colors='black', linewidths=0.5, zorder=99,)
         #axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
 
         # Plot coordinates if given
