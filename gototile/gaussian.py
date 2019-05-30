@@ -61,11 +61,6 @@ def create_gaussian_map(ra, dec, radius, nside=64, nest=True):
     grid_coords = pix2coord(nside, ipix, nest=nest)
 
     # Calculate the probability at each pixel
-    post = gaussian_prob(grid_coords, peak_coord, radius)
+    prob = gaussian_prob(grid_coords, peak_coord, radius)
 
-    # ???
-    post /= np.sum(post * hp.nside2pixarea(nside))
-    postcopy = np.copy(post)
-    postcopy *= 4 * np.pi / len(post)
-
-    return postcopy
+    return prob
