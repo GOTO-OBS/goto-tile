@@ -21,6 +21,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as\
     FigureCanvas
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
+from matplotlib.colors import BoundaryNorm
 from .math import cartesian_to_celestial
 from .skymap import read_colormaps
 
@@ -278,7 +279,7 @@ class SkyGrid(object):
     def plot(self, filename=None, dpi=300, orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              highlight=None, highlight_color=None, coordinates=None,
-             plot_skymap=False, plot_tilenames=False):
+             plot_skymap=False, plot_stats=False, plot_tilenames=False):
         """Plot the grid.
 
         Parameters
@@ -330,6 +331,9 @@ class SkyGrid(object):
         plot_skymap : bool, default = False
             color tiles based on their contained probability
             will fail unless a skymap has been applied to the grid using SkyGrid.apply_skymap()
+
+        plot_stats : bool, default = False
+            plot HEALPix pixels colored by the number of tiles they fall within
 
         plot_tilenames : bool, default = False
             plot the name of each tile in its centre
@@ -427,6 +431,42 @@ class SkyGrid(object):
             axes.add_collection(polys0)
             fig.colorbar(polys0, ax=axes, fraction=0.02, pad=0.05)
             polys.set_facecolor('none')
+
+        if plot_stats is True:
+            # Colour in areas based on the number of tiles they are within
+            polys.set_facecolor('none')
+
+            # HealPix for the grid
+            if hasattr(self, 'nside'):
+                nside = self.nside
+            else:
+                nside = 128
+            npix = healpy.nside2npix(nside)
+            ipix = np.arange(npix)
+            pix_coords = pix2coord(nside, ipix, nest=True)
+            pix_ras = pix_coords.ra.deg
+            pix_decs = pix_coords.dec.deg
+
+            # Statistics
+            tile_pixels = self.get_pixels(nside, True)
+            pix_freq = np.array([0] * npix)
+            for tile_pix in tile_pixels:
+                for pix in tile_pix:
+                    pix_freq[pix] += 1
+
+            # Plot HealPix points coloured by tile count
+            # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
+            cmap = plt.cm.jet
+            cmaplist = [cmap(i) for i in range(cmap.N)]
+            cmaplist[0] = (.5,.5,.5,1.0)
+            cmap = cmap.from_list('Custom cmap', cmaplist, cmap.N)
+
+            bounds = np.linspace(0,6,7)
+            norm = BoundaryNorm(bounds, cmap.N)
+
+            points = axes.scatter(pix_ras, pix_decs, s=1, zorder=0, transform=transform,
+                                  c=pix_freq, cmap='gist_rainbow', norm=norm)
+            fig.colorbar(points, ax=axes, fraction=0.02, pad=0.05)
 
         # Plot tile colors
         if color is not None:
