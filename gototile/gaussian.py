@@ -36,15 +36,13 @@ def gaussian_prob(grid, peak, radius):
     return prob
 
 
-def create_gaussian_map(ra, dec, radius, nside=64, nest=True):
+def create_gaussian_map(peak, radius, nside=64, nest=True):
     """Create a HEALPix map with a Gaussian peak at the given coordinates.
 
     Parameters
     ----------
-    ra : float
-        central ra, in degrees
-    dec : float
-        central dec, in degrees
+    peak : scalar `astropy.coordinates.SkyCoord`
+        central peak of the distribution
     radius : float
         68% containment radius, in degrees
     nside : int, default = 64
@@ -52,15 +50,12 @@ def create_gaussian_map(ra, dec, radius, nside=64, nest=True):
     nest : bool, default = True
         if True use HEALPix 'NESTED' ordering, if False use 'RING' ordering
     """
-    # Create an Astropy SkyCoord at the peak
-    peak_coord = SkyCoord(ra, dec, unit='deg')
-
     # Get the celestial coordinates of each pixel
     npix = hp.nside2npix(nside)
     ipix = np.arange(npix)
-    grid_coords = pix2coord(nside, ipix, nest=nest)
+    grid = pix2coord(nside, ipix, nest=nest)
 
     # Calculate the probability at each pixel
-    prob = gaussian_prob(grid_coords, peak_coord, radius)
+    prob = gaussian_prob(grid, peak, radius)
 
     return prob

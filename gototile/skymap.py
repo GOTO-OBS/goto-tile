@@ -347,7 +347,13 @@ class SkyMap(object):
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        prob_map = create_gaussian_map(ra, dec, radius, nside, nest=True)
+        # Create an Astropy SkyCoord at the peak
+        peak = SkyCoord(ra, dec, unit='deg')
+
+        # Get the gaussian probability data
+        prob_map = create_gaussian_map(peak, radius, nside, nest=True)
+
+        # Create a new SkyMap
         return cls.from_data(prob_map)
 
     def copy(self):
