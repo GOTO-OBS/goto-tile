@@ -420,8 +420,10 @@ class SkyMap(object):
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
-        total = self.skymap.sum()
-        self.skymap /= total
+        norm_skymap = self.skymap / self.skymap.sum()
+
+        # Save the new skymap
+        self._save_skymap(norm_skymap, self.order)
 
     def get_probability(self, coord, radius=0):
         """Return the probability at a given sky coordinate.
