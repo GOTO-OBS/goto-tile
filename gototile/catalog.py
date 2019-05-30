@@ -75,12 +75,6 @@ def visible_catalog(catalog, sidtimes, telescope):
     return catalog[mask], np.where(mask)[0]
 
 
-def read_catalog(path):
-    """Read a catalog and return a Pandas dataframe."""
-    table = pd.read_csv(path)
-    return table
-
-
 def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
                           nside=64, nest=True, smooth=True, sigma=15, min_weight=0):
     """Create a skymap of weighted galaxy positions from a given catalog.
@@ -147,7 +141,7 @@ def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
             raise ValueError('Catalog name not recognized')
 
     # Read the catalog
-    table = read_catalog(filepath)
+    table = pd.read_csv(filepath)
 
     # Calculate the weight for each galaxy based on its reported distance
     if dist_mean and dist_err:

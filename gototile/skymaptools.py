@@ -335,7 +335,7 @@ def calculate_tiling(skymap, telescopes, date=None,
         timespan = max([telescope.sidtimes[-1] for telescope in telescopes])
         timespan = timespan - date
     # if catalog['path']:
-    #     cattable = read_catalog(**catalog)
+    #     cattable = pd.read_csv(**catalog)
     #     allskymap, catsources = map2catalog(allskymap, cattable)
     #     if nightsky:
     #         indiceslist = []
