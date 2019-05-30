@@ -339,8 +339,9 @@ def get_tile_pixels(vertices, nside, nested=True):
 
     Parameters
     ----------
-    vertices : `numpy.ndarray`
-        An array of shape (4,3) defining 4 vertices in cartesian coordinates.
+    tile_vertices : `numpy.ndarray`
+        A 1D array containing arrays of shape (4,3) defining 4 vertices in cartesian coordinates,
+        for each tile.
     """
     polygon_query = PolygonQuery(nside, nested)
 
