@@ -14,6 +14,7 @@ from .skymaptools import calculate_tiling
 from .skymap import SkyMap
 from . import settings
 from . import extinction
+from . import catalog
 from . import telescope as telmodule
 from .telescope import build_scope, read_config_file
 from .utils import pointings_to_text
