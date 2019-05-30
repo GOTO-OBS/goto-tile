@@ -37,8 +37,8 @@ def prob(ra_grid,dec_grid,ra,dec,radius):
     return prob
 
 
-def gaussian_skymap(ra, dec, radius, nside=64):
-    """Calculate the probability for all skymap grids.
+def gaussian_skymap(ra, dec, radius, nside=64, nest=True):
+    """Create a HEALPix skymap with a Gaussian peak at the given coordinates.
 
     Parameters
     ----------
@@ -48,13 +48,17 @@ def gaussian_skymap(ra, dec, radius, nside=64):
         central dec, in degrees
     radius : float
         68% containment radius, in degrees
+    nside : int, default = 64
+        HEALPix Nside parameter to use when creating the skymap
+    nest : bool, default = True
+        if True use HEALPix 'NESTED' ordering, if False use 'RING' ordering
     """
     position_ra = np.radians(ra)                                     # convert RA_detect to radian
     position_dec = np.radians(dec)                                   # convert Dec_detect to radian
 
     npix = hp.nside2npix(nside)
     ipix = range(npix)
-    theta, phi = hp.pix2ang(nside, ipix)
+    theta, phi = hp.pix2ang(nside, ipix, nest=nest)
     ra = phi
     dec = 0.5 * np.pi - theta
 
@@ -67,11 +71,10 @@ def gaussian_skymap(ra, dec, radius, nside=64):
     m = Table([postcopy], names=['PROB'])
     m['PROB'].unit = u.pixel ** -1
 
-    ordering = 'RING'
     extra_header = [
           ('PIXTYPE', 'HEALPIX',
            'HEALPIX pixelisation'),
-          ('ORDERING', ordering,
+          ('ORDERING', 'NESTED' if nest else 'RING',
            'Pixel ordering scheme: RING, NESTED, or NUNIQ'),
           ('COORDSYS', 'C',
            'Ecliptic, Galactic or Celestial (equatorial)'),
