@@ -5,7 +5,7 @@ import numpy as np
 
 from .skymap import SkyMap
 
-def extinction2skymap(min_weight=0, exp_k=5):
+def create_extinction_skymap(min_weight=0, exp_k=5):
     """Create a skymap of weighted galactic extinction.
 
     Parameters

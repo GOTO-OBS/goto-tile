@@ -81,8 +81,8 @@ def read_catalog(path):
     return table
 
 
-def catalog2skymap(name, key='weight', dist_mean=None, dist_err=None,
-                   nside=64, nest=True, smooth=True, sigma=15, min_weight=0):
+def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
+                          nside=64, nest=True, smooth=True, sigma=15, min_weight=0):
     """Create a skymap of weighted galaxy positions from a given catalog.
 
     Parameters

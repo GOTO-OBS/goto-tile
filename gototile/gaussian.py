@@ -43,12 +43,20 @@ def create_gaussian_map(peak, radius, nside=64, nest=True):
     ----------
     peak : scalar `astropy.coordinates.SkyCoord`
         central peak of the distribution
+
     radius : float
         68% containment radius, in degrees
+
     nside : int, default = 64
         HEALPix Nside parameter to use when creating the skymap
+
     nest : bool, default = True
         if True use HEALPix 'NESTED' ordering, if False use 'RING' ordering
+
+    Returns
+    -------
+    prob_array : `numpy.array`
+        the probability data
     """
     # Get the celestial coordinates of each pixel
     npix = hp.nside2npix(nside)
@@ -59,3 +67,34 @@ def create_gaussian_map(peak, radius, nside=64, nest=True):
     prob = gaussian_prob(grid, peak, radius)
 
     return prob
+
+
+def create_gaussian_skymap(peak, radius, nside=64, nest=True):
+    """Create a skymap with a Gaussian peak at the given coordinates.
+
+    Parameters
+    ----------
+    peak : scalar `astropy.coordinates.SkyCoord`
+        central peak of the distribution
+
+    radius : float
+        68% containment radius, in degrees
+
+    nside : int, default = 64
+        HEALPix Nside parameter to use when creating the skymap
+
+    nest : bool, default = True
+        if True use HEALPix 'NESTED' ordering, if False use 'RING' ordering
+
+    Returns
+    -------
+    skymap : `gototile.skymap.SkyMap`
+        the data in a SkyMap class
+    """
+    # Get the probability data
+    prob = create_gaussian_map(peak, radius, nside, nest)
+
+    # Create a SkyMap class
+    skymap = SkyMap.from_data(prob, nested=nest)
+
+    return skymap
