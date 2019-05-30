@@ -159,6 +159,7 @@ def catalog2skymap(name, key='weight', dist_mean=None, dist_err=None,
     coord = SkyCoord(ra, dec, unit='deg', frame='fk5')
 
     # Convert coordinates into HEALPix pixels
+    # NB We need to use nest=False because hp.smoothing expects RING order
     ipix = skymaptools.coord2pix(nside, coord, nest=False)
 
     # Create skymap weight array by summing weights of each pixel
@@ -177,8 +178,10 @@ def catalog2skymap(name, key='weight', dist_mean=None, dist_err=None,
     weights = (weights - np.min(weights)) / (np.max(weights) - np.min(weights))
     weights = (1 - min_weight) * weights + min_weight
 
-    # Create a SkyMap class
+    # Create a SkyMap class (remember it has order=RING)
     skymap = SkyMap.from_data(weights, nested=False, coordsys='C')
+
+    # If we were asked for a nested skymap then regrade before returning
     if nest is True:
         skymap.regrade(order='NESTED')
 
