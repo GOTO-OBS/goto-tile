@@ -247,20 +247,34 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def get_stats(self, nside=128):
-        """Return a table containing grid statistics.
+    def _get_pixel_count(self, nside=128, nested=True):
+        """Get the count of the number of times each pixel is contained within a grid tile."""
+        if hasattr(self, 'pixels'):
+            # If a skymap has been applied: use those pixels
+            tile_pixels = self.pixels
+            nside = self.nside
+            nested = self.isnested
+        else:
+            # Use the given parameters
+            tile_pixels = self.get_pixels(nside, nested)
 
-        """
-
-        # Get the pixels within each tile
-        tile_pixels = self.get_pixels(nside, True)
-
-        # Statistics
+        # Number of pixels
         npix = healpy.nside2npix(nside)
+
+        # For each pixel, create a count of the number of tiles it falls within
         count = np.array([0] * npix)
         for tile_pix in tile_pixels:
             for pix in tile_pix:
                 count[pix] += 1
+
+        return count
+
+    def get_stats(self, nside=128, nested=True):
+        """Return a table containing grid statistics."""
+        # Get the count
+        count = self._get_pixel_count(nside, nested)
+
+        # Create a frequency counter
         counter = collections.Counter(count)
 
         # Make table
@@ -269,7 +283,7 @@ class SkyGrid(object):
 
         in_tiles = [i for i in counter]
         pix = [counter[i] for i in counter]
-        freq = [counter[i]/npix for i in counter]
+        freq = [counter[i]/len(count) for i in counter]
 
         table = QTable([in_tiles, pix, freq],
                        names=col_names, dtype=col_types)
@@ -436,23 +450,21 @@ class SkyGrid(object):
             # Colour in areas based on the number of tiles they are within
             polys.set_facecolor('none')
 
-            # HealPix for the grid
+            # Use attributes of the skymap if one has been applied
             if hasattr(self, 'nside'):
                 nside = self.nside
+                nest = self.isnested
             else:
                 nside = 128
+                nest = True
+
+            # Get the coordinates of each pixel to plot
             npix = healpy.nside2npix(nside)
             ipix = np.arange(npix)
-            pix_coords = pix2coord(nside, ipix, nest=True)
-            pix_ras = pix_coords.ra.deg
-            pix_decs = pix_coords.dec.deg
+            coords = pix2coord(nside, ipix, nest=nest)
 
-            # Statistics
-            tile_pixels = self.get_pixels(nside, True)
-            pix_freq = np.array([0] * npix)
-            for tile_pix in tile_pixels:
-                for pix in tile_pix:
-                    pix_freq[pix] += 1
+            # Get count statistics
+            count = self._get_pixel_count(nside, nest)
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
@@ -464,8 +476,10 @@ class SkyGrid(object):
             bounds = np.linspace(0,6,7)
             norm = BoundaryNorm(bounds, cmap.N)
 
-            points = axes.scatter(pix_ras, pix_decs, s=1, zorder=0, transform=transform,
-                                  c=pix_freq, cmap='gist_rainbow', norm=norm)
+            points = axes.scatter(coords.ra.deg, coords.dec.deg,
+                                  transform=transform,
+                                  s=1, c=count, cmap='gist_rainbow', norm=norm,
+                                  zorder=0)
             fig.colorbar(points, ax=axes, fraction=0.02, pad=0.05)
 
         # Plot tile colors
@@ -617,7 +631,8 @@ class SkyGrid(object):
         if coordinates:
             axes.scatter(coordinates.ra.value, coordinates.dec.value,
                          transform=transform,
-                         s=99, c='blue', marker='*', zorder=9)
+                         s=99, c='blue', marker='*',
+                         zorder=9)
             if coordinates.isscalar:
                 coordinates = SkyCoord([coordinates])
             for coord in coordinates:
