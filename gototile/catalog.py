@@ -97,7 +97,7 @@ def visible_catalog(catalog, sidtimes, telescope):
     return catalog[mask], np.where(mask)[0]
 
 
-def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
+def create_catalog_skymap(name, dist_mean=None, dist_err=None, key='weight',
                           nside=64, nest=True, smooth=True, sigma=15, min_weight=0):
     """Create a skymap of weighted galaxy positions from a given catalog.
 
@@ -108,11 +108,6 @@ def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
         options now are 'GWGC' or 'GLADE'
         if 'GLADE' the catalog will need to be downloaded the first time, as it's a big file
 
-    key : str, optional
-        table key to use to weight the catalog
-        default is 'weight'
-        if dist_mean and dist_err are given then the weighting will use the 'Dist' key by default
-
     dist_mean : float, optional
         mean signal distance, used to weight the catalog sources based on distance
         if given, dist_err should also be given
@@ -120,6 +115,11 @@ def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
     dist_err : float, optional
         error on the signal distance, used to weight the catalog sources based on distance
         if given, dist_mean should also be given
+
+    key : str, optional
+        table key to use to weight the catalog
+        default is 'weight'
+        if dist_mean and dist_err are given then the weighting will use the 'Dist' key by default
 
     nside : int, optional
         HEALPix Nside parameter for the resulting skymap
