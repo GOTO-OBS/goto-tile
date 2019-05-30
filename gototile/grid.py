@@ -32,16 +32,8 @@ from astropy import units as u
 from astropy.table import QTable
 
 from .skymaptools import pix2coord
-from .gridtools import create_grid, get_tile_vertices, get_tile_edges
+from .gridtools import create_grid, get_tile_vertices, get_tile_edges, get_tile_pixels
 from .math import RAD, PI
-
-
-class PolygonQuery(object):
-    def __init__(self, nside, nested):
-        self.nside = nside
-        self.nested = nested
-    def __call__(self, vertices):
-        return healpy.query_polygon(self.nside, vertices, nest=self.nested)
 
 
 class SkyGrid(object):
@@ -136,16 +128,9 @@ class SkyGrid(object):
         newgrid = SkyGrid(self.fov, self.overlap)
         return newgrid
 
-    def get_pixels(self, nside, nested=True):
-        """Calculate the HEALPix indicies within each tile.
-
-        See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
-        """
-        polygon_query = PolygonQuery(nside, nested)
-        pool = multiprocessing.Pool()
-        pixels = pool.map(polygon_query, self.vertices)
-        pool.close()
-        pool.join()
+    def get_pixels(self, nside):
+        """Calculate the HEALPix indicies within each tile."""
+        pixels = get_tile_pixels(self.vertices, nside)
         return np.array(pixels)
 
     def apply_skymap(self, skymap):
@@ -159,16 +144,23 @@ class SkyGrid(object):
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
         """
+        # Need to make sure the skymap has order='NESTED' not ring, because it seems there are
+        # problems with hp.query_polygon in RING ordering.
+        # See https://github.com/GOTO-OBS/goto-tile/issues/65
+        # Therefore enforce NESTED when applying a skymap to a grid
+        new_skymap = skymap.copy()
+        if not new_skymap.isnested:
+            new_skymap.regrade(order='NESTED')
+
         # Calculate which pixels are within the tiles
-        self.pixels = self.get_pixels(skymap.nside, skymap.isnested)
+        self.pixels = self.get_pixels(new_skymap.nside)
 
         # Calculate the contained probabilities within each tile
-        probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
+        probs = np.array([new_skymap.skymap[pix].sum() for pix in self.pixels])
 
         # Store skymap details on the class
-        self.skymap = skymap.copy()
-        self.nside = skymap.nside
-        self.isnested = skymap.isnested
+        self.skymap = new_skymap
+        self.nside = new_skymap.nside
         self.probs = probs
 
         return probs
@@ -247,20 +239,33 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def get_stats(self, nside=128):
-        """Return a table containing grid statistics.
+    def _get_pixel_count(self, nside=128):
+        """Get the count of the number of times each pixel is contained within a grid tile."""
+        if hasattr(self, 'pixels'):
+            # If a skymap has been applied: use those pixels
+            tile_pixels = self.pixels
+            nside = self.nside
+        else:
+            # Use the given parameters
+            tile_pixels = self.get_pixels(nside)
 
-        """
-
-        # Get the pixels within each tile
-        tile_pixels = self.get_pixels(nside, True)
-
-        # Statistics
+        # Number of pixels
         npix = healpy.nside2npix(nside)
+
+        # For each pixel, create a count of the number of tiles it falls within
         count = np.array([0] * npix)
         for tile_pix in tile_pixels:
             for pix in tile_pix:
                 count[pix] += 1
+
+        return count
+
+    def get_stats(self, nside=128):
+        """Return a table containing grid statistics."""
+        # Get the count
+        count = self._get_pixel_count(nside)
+
+        # Create a frequency counter
         counter = collections.Counter(count)
 
         # Make table
@@ -269,7 +274,7 @@ class SkyGrid(object):
 
         in_tiles = [i for i in counter]
         pix = [counter[i] for i in counter]
-        freq = [counter[i]/npix for i in counter]
+        freq = [counter[i]/len(count) for i in counter]
 
         table = QTable([in_tiles, pix, freq],
                        names=col_names, dtype=col_types)
@@ -436,23 +441,19 @@ class SkyGrid(object):
             # Colour in areas based on the number of tiles they are within
             polys.set_facecolor('none')
 
-            # HealPix for the grid
+            # Use attributes of the skymap if one has been applied
             if hasattr(self, 'nside'):
                 nside = self.nside
             else:
                 nside = 128
+
+            # Get the coordinates of each pixel to plot
             npix = healpy.nside2npix(nside)
             ipix = np.arange(npix)
-            pix_coords = pix2coord(nside, ipix, nest=True)
-            pix_ras = pix_coords.ra.deg
-            pix_decs = pix_coords.dec.deg
+            coords = pix2coord(nside, ipix, nest=True)
 
-            # Statistics
-            tile_pixels = self.get_pixels(nside, True)
-            pix_freq = np.array([0] * npix)
-            for tile_pix in tile_pixels:
-                for pix in tile_pix:
-                    pix_freq[pix] += 1
+            # Get count statistics
+            count = self._get_pixel_count(nside)
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
@@ -464,8 +465,10 @@ class SkyGrid(object):
             bounds = np.linspace(0,6,7)
             norm = BoundaryNorm(bounds, cmap.N)
 
-            points = axes.scatter(pix_ras, pix_decs, s=1, zorder=0, transform=transform,
-                                  c=pix_freq, cmap='gist_rainbow', norm=norm)
+            points = axes.scatter(coords.ra.deg, coords.dec.deg,
+                                  transform=transform,
+                                  s=1, c=count, cmap='gist_rainbow', norm=norm,
+                                  zorder=0)
             fig.colorbar(points, ax=axes, fraction=0.02, pad=0.05)
 
         # Plot tile colors
@@ -617,7 +620,8 @@ class SkyGrid(object):
         if coordinates:
             axes.scatter(coordinates.ra.value, coordinates.dec.value,
                          transform=transform,
-                         s=99, c='blue', marker='*', zorder=9)
+                         s=99, c='blue', marker='*',
+                         zorder=9)
             if coordinates.isscalar:
                 coordinates = SkyCoord([coordinates])
             for coord in coordinates:
