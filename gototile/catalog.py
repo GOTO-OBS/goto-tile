@@ -64,6 +64,28 @@ class download():
         os.remove(out_txt)
 
 
+def map2catalog(skymap, catalog, key='weight'):
+    """Return a copy of the skymap folded with the catalog"""
+    weights = np.zeros(len(skymap.skymap))
+
+    phi = np.deg2rad(catalog['ra']%360)
+    theta = np.pi/2 - np.deg2rad(catalog['dec'])
+
+    catalogpixels = healpy.ang2pix(skymap.nside, theta, phi, nest=skymap.isnested)
+    sources = defaultdict(list)
+
+    for i, weight in enumerate(catalog[key]):
+        if weight:
+            pixel = catalogpixels[i]
+            weights[pixel] += weight
+            # Store the catalog source
+            sources[pixel].append((i, catalog['ra'][i], catalog['dec'][i]))
+    weightmap = skymap.copy()
+    weightmap.skymap = weights * weightmap.skymap
+
+    return weightmap, sources
+
+
 def visible_catalog(catalog, sidtimes, telescope):
 
     mask = np.zeros(len(catalog), dtype=np.bool)
@@ -180,25 +202,3 @@ def create_catalog_skymap(name, key='weight', dist_mean=None, dist_err=None,
         skymap.regrade(order='NESTED')
 
     return skymap
-
-
-def map2catalog(skymap, catalog, key='weight'):
-    """Return a copy of the skymap folded with the catalog"""
-    weights = np.zeros(len(skymap.skymap))
-
-    phi = np.deg2rad(catalog['ra']%360)
-    theta = np.pi/2 - np.deg2rad(catalog['dec'])
-
-    catalogpixels = healpy.ang2pix(skymap.nside, theta, phi, nest=skymap.isnested)
-    sources = defaultdict(list)
-
-    for i, weight in enumerate(catalog[key]):
-        if weight:
-            pixel = catalogpixels[i]
-            weights[pixel] += weight
-            # Store the catalog source
-            sources[pixel].append((i, catalog['ra'][i], catalog['dec'][i]))
-    weightmap = skymap.copy()
-    weightmap.skymap = weights * weightmap.skymap
-
-    return weightmap, sources
