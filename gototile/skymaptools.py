@@ -14,78 +14,12 @@ import multiprocessing
 import numpy as np
 import healpy as hp
 from . import settings
-from .catalog import visible_catalog, read_catalog, map2catalog
 from . import math
 from . import utils
 from astropy.io.fits import getdata
 import astropy.io.fits as fits
 import reproject as rp
 import pkg_resources
-
-
-def galactic2ecliptic(infile, outfile=None, key=None, nside=64, in_nested=True, out_nested=False, exp_k=5):
-    """
-    Transform galactic skymap to ecliptic skymap.
-
-    Parameters
-    ------------
-    infile: str
-        file path of the skymap FITS
-    outfile: str
-        outfile name if the filename is given
-    key: str
-        name of the selected skymap in the FITS
-    nside: int
-        nside for output skymap
-    in_nested: bool, optional
-        if True, indicating nested for input file
-    out_nested: bool, optional
-        if True, return nested skymap
-    exp_k: int
-        exponential constant for weight skymap
-
-    Returns
-    --------------
-    healpix array
-    """
-    if not key:
-        skymap = hp.read_map(infile, nest=None)
-    else:
-        skymap = getdata(infile)[key]
-
-    skymap = hp.cartview(skymap, coord=['G','E'],
-                    return_projected_map=True,
-                    nest=in_nested)
-
-    hdr = fits.Header.fromstring("""
-NAXIS   =                    2
-NAXIS1  =                  800
-NAXIS2  =                  400
-CTYPE1  = 'RA---CAR'
-CRPIX1  =                  400
-CRVAL1  =                  0.0
-CDELT1  =                 -0.450000
-CUNIT1  = 'deg     '
-CTYPE2  = 'DEC--CAR'
-CRPIX2  =                  200
-CRVAL2  =                  0.0
-CDELT2  =                  0.4500000
-CUNIT2  = 'deg     '
-COORDSYS= 'ECLIPTIC'
-""", sep='\n')
-    skymap, footprint_Gal_HP = rp.reproject_to_healpix((skymap, hdr), coord_system_out='icrs', nside=nside, nested=out_nested)
-
-    skymap[np.isnan(skymap)] = 0
-    s_skymap = (skymap-np.min(skymap))/(np.max(skymap)-np.min(skymap))
-
-    weight = np.exp(-exp_k*s_skymap)
-
-    if outfile:
-        DATA_DIR = pkg_resources.resource_filename('gototile', 'data')
-        FILE_PATH = os.path.join(DATA_DIR, outfile)
-        hp.write_map(FILE_PATH, weight, nest=out_nested)
-
-    return weight
 
 
 def coord2pix(nside, coord, nest=False):
@@ -400,26 +334,26 @@ def calculate_tiling(skymap, telescopes, date=None,
     if timespan is None:
         timespan = max([telescope.sidtimes[-1] for telescope in telescopes])
         timespan = timespan - date
-    if catalog['path']:
-        cattable = read_catalog(**catalog)
-        allskymap, catsources = map2catalog(allskymap, cattable)
-        if nightsky:
-            indiceslist = []
-            for telescope in telescopes:
-                _, indices = visible_catalog(
-                    cattable, telescope.sidtimes,
-                    telescope)
-                telescope.indices['catalog'] = indices
-                telescope.skymap, telescope.catsources = map2catalog(
-                    skymap, cattable[indices])
-                indiceslist.append(indices)
-            indices = np.unique(np.hstack(indiceslist))
-            cattable = cattable[indices]
-            newskymap, catsources = map2catalog(skymap, cattable)
-        else:
-            newskymap = allskymap.copy()
-            for telescope in telescopes:
-                telescope.skymap = allskymap.copy()
+    # if catalog['path']:
+    #     cattable = read_catalog(**catalog)
+    #     allskymap, catsources = map2catalog(allskymap, cattable)
+    #     if nightsky:
+    #         indiceslist = []
+    #         for telescope in telescopes:
+    #             _, indices = visible_catalog(
+    #                 cattable, telescope.sidtimes,
+    #                 telescope)
+    #             telescope.indices['catalog'] = indices
+    #             telescope.skymap, telescope.catsources = map2catalog(
+    #                 skymap, cattable[indices])
+    #             indiceslist.append(indices)
+    #         indices = np.unique(np.hstack(indiceslist))
+    #         cattable = cattable[indices]
+    #         newskymap, catsources = map2catalog(skymap, cattable)
+    #     else:
+    #         newskymap = allskymap.copy()
+    #         for telescope in telescopes:
+    #             telescope.skymap = allskymap.copy()
     elif nightsky:
         indiceslist = []
         for telescope in telescopes:
