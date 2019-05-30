@@ -327,14 +327,15 @@ def get_tile_edges(vertices, steps=5):
 
 
 class PolygonQuery(object):
-    def __init__(self, nside, nested):
+    def __init__(self, nside):
         self.nside = nside
-        self.nested = nested
     def __call__(self, vertices):
-        return hp.query_polygon(self.nside, vertices, nest=self.nested, inclusive=True, fact=32)
+        # Note nest is always True
+        # See https://github.com/GOTO-OBS/goto-tile/issues/65
+        return hp.query_polygon(self.nside, vertices, nest=True, inclusive=True, fact=32)
 
 
-def get_tile_pixels(vertices, nside, nested=True):
+def get_tile_pixels(vertices, nside):
     """Find the HEALPix pixels within the given vertices.
 
     Parameters
@@ -342,8 +343,11 @@ def get_tile_pixels(vertices, nside, nested=True):
     tile_vertices : `numpy.ndarray`
         A 1D array containing arrays of shape (4,3) defining 4 vertices in cartesian coordinates,
         for each tile.
+
+    nside : float
+        The HEALPix Nside resolution parameter.
     """
-    polygon_query = PolygonQuery(nside, nested)
+    polygon_query = PolygonQuery(nside)
 
     pool = multiprocessing.Pool()
     pixels = pool.map(polygon_query, vertices)

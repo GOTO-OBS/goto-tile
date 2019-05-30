@@ -128,9 +128,9 @@ class SkyGrid(object):
         newgrid = SkyGrid(self.fov, self.overlap)
         return newgrid
 
-    def get_pixels(self, nside, nested=True):
+    def get_pixels(self, nside):
         """Calculate the HEALPix indicies within each tile."""
-        pixels = get_tile_pixels(self.vertices, nside, nested)
+        pixels = get_tile_pixels(self.vertices, nside)
         return np.array(pixels)
 
     def apply_skymap(self, skymap):
@@ -144,16 +144,23 @@ class SkyGrid(object):
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
         """
+        # Need to make sure the skymap has order='NESTED' not ring, because it seems there are
+        # problems with hp.query_polygon in RING ordering.
+        # See https://github.com/GOTO-OBS/goto-tile/issues/65
+        # Therefore enforce NESTED when applying a skymap to a grid
+        new_skymap = skymap.copy()
+        if not new_skymap.isnested:
+            new_skymap.regrade(order='NESTED')
+
         # Calculate which pixels are within the tiles
-        self.pixels = self.get_pixels(skymap.nside, skymap.isnested)
+        self.pixels = self.get_pixels(new_skymap.nside)
 
         # Calculate the contained probabilities within each tile
-        probs = np.array([skymap.skymap[pix].sum() for pix in self.pixels])
+        probs = np.array([new_skymap.skymap[pix].sum() for pix in self.pixels])
 
         # Store skymap details on the class
-        self.skymap = skymap.copy()
-        self.nside = skymap.nside
-        self.isnested = skymap.isnested
+        self.skymap = new_skymap
+        self.nside = new_skymap.nside
         self.probs = probs
 
         return probs
@@ -232,16 +239,15 @@ class SkyGrid(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def _get_pixel_count(self, nside=128, nested=True):
+    def _get_pixel_count(self, nside=128):
         """Get the count of the number of times each pixel is contained within a grid tile."""
         if hasattr(self, 'pixels'):
             # If a skymap has been applied: use those pixels
             tile_pixels = self.pixels
             nside = self.nside
-            nested = self.isnested
         else:
             # Use the given parameters
-            tile_pixels = self.get_pixels(nside, nested)
+            tile_pixels = self.get_pixels(nside)
 
         # Number of pixels
         npix = healpy.nside2npix(nside)
@@ -254,10 +260,10 @@ class SkyGrid(object):
 
         return count
 
-    def get_stats(self, nside=128, nested=True):
+    def get_stats(self, nside=128):
         """Return a table containing grid statistics."""
         # Get the count
-        count = self._get_pixel_count(nside, nested)
+        count = self._get_pixel_count(nside)
 
         # Create a frequency counter
         counter = collections.Counter(count)
@@ -438,18 +444,16 @@ class SkyGrid(object):
             # Use attributes of the skymap if one has been applied
             if hasattr(self, 'nside'):
                 nside = self.nside
-                nest = self.isnested
             else:
                 nside = 128
-                nest = True
 
             # Get the coordinates of each pixel to plot
             npix = healpy.nside2npix(nside)
             ipix = np.arange(npix)
-            coords = pix2coord(nside, ipix, nest=nest)
+            coords = pix2coord(nside, ipix, nest=True)
 
             # Get count statistics
-            count = self._get_pixel_count(nside, nest)
+            count = self._get_pixel_count(nside)
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
