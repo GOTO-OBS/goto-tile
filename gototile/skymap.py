@@ -13,7 +13,7 @@ import healpy
 import ephem
 from . import settings
 from . import skymaptools as smt
-from .gaussian import gaussian_skymap
+from .gaussian import create_gaussian_map
 from matplotlib import pyplot as plt
 import ligo.skymap.plot
 
@@ -287,31 +287,7 @@ class SkyMap(object):
         return cls(skymap, header)
 
     @classmethod
-    def from_position(cls, ra, dec, radius, nside=64):
-        """Initialize a `~gototile.skymap.SkyMap` object from a sky position and radius.
-
-        Parameters
-        ----------
-        ra : float
-            ra in decimal degrees
-        dec : float
-            declination in decimal degrees
-        radius : float
-            68% containment radius in decimal degrees
-        nside : int, optional
-            healpix nside parameter (must be a power of 2)
-            default is 64
-
-        Returns
-        -------
-        `~gototile.skymap.SkyMap``
-            SkyMap object.
-        """
-        hdulist = gaussian_skymap(ra, dec, radius, nside, nest=True)
-        return cls.from_fits(hdulist)
-
-    @classmethod
-    def from_data(cls, data, nested, coordsys='C'):
+    def from_data(cls, data, nested=True, coordsys='C'):
         """Initialize a `~gototile.skymap.SkyMap` object from an array of data.
 
         Parameters
@@ -349,6 +325,30 @@ class SkyMap(object):
                   }
 
         return cls(data, header)
+
+    @classmethod
+    def from_position(cls, ra, dec, radius, nside=64):
+        """Initialize a `~gototile.skymap.SkyMap` object from a sky position and radius.
+
+        Parameters
+        ----------
+        ra : float
+            ra in decimal degrees
+        dec : float
+            declination in decimal degrees
+        radius : float
+            68% containment radius in decimal degrees
+        nside : int, optional
+            healpix nside parameter (must be a power of 2)
+            default is 64
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        prob_map = create_gaussian_map(ra, dec, radius, nside, nest=True)
+        return cls.from_data(prob_map)
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""

@@ -40,7 +40,7 @@ def galactic2ecliptic(infile, outfile=None, key=None, nside=64, in_nested=True, 
     in_nested: bool, optional
         if True, indicating nested for input file
     out_nested: bool, optional
-        if True, return nested skymap 
+        if True, return nested skymap
     exp_k: int
         exponential constant for weight skymap
 
@@ -52,11 +52,11 @@ def galactic2ecliptic(infile, outfile=None, key=None, nside=64, in_nested=True, 
         skymap = hp.read_map(infile, nest=None)
     else:
         skymap = getdata(infile)[key]
-    
-    skymap = hp.cartview(skymap, coord=['G','E'], 
-                    return_projected_map=True, 
+
+    skymap = hp.cartview(skymap, coord=['G','E'],
+                    return_projected_map=True,
                     nest=in_nested)
-    
+
     hdr = fits.Header.fromstring("""
 NAXIS   =                    2
 NAXIS1  =                  800
