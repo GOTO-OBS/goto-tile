@@ -32,16 +32,8 @@ from astropy import units as u
 from astropy.table import QTable
 
 from .skymaptools import pix2coord
-from .gridtools import create_grid, get_tile_vertices, get_tile_edges
+from .gridtools import create_grid, get_tile_vertices, get_tile_edges, get_tile_pixels
 from .math import RAD, PI
-
-
-class PolygonQuery(object):
-    def __init__(self, nside, nested):
-        self.nside = nside
-        self.nested = nested
-    def __call__(self, vertices):
-        return healpy.query_polygon(self.nside, vertices, nest=self.nested)
 
 
 class SkyGrid(object):
@@ -137,15 +129,8 @@ class SkyGrid(object):
         return newgrid
 
     def get_pixels(self, nside, nested=True):
-        """Calculate the HEALPix indicies within each tile.
-
-        See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
-        """
-        polygon_query = PolygonQuery(nside, nested)
-        pool = multiprocessing.Pool()
-        pixels = pool.map(polygon_query, self.vertices)
-        pool.close()
-        pool.join()
+        """Calculate the HEALPix indicies within each tile."""
+        pixels = get_tile_pixels(self.vertices, nside, nested)
         return np.array(pixels)
 
     def apply_skymap(self, skymap):

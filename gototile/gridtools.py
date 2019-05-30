@@ -324,3 +324,29 @@ def get_tile_edges(vertices, steps=5):
         points = interpolate(corner2, corner1, steps)  # Note the order is flipped
         all_points.extend(points[:-1])  # We remove the final point, since it's duplicated
     return np.array(all_points)
+
+
+class PolygonQuery(object):
+    def __init__(self, nside, nested):
+        self.nside = nside
+        self.nested = nested
+    def __call__(self, vertices):
+        return hp.query_polygon(self.nside, vertices, nest=self.nested)
+
+
+def get_tile_pixels(vertices, nside, nested=True):
+    """Find the HEALPix pixels within the given vertices.
+
+    Parameters
+    ----------
+    vertices : `numpy.ndarray`
+        An array of shape (4,3) defining 4 vertices in cartesian coordinates.
+    """
+    polygon_query = PolygonQuery(nside, nested)
+
+    pool = multiprocessing.Pool()
+    pixels = pool.map(polygon_query, vertices)
+    pool.close()
+    pool.join()
+
+    return np.array(pixels)
