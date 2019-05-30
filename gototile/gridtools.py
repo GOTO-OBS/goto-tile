@@ -331,7 +331,7 @@ class PolygonQuery(object):
         self.nside = nside
         self.nested = nested
     def __call__(self, vertices):
-        return hp.query_polygon(self.nside, vertices, nest=self.nested)
+        return hp.query_polygon(self.nside, vertices, nest=self.nested, inclusive=True, fact=32)
 
 
 def get_tile_pixels(vertices, nside, nested=True):
