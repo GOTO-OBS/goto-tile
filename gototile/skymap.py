@@ -13,7 +13,6 @@ import healpy
 import ephem
 from . import settings
 from . import skymaptools as smt
-from .catalog import read_catalog
 from .gaussian import gaussian_skymap
 from matplotlib import pyplot as plt
 import ligo.skymap.plot
