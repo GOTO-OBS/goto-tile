@@ -63,21 +63,6 @@ class download():
 
         os.remove(out_txt)
 
-    @staticmethod
-    def ext_skymap(url="https://irsa.ipac.caltech.edu/data/Planck/release_1/all-sky-maps/maps/COM_CompMap_dust-commrul_0256_R1.00.fits",
-        local_path=None, outfile='ext_map.fits'):
-        print("Downloading Extinction Skymap...")
-        if local_path==None:
-            local_path = pkg_resources.resource_filename('gototile', 'data')
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
-
-        outfile = os.path.join(local_path, outfile)
-        urlretrieve(url, outfile, download.reporthook)
-
-
-
-
 
 def visible_catalog(catalog, sidtimes, telescope):
 
