@@ -324,3 +324,34 @@ def get_tile_edges(vertices, steps=5):
         points = interpolate(corner2, corner1, steps)  # Note the order is flipped
         all_points.extend(points[:-1])  # We remove the final point, since it's duplicated
     return np.array(all_points)
+
+
+class PolygonQuery(object):
+    def __init__(self, nside):
+        self.nside = nside
+    def __call__(self, vertices):
+        # Note nest is always True
+        # See https://github.com/GOTO-OBS/goto-tile/issues/65
+        return hp.query_polygon(self.nside, vertices, nest=True, inclusive=True, fact=32)
+
+
+def get_tile_pixels(vertices, nside):
+    """Find the HEALPix pixels within the given vertices.
+
+    Parameters
+    ----------
+    tile_vertices : `numpy.ndarray`
+        A 1D array containing arrays of shape (4,3) defining 4 vertices in cartesian coordinates,
+        for each tile.
+
+    nside : float
+        The HEALPix Nside resolution parameter.
+    """
+    polygon_query = PolygonQuery(nside)
+
+    pool = multiprocessing.Pool()
+    pixels = pool.map(polygon_query, vertices)
+    pool.close()
+    pool.join()
+
+    return np.array(pixels)

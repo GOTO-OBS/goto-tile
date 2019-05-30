@@ -308,7 +308,7 @@ class SkyMap(object):
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        hdulist = gaussian_skymap(ra, dec, radius, nside)
+        hdulist = gaussian_skymap(ra, dec, radius, nside, nest=True)
         return cls.from_fits(hdulist)
 
     @classmethod
