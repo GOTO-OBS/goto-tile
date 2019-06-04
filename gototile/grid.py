@@ -16,6 +16,8 @@ from copy import copy
 
 
 from matplotlib import pyplot as plt
+if 'DISPLAY' not in os.environ:
+    plt.switch_backend('agg')
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as\
     FigureCanvas

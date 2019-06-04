@@ -16,6 +16,8 @@ from . import skymaptools as smt
 from .catalog import read_catalog
 from .gaussian import gaussian_skymap
 from matplotlib import pyplot as plt
+if 'DISPLAY' not in os.environ:
+    plt.switch_backend('agg')
 import ligo.skymap.plot
 
 try:

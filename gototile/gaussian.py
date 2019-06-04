@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 from astropy.table import Table
 import healpy as hp
 from astropy import units as u
