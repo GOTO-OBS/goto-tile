@@ -62,9 +62,10 @@ def parse_args(args=None):
     parser.add_argument('--exptime', type=float,
                         help="Use this exposure times, in seconds. "
                         "Applies to *all* telescopes")
-    parser.add_argument('-c', '--catalog', nargs='?', const=True,
+    parser.add_argument('-c', '--catalog', 
+                        choices=['GLADE','GWGC'],
                         help="Use a catalog to convolve with; specify as an "
-                        "astropy readable table format (default catalog: GWGC)")
+                        "astropy readable table format")
     parser.add_argument('--catalog-weight-key',
                         help="Field name to serve as a catalog weight. "
                         "Default is no weighting (spatial density only)")
@@ -176,10 +177,15 @@ def parse_args(args=None):
 
     args.coverage = {'min': args.minfrac, 'max': args.maxfrac}
 
-    if args.catalog is True:
-        args.catalog = settings.GWGC_PATH
-        if not args.catalog_weight_key:
-            args.catalog_weight_key = 'weight'
+    if args.catalog:
+        if args.catalog == 'GWGC':
+            args.catalog = settings.GWGC_PATH
+            if not args.catalog_weight_key:
+                args.catalog_weight_key = 'weight'
+        elif args.catalog == 'GLADE':
+            args.catalog = settings.GLADE_PATH
+            if not args.catalog_weight_key:
+                args.catalog_weight_key = 'weight'
     args.catalog = {'path': args.catalog, 'key': args.catalog_weight_key}
 
     if args.plot is True:

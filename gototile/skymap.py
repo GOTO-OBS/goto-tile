@@ -13,8 +13,7 @@ import healpy
 import ephem
 from . import settings
 from . import skymaptools as smt
-from .catalog import read_catalog
-from .gaussian import gaussian_skymap
+from .gaussian import create_gaussian_map
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
@@ -90,6 +89,15 @@ class SkyMap(object):
         if order not in ('NESTED', 'RING'):
             raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
 
+        # Get the coordinate system from the header
+        try:
+            coordsys = header['coordsys'][0]
+        except KeyError:
+            raise ValueError('No COORDSYS value in the header')
+        if coordsys not in ('G', 'E', 'C'):
+            raise ValueError('COORDSYS card in header has unknown value: {}'.format(coordsys))
+        self.coordsys = coordsys
+
         # Parse and store the skymap
         self._save_skymap(skymap, order)
 
@@ -126,6 +134,23 @@ class SkyMap(object):
 
     def __ne__(self, other):
         return not self == other
+
+    def __mul__(self, other):
+        if not isinstance(other, self.__class__):
+            raise ValueError('SkyMaps can only be multipled by other SkyMaps')
+
+        result = self.copy()
+        other_copy = other.copy()
+
+        if self.nside != other_copy.nside or self.order != other_copy.order:
+            other_copy.regrade(self.nside, self.order)
+        if self.coordsys != other_copy.coordsys:
+            other_copy.rotate(self.coordsys)
+
+        new_skymap = result.skymap * other_copy.skymap
+        result._save_skymap(new_skymap, order=self.order)
+
+        return result
 
     def __repr__(self):
         template = ('SkyMap(objid="{}", date_det="{}", nside={})')
@@ -264,6 +289,46 @@ class SkyMap(object):
         return cls(skymap, header)
 
     @classmethod
+    def from_data(cls, data, nested=True, coordsys='C'):
+        """Initialize a `~gototile.skymap.SkyMap` object from an array of data.
+
+        Parameters
+        ----------
+        data : list or `numpy.array`
+            an array of data to map onto a HEALPix sphere
+            the length of the data must match one of the valid HEALPix resolutions
+
+        nested : bool
+            if True the data has order=NESTED, if False then order=RING
+
+        coordsys : str
+            The coordinate system the data uses.
+            'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
+
+        Returns
+        -------
+        `~gototile.skymap.SkyMap``
+            SkyMap object.
+        """
+        if not isinstance(data, np.ndarray):
+            data = np.array(data)
+
+        # Check the data is a valid length
+        try:
+            nside = healpy.npix2nside(len(data))
+        except ValueError:
+            raise ValueError('Length of data is invalid')
+
+        header = {'PIXTYPE': 'HEALPIX',
+                  'ordering': 'NESTED' if nested else 'RING',
+                  'COORDSYS': coordsys[0],
+                  'NSIDE': nside,
+                  'INDXSCHM': 'IMPLICIT',
+                  }
+
+        return cls(data, header)
+
+    @classmethod
     def from_position(cls, ra, dec, radius, nside=64):
         """Initialize a `~gototile.skymap.SkyMap` object from a sky position and radius.
 
@@ -284,8 +349,14 @@ class SkyMap(object):
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        hdulist = gaussian_skymap(ra, dec, radius, nside, nest=True)
-        return cls.from_fits(hdulist)
+        # Create an Astropy SkyCoord at the peak
+        peak = SkyCoord(ra, dec, unit='deg')
+
+        # Get the gaussian probability data
+        prob_map = create_gaussian_map(peak, radius, nside, nest=True)
+
+        # Create a new SkyMap
+        return cls.from_data(prob_map)
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
@@ -317,10 +388,50 @@ class SkyMap(object):
         self.header['nside'] = nside
         self.header['ordering'] = order
 
+    def rotate(self, coordsys='C'):
+        """Convert coordinate systems.
+
+        Parameters
+        ------------
+        coordsys : str
+            First character is the coordinate system to convert to.
+            As in HEALPIX, allowed coordinate systems are:
+            'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
+        """
+        if self.coordsys == coordsys:
+            return
+
+        rotator = healpy.Rotator(coord=(self.coordsys, coordsys))
+
+        # NOTE: rotator expectes order=RING in and returns order=RING out
+        # If this skymap is NESTED we need to regrade before and after
+        if self.order == 'NESTED':
+            in_skymap = healpy.ud_grade(self.skymap, nside_out=self.nside,
+                                        order_in='NESTED', order_out='RING')
+        else:
+            in_skymap = self.skymap.copy()
+
+        # Rotate the skymap, now we're sure it's in RING order
+        out_skymap = rotator.rotate_map(in_skymap)
+
+        # Convert back to NESTED if needed
+        if self.order == 'NESTED':
+            out_skymap = healpy.ud_grade(out_skymap, nside_out=self.nside,
+                                         order_in='RING', order_out='NESTED')
+
+        # Save the new skymap
+        self._save_skymap(out_skymap, self.order)
+
+        # Update the header
+        self.header['coordsys'] = coordsys
+        self.coordsys = coordsys
+
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
-        total = self.skymap.sum()
-        self.skymap /= total
+        norm_skymap = self.skymap / self.skymap.sum()
+
+        # Save the new skymap
+        self._save_skymap(norm_skymap, self.order)
 
     def get_probability(self, coord, radius=0):
         """Return the probability at a given sky coordinate.
@@ -389,7 +500,7 @@ class SkyMap(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, filename=None, dpi=300, coordinates=None):
+    def plot(self, filename=None, dpi=300, coordinates=None, plot_contours=True):
         """Plot the skymap.
 
         Parameters
@@ -405,8 +516,20 @@ class SkyMap(object):
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
 
+        plot_contours : bool, default = True
+            plot the 50% and 90% contour areas
+
         """
         figure = plt.figure(figsize=(8,6))
+
+        # Can only plot in equatorial coordinates
+        # If it's not, temporarily rotate into equatorial and then go back afterwards
+        if not self.coordsys == 'C':
+            old_coordsys = self.coordsys
+            self.rotate('C')
+        else:
+            old_coordsys = None
+
         axes = plt.axes(projection='astro hours mollweide')
         axes.grid()
         transform = axes.get_transform('world')
@@ -415,9 +538,11 @@ class SkyMap(object):
         axes.imshow_hpx(self.skymap, cmap='cylon', nested=self.isnested)
 
         # Plot 50% and 90% contours
-        cs = axes.contour_hpx(self.contours*100 , nested=self.isnested,
-                            levels = [50, 90],
-                            colors='black', linewidths=0.5, zorder=99,)
+        if plot_contours:
+            cs = axes.contour_hpx(self.contours , nested=self.isnested,
+                                  levels = [0.5 * self.skymap.sum(),
+                                            0.9 * self.skymap.sum()],
+                                  colors='black', linewidths=0.5, zorder=99,)
         #axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
 
         # Plot coordinates if given
@@ -434,6 +559,10 @@ class SkyMap(object):
                             ha='center', va='bottom',
                             size='x-small', zorder=12,
                             )
+
+        # Remember to rotate back!
+        if old_coordsys:
+            self.rotate(old_coordsys)
 
         # Set title
         title = 'Skymap for trigger {}'.format(self.objid)

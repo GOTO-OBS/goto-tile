@@ -6,3 +6,6 @@ __pycache__/
 # Visual Studio Code files
 *.browse*
 *.vscode*
+
+# Don't upload large catalogs
+gototile/data/GLADE.csv

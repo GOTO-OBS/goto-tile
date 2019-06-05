@@ -14,9 +14,12 @@ import multiprocessing
 import numpy as np
 import healpy as hp
 from . import settings
-from .catalog import visible_catalog, read_catalog, map2catalog
 from . import math
 from . import utils
+from astropy.io.fits import getdata
+import astropy.io.fits as fits
+import reproject as rp
+import pkg_resources
 
 
 def coord2pix(nside, coord, nest=False):
@@ -331,26 +334,26 @@ def calculate_tiling(skymap, telescopes, date=None,
     if timespan is None:
         timespan = max([telescope.sidtimes[-1] for telescope in telescopes])
         timespan = timespan - date
-    if catalog['path']:
-        cattable = read_catalog(**catalog)
-        allskymap, catsources = map2catalog(allskymap, cattable)
-        if nightsky:
-            indiceslist = []
-            for telescope in telescopes:
-                _, indices = visible_catalog(
-                    cattable, telescope.sidtimes,
-                    telescope)
-                telescope.indices['catalog'] = indices
-                telescope.skymap, telescope.catsources = map2catalog(
-                    skymap, cattable[indices])
-                indiceslist.append(indices)
-            indices = np.unique(np.hstack(indiceslist))
-            cattable = cattable[indices]
-            newskymap, catsources = map2catalog(skymap, cattable)
-        else:
-            newskymap = allskymap.copy()
-            for telescope in telescopes:
-                telescope.skymap = allskymap.copy()
+    # if catalog['path']:
+    #     cattable = pd.read_csv(**catalog)
+    #     allskymap, catsources = map2catalog(allskymap, cattable)
+    #     if nightsky:
+    #         indiceslist = []
+    #         for telescope in telescopes:
+    #             _, indices = visible_catalog(
+    #                 cattable, telescope.sidtimes,
+    #                 telescope)
+    #             telescope.indices['catalog'] = indices
+    #             telescope.skymap, telescope.catsources = map2catalog(
+    #                 skymap, cattable[indices])
+    #             indiceslist.append(indices)
+    #         indices = np.unique(np.hstack(indiceslist))
+    #         cattable = cattable[indices]
+    #         newskymap, catsources = map2catalog(skymap, cattable)
+    #     else:
+    #         newskymap = allskymap.copy()
+    #         for telescope in telescopes:
+    #             telescope.skymap = allskymap.copy()
     elif nightsky:
         indiceslist = []
         for telescope in telescopes:

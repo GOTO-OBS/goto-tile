@@ -14,7 +14,6 @@ from astropy.coordinates import EarthLocation, Latitude, Longitude, get_sun
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.units import Quantity
 from astropy import units
-from .catalog import visible_catalog, read_catalog, map2catalog
 from . import settings
 from .grid import SkyGrid
 from .skymaptools import calc_siderealtimes, get_visiblemap, getvectors

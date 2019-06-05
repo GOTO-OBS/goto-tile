@@ -154,6 +154,10 @@ class SkyGrid(object):
         if not new_skymap.isnested:
             new_skymap.regrade(order='NESTED')
 
+        # Also make sure the skymap is in equatorial coordinates
+        if new_skymap.coordsys != 'C':
+            new_skymap.rotate('C')
+
         # Calculate which pixels are within the tiles
         self.pixels = self.get_pixels(new_skymap.nside)
 
