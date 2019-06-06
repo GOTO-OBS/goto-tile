@@ -289,6 +289,7 @@ class SkyGrid(object):
 
     def plot(self, filename=None, dpi=300, orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
+             discrete_colorbar=False,
              highlight=None, highlight_color=None, coordinates=None,
              plot_skymap=False, plot_stats=False, plot_tilenames=False):
         """Plot the grid.
@@ -335,6 +336,10 @@ class SkyGrid(object):
         alpha : float, optional
             all tiles will be set to that alpha
             default = 0.3
+
+        discrete_colorbar : bool, optional
+            if given a color array or dict, whether to plot using a discrete colorbar or not
+            default = False
 
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
@@ -463,19 +468,30 @@ class SkyGrid(object):
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
+            # Create the new map
             cmap = plt.cm.jet
             cmaplist = [cmap(i) for i in range(cmap.N)]
-            cmaplist[0] = (.5,.5,.5,1.0)
-            cmap = cmap.from_list('Custom cmap', cmaplist, cmap.N)
+            cmap = cmap.from_list('Custom', cmaplist, cmap.N)
 
-            bounds = np.linspace(0,6,7)
-            norm = BoundaryNorm(bounds, cmap.N)
+            # Normalize
+            k = 5
+            norm = BoundaryNorm(np.linspace(0, k+1, k+2), cmap.N)
 
+            # Plot the points
             points = axes.scatter(coords.ra.deg, coords.dec.deg,
                                   transform=transform,
-                                  s=1, c=count, cmap='gist_rainbow', norm=norm,
+                                  s=1, c=count,
+                                  cmap='gist_rainbow', norm=norm,
                                   zorder=0)
-            fig.colorbar(points, ax=axes, fraction=0.02, pad=0.05)
+
+            # Add the colorbar
+            cb = fig.colorbar(points, ax=axes, fraction=0.02, pad=0.05)
+            tick_labels = np.arange(0, k+1, 1)
+            tick_location = tick_labels + 0.5
+            tick_labels = [str(label) for label in tick_labels]
+            tick_labels[-1] = str(tick_labels[-1] + '+')
+            cb.set_ticks(tick_location)
+            cb.set_ticklabels(tick_labels)
 
         # Plot tile colors
         if color is not None:
@@ -495,7 +511,32 @@ class SkyGrid(object):
                             i = [i for i, x in enumerate(tilenames) if x == k]
                             color_array[i] = color[k]
                         polys.set_array(np.array(color_array))
-                        fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
+
+                        if discrete_colorbar:
+                            # See above link in plot_stats
+                            # Create the new map
+                            cmap = plt.cm.jet_r
+                            cmaplist = [cmap(i) for i in range(cmap.N)]
+                            cmaplist[0] = (1.0, 1.0, 1.0, 1.0)  # Force 0 to white
+                            cmap = cmap.from_list('Custom', cmaplist, cmap.N)
+
+                            # Normalize
+                            k = max(color_array)
+                            norm = BoundaryNorm(np.linspace(0, k+1, k+2), cmap.N)
+
+                            # Apply the map and normalization
+                            polys.set_cmap(cmap)
+                            polys.set_norm(norm)
+
+                            # Add the colorbar
+                            cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
+                            tick_labels = np.arange(0, k+1, 1)
+                            tick_location = tick_labels + 0.5
+                            cb.set_ticks(tick_location)
+                            cb.set_ticklabels(tick_labels)
+                        else:
+                            fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
+
                     except:
                         raise ValueError('Invalid entries in color array')
 
