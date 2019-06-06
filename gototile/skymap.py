@@ -500,11 +500,16 @@ class SkyMap(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, filename=None, dpi=300, coordinates=None, plot_contours=True):
+    def plot(self, title=None, filename=None, dpi=300,
+             coordinates=None, plot_contours=True):
         """Plot the skymap.
 
         Parameters
         ----------
+        title : str, optional
+            title to show above the plot
+            if not given a default title will be applied with the name of the grid
+
         filename : str, optional
             filename to save the plot to
             if not given then the plot will be displayed with plt.show()
@@ -565,7 +570,8 @@ class SkyMap(object):
             self.rotate(old_coordsys)
 
         # Set title
-        title = 'Skymap for trigger {}'.format(self.objid)
+        if not title:
+            title = 'Skymap for trigger {}'.format(self.objid)
         axes.set_title(title, y=1.05)
 
         # Save or show

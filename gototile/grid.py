@@ -287,7 +287,8 @@ class SkyGrid(object):
         table['freq'].format = '.4f'
         return table
 
-    def plot(self, filename=None, dpi=300, orthoplot=False, center=(0,45),
+    def plot(self, title=None, filename=None, dpi=300,
+             orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False,
              highlight=None, highlight_color=None, coordinates=None,
@@ -296,6 +297,10 @@ class SkyGrid(object):
 
         Parameters
         ----------
+        title : str, optional
+            title to show above the plot
+            if not given a default title will be applied with the name of the grid
+
         filename : str, optional
             filename to save the plot to
             if not given then the plot will be displayed with plt.show()
@@ -680,12 +685,13 @@ class SkyGrid(object):
                             )
 
         # Set title
-        title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
-                                                                 self.fov['dec'],
-                                                                 self.overlap['ra'],
-                                                                 self.overlap['dec'])
-        if plot_skymap and hasattr(self, 'skymap'):
-            title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
+        if not title:
+            title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
+                                                                    self.fov['dec'],
+                                                                    self.overlap['ra'],
+                                                                    self.overlap['dec'])
+            if plot_skymap and hasattr(self, 'skymap'):
+                title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
         axes.set_title(title, y=1.05)
 
         # Save or show
