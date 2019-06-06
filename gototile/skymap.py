@@ -500,7 +500,7 @@ class SkyMap(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, title=None, filename=None, dpi=300,
+    def plot(self, title=None, filename=None, dpi=300, figsize=(8,6),
              coordinates=None, plot_contours=True):
         """Plot the skymap.
 
@@ -518,6 +518,10 @@ class SkyMap(object):
             DPI to save the plot at
             default is 300
 
+        figsize : 2-tuple, optional
+            size of the matplotlib figure
+            default is (8,6) - matching the GraceDB plots
+
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
 
@@ -525,7 +529,7 @@ class SkyMap(object):
             plot the 50% and 90% contour areas
 
         """
-        figure = plt.figure(figsize=(8,6))
+        figure = plt.figure(figsize=figsize)
 
         # Can only plot in equatorial coordinates
         # If it's not, temporarily rotate into equatorial and then go back afterwards

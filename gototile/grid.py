@@ -287,7 +287,7 @@ class SkyGrid(object):
         table['freq'].format = '.4f'
         return table
 
-    def plot(self, title=None, filename=None, dpi=300,
+    def plot(self, title=None, filename=None, dpi=300, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False,
@@ -308,6 +308,10 @@ class SkyGrid(object):
         dpi : int, optional
             DPI to save the plot at
             default is 300
+
+        figsize : 2-tuple, optional
+            size of the matplotlib figure
+            default is (8,6) - matching the GraceDB plots
 
         orthoplot : bool, default = False
             plot the sphere in a orthographic projection, centred on `centre`
@@ -361,7 +365,7 @@ class SkyGrid(object):
             WARNING: plots can take a long time to render
 
         """
-        fig = plt.figure(figsize=(8,6))
+        fig = plt.figure(figsize=figsize)
         if not orthoplot:
             axes = plt.axes(projection='astro hours mollweide')
         else:
