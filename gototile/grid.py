@@ -377,6 +377,7 @@ class SkyGrid(object):
                 center = SkyCoord(center[0], center[1], unit='deg')
             axes = plt.axes(projection='astro globe', center=center)
         axes.grid()
+        axes.set_axisbelow(False)
         transform = axes.get_transform('world')
 
         # Create the tile polygons
