@@ -21,7 +21,7 @@ if 'DISPLAY' not in os.environ:
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as\
     FigureCanvas
-from matplotlib.patches import Polygon
+from matplotlib.patches import Patch, Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
 from .math import cartesian_to_celestial
@@ -291,8 +291,8 @@ class SkyGrid(object):
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False,
-             highlight=None, highlight_color=None, coordinates=None,
-             tilenames=False,
+             highlight=None, highlight_color=None, highlight_label=None,
+             coordinates=None, tilenames=False,
              plot_skymap=False, plot_stats=False):
         """Plot the grid.
 
@@ -327,6 +327,9 @@ class SkyGrid(object):
 
         highlight_color : str or list of str, optional
             a list of colors to use when highlighting
+
+        highlight_label : str or list of str, optional
+            labels to add to the legend when highlighting
 
         color : str or list or dict, optional
             if str all tiles will be colored using that string
@@ -634,6 +637,7 @@ class SkyGrid(object):
 
         # Highlight paticular tiles
         if highlight is not None:
+            legend_patches = []
             if isinstance(highlight[0], str):
             # Should be a list with keys as tile names
                 try:
@@ -645,12 +649,22 @@ class SkyGrid(object):
                         i = [i for i, x in enumerate(new_tilenames) if x == k]
                         linecolor_array[i] = highlight_color
                         linewidth_array[i] = 1.5
+                    # Create polygons
                     polys3 = copy(polys2)
                     polys3.set_edgecolor(np.array(linecolor_array))
                     polys3.set_linewidth(np.array(linewidth_array))
                     polys3.set_alpha(0.5)
                     polys3.set_zorder(9)
                     axes.add_collection(polys3)
+                    # Add to legend
+                    if highlight_label is not None:
+                        label = highlight_label + ' ({} tiles)'.format(len(highlight))
+                        patch = Patch(facecolor='none',
+                                    edgecolor=highlight_color,
+                                    linewidth=1.5,
+                                    label=label,
+                                    )
+                        legend_patches.append(patch)
                 except:
                     raise ValueError('Invalid entries in highlight list')
             else:
@@ -667,16 +681,35 @@ class SkyGrid(object):
                         linewidth_array = np.array([0] * len(new_tilenames))
                         for k in tilelist:
                             i = [i for i, x in enumerate(new_tilenames) if x == k]
-                            linecolor_array[i] = colors[j % len(colors)]
+                            color = colors[j % len(colors)]
+                            linecolor_array[i] = color
                             linewidth_array[i] = 1.5
+                        # Create polygons
                         polys4 = copy(polys2)
                         polys4.set_edgecolor(np.array(linecolor_array))
                         polys4.set_linewidth(np.array(linewidth_array))
                         polys4.set_alpha(0.5)
                         polys4.set_zorder(9 + len(highlight) - j)
                         axes.add_collection(polys4)
+                        # Add to legend
+                        if highlight_label is not None:
+                            label = highlight_label[j] + ' ({} tiles)'.format(len(tilelist))
+                            patch = Patch(facecolor='none',
+                                          edgecolor=color,
+                                          linewidth=1.5,
+                                          label=label,
+                                          )
+                            legend_patches.append(patch)
                 except:
                     raise ValueError('Invalid entries in highlight list')
+
+            # Display legend
+            if len(legend_patches) > 0:
+                plt.legend(handles=legend_patches,
+                            loc='center',
+                            bbox_to_anchor=(0.5, -0.1),
+                            ncol=3,
+                            ).set_zorder(999)
 
         # Plot coordinates
         if coordinates:
