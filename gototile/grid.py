@@ -187,6 +187,40 @@ class SkyGrid(object):
 
         return pixels
 
+    def get_tile(self, coord):
+        """Find which tile the given coordinates fall within.
+        If there's an overlap between tiles then a lot of the sky will fall within multiple tiles.
+        This function only returns the closest tile centre for each RA/Dec given.
+
+        Parameters
+        ----------
+        coord : `astropy.coordiantes.SkyCoord`
+            The coordinates to find which tile they are within.
+
+        """
+        # Handle both scalar and vector coordiantes
+        if coord.isscalar:
+            coord = [coord]
+
+        # Annoyingly SkyCoord.separation requires one or the other to be scalar.
+        # So we need this annoying loop to deal with multiple input coordinates.
+        tilenames = []
+        for c in coord:
+            # Get the separation between the coords and the tile centres
+            sep = np.array(c.separation(self.coords))
+
+            # Find which tile has the minimum separation
+            index = np.where(sep == (min(sep)))[0][0]
+
+            # Get the tile name and add it to the list
+            name = self.tilenames[index]
+            tilenames.append(name)
+
+        if len(tilenames) == 1:
+            return tilenames[0]
+        else:
+            return tilenames
+
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
 
