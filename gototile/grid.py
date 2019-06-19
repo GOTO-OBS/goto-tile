@@ -330,7 +330,7 @@ class SkyGrid(object):
              discrete_colorbar=False,
              highlight=None, highlight_color=None, highlight_label=None,
              coordinates=None, tilenames=False, text=False,
-             plot_skymap=False, plot_stats=False):
+             plot_skymap=False, plot_contours=False, plot_stats=False):
         """Plot the grid.
 
         Parameters
@@ -404,6 +404,10 @@ class SkyGrid(object):
 
         plot_skymap : bool, default = False
             color tiles based on their contained probability
+            will fail unless a skymap has been applied to the grid using SkyGrid.apply_skymap()
+
+        plot_contours : bool, default = False
+            plot 50% and 90% skymap contours
             will fail unless a skymap has been applied to the grid using SkyGrid.apply_skymap()
 
         plot_stats : bool, default = False
@@ -521,6 +525,17 @@ class SkyGrid(object):
             axes.add_collection(polys0)
             fig.colorbar(polys0, ax=axes, fraction=0.02, pad=0.05)
             polys.set_facecolor('none')
+
+        if plot_contours is True:
+            if not hasattr(self, 'skymap'):
+                raise ValueError('SkyGrid does not have a SkyMap applied')
+
+            # Plot the 50% and 90% skymap contours
+            # Taken from SkyMap.plot()
+            axes.contour_hpx(self.skymap.contours , nested=self.skymap.isnested,
+                             levels = [0.5 * self.skymap.skymap.sum(),
+                                       0.9 * self.skymap.skymap.sum()],
+                             colors='black', linewidths=0.5, zorder=99,)
 
         if plot_stats is True:
             # Colour in areas based on the number of tiles they are within
