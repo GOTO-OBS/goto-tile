@@ -501,6 +501,7 @@ class SkyMap(object):
         return table
 
     def plot(self, title=None, filename=None, dpi=300, figsize=(8,6),
+             orthoplot=False, center=(0,45),
              coordinates=None, plot_contours=True):
         """Plot the skymap.
 
@@ -522,6 +523,13 @@ class SkyMap(object):
             size of the matplotlib figure
             default is (8,6) - matching the GraceDB plots
 
+        orthoplot : bool, default = False
+            plot the sphere in a orthographic projection, centred on `centre`
+
+        center : tuple or `astropy.coordinates.SkyCoord`, default (0,45)
+            coordinates to center the orthographic plot on
+            if given as a tuple units will be considered to be degrees
+
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
 
@@ -539,7 +547,12 @@ class SkyMap(object):
         else:
             old_coordsys = None
 
-        axes = plt.axes(projection='astro hours mollweide')
+        if not orthoplot:
+            axes = plt.axes(projection='astro hours mollweide')
+        else:
+            if isinstance(center, tuple):
+                center = SkyCoord(center[0], center[1], unit='deg')
+            axes = plt.axes(projection='astro globe', center=center)
         axes.grid()
         transform = axes.get_transform('world')
 
