@@ -158,18 +158,21 @@ class SkyGrid(object):
         if new_skymap.coordsys != 'C':
             new_skymap.rotate('C')
 
+        # Store skymap details on the class
+        self.skymap = new_skymap
+        self.nside = new_skymap.nside
+
         # Calculate which pixels are within the tiles
         self.pixels = self.get_pixels(new_skymap.nside)
 
         # Calculate the contained probabilities within each tile
-        probs = np.array([new_skymap.skymap[pix].sum() for pix in self.pixels])
+        self.probs = np.array([np.sum(new_skymap.skymap[pix]) for pix in self.pixels])
 
-        # Store skymap details on the class
-        self.skymap = new_skymap
-        self.nside = new_skymap.nside
-        self.probs = probs
+        # Calculate the min and mean pixel contours for each tile
+        self.min_contours = np.array([np.min(new_skymap.contours[pix]) for pix in self.pixels])
+        self.mean_contours = np.array([np.mean(new_skymap.contours[pix]) for pix in self.pixels])
 
-        return probs
+        return self.probs
 
     def _pixels_from_tilenames(self, tilenames):
         """Get the unique pixels contained within the given tile(s)."""
