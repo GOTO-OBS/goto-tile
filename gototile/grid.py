@@ -781,7 +781,7 @@ class SkyGrid(object):
                             )
 
         # Set title
-        if not title:
+        if title is None:
             title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
                                                                     self.fov['dec'],
                                                                     self.overlap['ra'],

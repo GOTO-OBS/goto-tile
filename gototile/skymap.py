@@ -574,7 +574,7 @@ class SkyMap(object):
             self.rotate(old_coordsys)
 
         # Set title
-        if not title:
+        if title is None:
             title = 'Skymap for trigger {}'.format(self.objid)
         axes.set_title(title, y=1.05)
 
