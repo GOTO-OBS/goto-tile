@@ -173,7 +173,7 @@ class SkyGrid(object):
 
     def _pixels_from_tilenames(self, tilenames):
         """Get the unique pixels contained within the given tile(s)."""
-        if isinstance(tilenames, list):
+        if isinstance(tilenames, (list, np.ndarray)):
             # Multiple tiles
             indexes = [self.tilenames.index(tile) for tile in tilenames]
             pixels = []
