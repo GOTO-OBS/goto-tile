@@ -326,7 +326,7 @@ class SkyGrid(object):
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False,
              highlight=None, highlight_color=None, highlight_label=None,
-             coordinates=None, tilenames=False,
+             coordinates=None, tilenames=False, text=False,
              plot_skymap=False, plot_stats=False):
         """Plot the grid.
 
@@ -391,9 +391,13 @@ class SkyGrid(object):
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
 
-        tilenames : list
+        tilenames : list, optional
             should be a list of tile names (as in SkyGrid.tilenames)
             plot the name of the given tiles in their centre
+
+        text : dict, optional
+            the keys should be tile names (as in SkyGrid.tilenames)
+            the values will be plotted as strings at the tile centres
 
         plot_skymap : bool, default = False
             color tiles based on their contained probability
@@ -474,13 +478,27 @@ class SkyGrid(object):
         axes.add_collection(polys2)
 
         # Plot tile names
-        if tilenames:
+        if tilenames and not text:
+            # Should be a list of tilenames
             for name in tilenames:
                 if name not in self.tilenames:
                     continue
                 index = np.where(np.array(self.tilenames)==name)[0][0]
                 coord = self.coords[index]
                 plt.text(coord.ra.deg, coord.dec.deg, name,
+                         color='k', weight='bold', fontsize=6,
+                         ha='center', va='center', clip_on=True,
+                         transform=transform)
+
+        # Plot text
+        if text:
+            # Should be a dict with keys as tile names
+            for name in text:
+                if name not in self.tilenames:
+                    continue
+                index = np.where(np.array(self.tilenames)==name)[0][0]
+                coord = self.coords[index]
+                plt.text(coord.ra.deg, coord.dec.deg, str(text[name]),
                          color='k', weight='bold', fontsize=6,
                          ha='center', va='center', clip_on=True,
                          transform=transform)
