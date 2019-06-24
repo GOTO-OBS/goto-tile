@@ -487,6 +487,25 @@ class SkyMap(object):
 
         return contour < percentage
 
+    def get_contour_area(self, percentage):
+        """Return the area of a given probability contour area, in square degrees.
+
+        Parameters
+        ----------
+        percentage : float
+            The confidence level, percentage in the range 0-1.
+        """
+        if not 0 <= percentage <= 1:
+            raise ValueError('Percentage must be in range 0-1')
+
+        # Get pixels within that contour
+        pixels = self._pixels_within_contour(percentage)
+
+        # Get the number of pixels
+        npix = len(pixels)
+
+        return npix * self.pixel_area
+
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'prob']
