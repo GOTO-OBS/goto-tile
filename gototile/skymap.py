@@ -388,7 +388,6 @@ class SkyMap(object):
                          nest=self.isnested,
                          coord=self.coordsys,
                          column_names=[self.header['ttype1']],
-                         dtype=[self.header['tform1']],
                          extra_header=[(k.upper(), self.header[k]) for k in self.header],
                          overwrite=overwrite,
                          )
