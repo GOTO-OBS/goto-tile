@@ -727,6 +727,10 @@ class SkyGrid(object):
 
         # Highlight paticular tiles
         if highlight is not None:
+            if isinstance(highlight, str):
+                # Might just be one tile
+                highlight = [highlight]
+
             legend_patches = []
             if isinstance(highlight[0], str):
             # Should be a list with keys as tile names
