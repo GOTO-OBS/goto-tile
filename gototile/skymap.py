@@ -11,13 +11,14 @@ from astropy import units as u
 from astropy.table import QTable
 import healpy
 import ephem
-from . import settings
-from . import skymaptools as smt
-from .gaussian import create_gaussian_map
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
 import ligo.skymap.plot
+
+from . import settings
+from .gaussian import create_gaussian_map
+from .skymaptools import coord2pix, pix2coord
 
 try:
     stringtype = basestring  # Python 2
@@ -136,11 +137,11 @@ class SkyMap(object):
 
     def _pix2coord(self, pix):
         """Convert HEALpy pixel indexes to SkyCoords."""
-        return smt.pix2coord(self.nside, pix, nest=self.isnested)
+        return pix2coord(self.nside, pix, nest=self.isnested)
 
     def _coord2pix(self, coord):
         """Convert SkyCoords to HEALpy pixel indexes."""
-        return smt.coord2pix(self.nside, coord, nest=self.isnested)
+        return coord2pix(self.nside, coord, nest=self.isnested)
 
     def _save_skymap(self, skymap, order=None, coordsys=None):
         """Save the skymap data and add attributes."""
