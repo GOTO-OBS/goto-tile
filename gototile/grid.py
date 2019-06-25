@@ -150,27 +150,29 @@ class SkyGrid(object):
         # problems with hp.query_polygon in RING ordering.
         # See https://github.com/GOTO-OBS/goto-tile/issues/65
         # Therefore enforce NESTED when applying a skymap to a grid
-        new_skymap = skymap.copy()
-        if not new_skymap.isnested:
-            new_skymap.regrade(order='NESTED')
+        if not skymap.isnested:
+            skymap = skymap.copy()
+            skymap.regrade(order='NESTED')
 
         # Also make sure the skymap is in equatorial coordinates
-        if new_skymap.coordsys != 'C':
-            new_skymap.rotate('C')
-
-        # Store skymap details on the class
-        self.skymap = new_skymap
-        self.nside = new_skymap.nside
+        if skymap.coordsys != 'C':
+            skymap = skymap.copy()
+            skymap.rotate('C')
 
         # Calculate which pixels are within the tiles
-        self.pixels = self.get_pixels(new_skymap.nside)
+        if not hasattr(self, 'nside') or self.nside != skymap.nside:
+            self.nside = skymap.nside
+            self.pixels = self.get_pixels(self.nside)
 
         # Calculate the contained probabilities within each tile
-        self.probs = np.array([np.sum(new_skymap.skymap[pix]) for pix in self.pixels])
+        self.probs = np.array([np.sum(skymap.skymap[pix]) for pix in self.pixels])
 
         # Calculate the min and mean pixel contours for each tile
-        self.min_contours = np.array([np.min(new_skymap.contours[pix]) for pix in self.pixels])
-        self.mean_contours = np.array([np.mean(new_skymap.contours[pix]) for pix in self.pixels])
+        self.min_contours = np.array([np.min(skymap.contours[pix]) for pix in self.pixels])
+        self.mean_contours = np.array([np.mean(skymap.contours[pix]) for pix in self.pixels])
+
+        # Store skymap on the class
+        self.skymap = skymap
 
         return self.probs
 
