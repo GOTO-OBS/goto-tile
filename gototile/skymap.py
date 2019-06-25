@@ -57,78 +57,56 @@ class SkyMap(object):
             around the given position.
     """
 
-    def __init__(self, skymap, header):
+    def __init__(self, skymap, order, coordsys='C', header=None):
+        # Header is optional
+        if header is None:
+            header = {}
+
         # Check types
         if not isinstance(skymap, np.ndarray):
-            raise TypeError("skymap should be an array, use SkyMap.from_fits()")
+            raise TypeError('skymap should be an array, use SkyMap.from_fits()')
         if not isinstance(header, dict):
-            raise TypeError("header should be a dict")
-
-        # Convert the skymap to the requested type from settings
-        dtype = getattr(settings, 'DTYPE')
-        skymap = skymap.astype(dtype)
-
-        # Make sure the header cards are lowercase
-        header = {key.lower(): header[key] for key in header}
-
-        # Check the header NSIDE matches the skymap data
-        try:
-            header_nside = header['nside']
-        except KeyError:
-            raise ValueError('No NSIDE value in the header')
-        skymap_nside = healpy.npix2nside(len(skymap))
-        if not header_nside == skymap_nside:
-            raise ValueError("NSIDE from header ({:.0f}) doesn't match skymap ({:.0f})".format(
-                             header_nside, skymap_nside))
-
-        # Get the data ordering from the header
-        try:
-            order = header['ordering']
-        except KeyError:
-            raise ValueError('No ORDERING value in the header')
-        if order not in ('NESTED', 'RING'):
-            raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
-
-        # Get the coordinate system from the header
-        try:
-            coordsys = header['coordsys'][0]
-        except KeyError:
-            raise ValueError('No COORDSYS value in the header')
-        if coordsys not in ('G', 'E', 'C'):
-            raise ValueError('COORDSYS card in header has unknown value: {}'.format(coordsys))
-        self.coordsys = coordsys
+            raise TypeError('header should be a dict')
 
         # Parse and store the skymap
-        self._save_skymap(skymap, order)
+        self._save_skymap(skymap, order, coordsys)
 
-        # Store the header and key infomation as attributes
+        # Make sure the header cards are lowercase, and store
+        header = {key.lower(): header[key] for key in header}
         self.header = header
 
-        self.filename = self.header.get('filename')
+        # Store the filename
+        self.filename = header['filename'] if 'filename' in header else None
+        if self.filename.startswith('http'):
+            header['url'] = self.filename
 
-        alt_name = ''
-        if self.filename:
-            alt_name = os.path.basename(self.filename).split('.')[0]
+        # Get object name, or create one if it isn't in the header
+        if 'object' in header:
+            self.object = header['object']
+        elif self.filename:
+            self.object =  os.path.basename(self.filename).split('.')[0]
         else:
-            alt_name = 'unknown'
-        self.object = self.header.get('object', alt_name)
-        if 'coinc_event_id:' in self.object:
-            # for test events
-            self.object = self.object.split(':')[-1]
+            self.object = 'unknown'
         self.objid = self.object
 
-        self.url = self.header.get('referenc', '')
+        # Store creation time
+        self.date = Time.now()
+        self.mjd = self.date.mjd
 
-        self.mjd = astropy.time.Time.now().mjd
-        self.date = astropy.time.Time(float(self.mjd), format='mjd')
-        self.mjd_det = self.header.get('mjd-obs', self.mjd)
-        self.date_det = astropy.time.Time(float(self.mjd_det), format='mjd')
+        # Store event time, if there is one in the header
+        if 'date-obs' in header:
+            self.date_det = Time(header['date-obs'])
+        else:
+            self.date_det = date
+        self.mjd_det = self.date_det.mjd
 
     def __eq__(self, other):
         try:
             if len(self.skymap) != len(other.skymap):
                 return False
-            return np.all(self.skymap == other.skymap) and self.header == other.header
+            return (np.all(self.skymap == other.skymap) and
+                    self.order == other.order and
+                    self.coordsys == other.coordsys)
         except AttributeError:
             return False
 
@@ -148,13 +126,13 @@ class SkyMap(object):
             other_copy.rotate(self.coordsys)
 
         new_skymap = result.skymap * other_copy.skymap
-        result._save_skymap(new_skymap, order=self.order)
+        result._save_skymap(new_skymap)
 
         return result
 
     def __repr__(self):
-        template = ('SkyMap(objid="{}", date_det="{}", nside={})')
-        return template.format(self.objid, self.date_det.iso, self.nside)
+        template = ('SkyMap(nside={}, order={}, coordsys={}, object={})')
+        return template.format(self.nside, self.order, self.coordsys, self.object)
 
     def _pix2coord(self, pix):
         """Convert HEALpy pixel indexes to SkyCoords."""
@@ -164,14 +142,17 @@ class SkyMap(object):
         """Convert SkyCoords to HEALpy pixel indexes."""
         return smt.coord2pix(self.nside, coord, nest=self.isnested)
 
-    def _save_skymap(self, skymap, order):
+    def _save_skymap(self, skymap, order=None, coordsys=None):
         """Save the skymap data and add attributes."""
         self.skymap = skymap
         self.npix = len(skymap)
         self.nside = healpy.npix2nside(self.npix)
         self.pixel_area = healpy.nside2pixarea(self.nside, degrees=True)
-        self.order = order
-        self.isnested = order == 'NESTED'
+        if order:
+            self.order = order
+            self.isnested = order == 'NESTED'
+        if coordsys:
+            self.coordsys = coordsys
 
         # Save the coordinates of each skymap pixel
         all_pixels = range(self.npix)
@@ -270,23 +251,59 @@ class SkyMap(object):
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        info = healpy.read_map(fits_file, h=True, field=None,
-                               verbose=False, nest=None)
-        # `info` will be an array or multiple arrays, with the header appended (because h=True).
-        skymap = info[0]
-        header = dict(info[-1])
+        # Load the skymap and header
+        skymap, header = healpy.read_map(fits_file,
+                                         h=True,
+                                         field=None,
+                                         nest=None,
+                                         verbose=False,
+                                         )
 
-        # Dealing with newer 3D skymaps, the "skymap" will have 4 components
-        # (prob, distmu, distsigma, distnorm)
-        # We only want the probability map
+        # Convert header to dict
+        header = dict(header)
+
+        # Some skymaps have multiple components
+        # e.g. newer 3D skymaps from LVC (prob, distmu, distsigma, distnorm)
+        # We can't deal with them, just take the first map (e.g. probability)
         if header['TFIELDS'] > 1:
             skymap = skymap[0]
+            # Remove other column info from the header, so we don't get confused
+            # The keys follow the pattern T---i, e.g. TFORM1, TTYPE1, TUNIT1
+            keys = [k[:-1] for k in header if (k[0]=='T' and k[-1]=='1')]
+            for key in keys:
+                for i in range(2, header['TFIELDS'] + 1):
+                    del header[key+str(i)]
+        del header['TFIELDS']
+
+        # Get primary properties from header
+        nside = header['NSIDE']
+        if nside != healpy.npix2nside(len(skymap)):
+            raise ValueError("NSIDE from header ({}) doesn't match skymap length".format(nside))
+        del header['NSIDE']
+
+        order = header['ORDERING'].upper()
+        if order not in ('NESTED', 'RING'):
+            raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
+        del header['ORDERING']
+
+        coordsys = header['COORDSYS'][0].upper()
+        if coordsys not in ('G', 'E', 'C'):
+            raise ValueError('COORDSYS card in header has unknown value: {}'.format(coordsys))
+        del header['COORDSYS']
+
+        # Delete a load more keys that are unnecessary to save
+        for key in ['BITPIX', 'EXTNAME', 'FIRSTPIX', 'GCOUNT', 'INDXSCHM',
+                    'LASTPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'PCOUNT',
+                    'PIXTYPE', 'TFIELDS', 'XTENSION',
+                    ]:
+            if key in header:
+                del header[key]
 
         # Store the file name if the header was from a file
         if isinstance(fits_file, str):
             header['FILENAME'] = fits_file
 
-        return cls(skymap, header)
+        return cls(skymap, order, coordsys, header)
 
     @classmethod
     def from_data(cls, data, nested=True, coordsys='C'):
@@ -319,14 +336,10 @@ class SkyMap(object):
         except ValueError:
             raise ValueError('Length of data is invalid')
 
-        header = {'PIXTYPE': 'HEALPIX',
-                  'ordering': 'NESTED' if nested else 'RING',
-                  'COORDSYS': coordsys[0],
-                  'NSIDE': nside,
-                  'INDXSCHM': 'IMPLICIT',
-                  }
+        order = 'NESTED' if nested else 'RING',
+        coordsys = coordsys[0]
 
-        return cls(data, header)
+        return cls(data, order, coordsys)
 
     @classmethod
     def from_position(cls, ra, dec, radius, nside=64):
@@ -358,9 +371,34 @@ class SkyMap(object):
         # Create a new SkyMap
         return cls.from_data(prob_map)
 
+    def save(self, filename, overwrite=True):
+        """Save the SkyMap as a FITS file.
+
+        Parameters
+        ----------
+        filename : str
+            The file to save the SkyMap as.
+
+        overwrite : bool, optional
+            If True, existing file is silently overwritten.
+            Otherwise trying to write an existing file raises an OSError.
+        """
+        healpy.write_map(filename,
+                         [self.skymap],
+                         nest=self.isnested,
+                         coord=self.coordsys,
+                         column_names=[self.header['ttype1']],
+                         dtype=[self.header['tform1']],
+                         extra_header=[(k.upper(), self.header[k]) for k in self.header],
+                         overwrite=overwrite,
+                         )
+
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
-        newmap = SkyMap(self.skymap.copy(), self.header.copy())
+        newmap = SkyMap(self.skymap.copy(),
+                        self.order,
+                        self.coordsys,
+                        self.header.copy())
         return newmap
 
     def regrade(self, nside=None, order='NESTED',
@@ -382,11 +420,8 @@ class SkyMap(object):
                                      power=power, pess=pess, dtype=dtype)
 
         # Save the new skymap
-        self._save_skymap(new_skymap, order)
+        self._save_skymap(new_skymap, order=order)
 
-        # Update the header
-        self.header['nside'] = nside
-        self.header['ordering'] = order
 
     def rotate(self, coordsys='C'):
         """Convert coordinate systems.
@@ -420,18 +455,14 @@ class SkyMap(object):
                                          order_in='RING', order_out='NESTED')
 
         # Save the new skymap
-        self._save_skymap(out_skymap, self.order)
-
-        # Update the header
-        self.header['coordsys'] = coordsys
-        self.coordsys = coordsys
+        self._save_skymap(out_skymap, coordsys=coordsys)
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
         norm_skymap = self.skymap / self.skymap.sum()
 
         # Save the new skymap
-        self._save_skymap(norm_skymap, self.order)
+        self._save_skymap(norm_skymap)
 
     def get_probability(self, coord, radius=0):
         """Return the probability at a given sky coordinate.
