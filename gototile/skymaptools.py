@@ -20,6 +20,7 @@ from astropy.io.fits import getdata
 import astropy.io.fits as fits
 import reproject as rp
 import pkg_resources
+from functools import lru_cache
 
 
 def coord2pix(nside, coord, nest=False):
@@ -54,8 +55,12 @@ def coord2pix(nside, coord, nest=False):
     return pix
 
 
+@lru_cache(maxsize=128)
 def pix2coord(nside, ipix, nest=False):
     """Convert pixel index or indices to sky coordinates.
+
+    The results of this function are cached, as it's often called with the same arguments
+    when creating multiple skymaps with the same resolution.
 
     Parameters
     ----------
