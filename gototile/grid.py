@@ -33,7 +33,7 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
-from .skymaptools import pix2coord
+from .skymaptools import coord2pix, pix2coord
 from .gridtools import create_grid, get_tile_vertices, get_tile_edges, get_tile_pixels
 from .math import RAD, PI
 
@@ -190,34 +190,53 @@ class SkyGrid(object):
 
         return pixels
 
-    def get_tile(self, coord):
+    def get_tile(self, coord, overlap=False):
         """Find which tile the given coordinates fall within.
-        If there's an overlap between tiles then a lot of the sky will fall within multiple tiles.
-        This function only returns the closest tile centre for each RA/Dec given.
 
         Parameters
         ----------
         coord : `astropy.coordiantes.SkyCoord`
             The coordinates to find which tile they are within.
 
+        overlap : bool, optional
+            If True then check if the coordinates fall within multiple tiles, and return a list.
+            If False (defualt) just return the closest tile centre.
         """
         # Handle both scalar and vector coordiantes
         if coord.isscalar:
             coord = [coord]
 
-        # Annoyingly SkyCoord.separation requires one or the other to be scalar.
-        # So we need this annoying loop to deal with multiple input coordinates.
         tilenames = []
-        for c in coord:
-            # Get the separation between the coords and the tile centres
-            sep = np.array(c.separation(self.coords))
+        if not overlap:
+            # Annoyingly SkyCoord.separation requires one or the other to be scalar.
+            # So we need this annoying loop to deal with multiple input coordinates.
+            for c in coord:
+                # Get the separation between the coords and the tile centres
+                sep = np.array(c.separation(self.coords))
 
-            # Find which tile has the minimum separation
-            index = np.where(sep == (min(sep)))[0][0]
+                # Find which tile has the minimum separation
+                index = np.where(sep == (min(sep)))[0][0]
 
-            # Get the tile name and add it to the list
-            name = self.tilenames[index]
-            tilenames.append(name)
+                # Get the tile name and add it to the list
+                name = self.tilenames[index]
+                tilenames.append(name)
+        else:
+            # Get the tile pixels
+            if not hasattr(self, 'pixels'):
+                nside = 64
+                pixels = self.get_pixels(nside)
+            else:
+                nside = self.nside
+                pixels = self.pixels
+
+            for c in coord:
+                # Get the HEALPix pixel the coords are within
+                pixel = coord2pix(nside, c, nest=True)
+
+                # Get the tile indicies that contain that pixel and add to list
+                names = [self.tilenames[i] for i in range(self.ntiles)
+                         if pixel in pixels[i]]
+                tilenames.append(names)
 
         if len(tilenames) == 1:
             return tilenames[0]
