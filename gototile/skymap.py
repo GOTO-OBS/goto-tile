@@ -77,9 +77,12 @@ class SkyMap(object):
         self.header = header
 
         # Store the filename
-        self.filename = header['filename'] if 'filename' in header else None
-        if self.filename.startswith('http'):
-            header['url'] = self.filename
+        if 'filename' in header:
+            self.filename = header['filename']
+            if self.filename and self.filename.startswith('http'):
+                header['url'] = self.filename
+        else:
+            self.filename = None
 
         # Get object name, or create one if it isn't in the header
         if 'object' in header:
@@ -98,7 +101,7 @@ class SkyMap(object):
         if 'date-obs' in header:
             self.date_det = Time(header['date-obs'])
         else:
-            self.date_det = date
+            self.date_det = self.date
         self.mjd_det = self.date_det.mjd
 
     def __eq__(self, other):
