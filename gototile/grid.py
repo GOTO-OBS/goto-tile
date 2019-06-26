@@ -595,7 +595,7 @@ class SkyGrid(object):
 
             # Get the coordinates of each pixel to plot
             npix = healpy.nside2npix(nside)
-            ipix = np.arange(npix)
+            ipix = range(npix)
             coords = pix2coord(nside, ipix, nest=True)
 
             # Get count statistics
