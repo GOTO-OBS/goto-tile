@@ -178,6 +178,9 @@ class SkyGrid(object):
 
     def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=None, min_tile_prob=None):
         """Select tiles based off of thegiven contour."""
+        if not hasattr(self, 'skymap'):
+            raise ValueError('SkyGrid does not have a SkyMap applied')
+
         # Initially mask to cover the entire given contour level
         mask = self.min_contours < contour
 
