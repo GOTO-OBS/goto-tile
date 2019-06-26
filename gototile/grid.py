@@ -194,11 +194,11 @@ class SkyGrid(object):
         # Limit to given max tiles, if limit is given
         if max_tiles is not None and sum(mask) > max_tiles:
             # Limit by probability above `max_tiles`th tile
-            mask = self.probs > sorted(self.probs, reverse=True)[max_tiles]
+            mask &= self.probs > sorted(self.probs, reverse=True)[max_tiles]
 
         # Limit to tiles above min prob, if limit is given
         if min_tile_prob is not None:
-            mask = self.probs > min_tile_prob
+            mask &= self.probs > min_tile_prob
 
         # Returned the masked tile table
         table = self.get_table()
