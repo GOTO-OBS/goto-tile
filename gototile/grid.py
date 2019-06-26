@@ -176,7 +176,7 @@ class SkyGrid(object):
 
         return self.probs
 
-    def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=100):
+    def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=None, min_tile_prob=None):
         """Select tiles based off of thegiven contour."""
         # Initially mask to cover the entire given contour level
         mask = self.min_contours < contour
@@ -188,11 +188,14 @@ class SkyGrid(object):
             # Use the mean contours instead
             mask = self.mean_contours < contour
 
-        # Also limit to given max tiles
-        if sum(mask) > max_tiles:
-            # Limit by probability
-            prob_limit = sorted(self.probs, reverse=True)[max_tiles]
-            mask = self.probs > prob_limit
+        # Limit to given max tiles, if limit is given
+        if max_tiles is not None and sum(mask) > max_tiles:
+            # Limit by probability above `max_tiles`th tile
+            mask = self.probs > sorted(self.probs, reverse=True)[max_tiles]
+
+        # Limit to tiles above min prob, if limit is given
+        if min_tile_prob is not None:
+            mask = self.probs > min_tile_prob
 
         # Returned the masked tile table
         table = self.get_table()
