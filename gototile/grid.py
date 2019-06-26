@@ -184,6 +184,10 @@ class SkyGrid(object):
         # Initially mask to cover the entire given contour level
         mask = self.min_contours < contour
 
+        # If it's a super-well constrained target then the contour method won't really work
+        if min(self.min_contours) > contour or any(self.probs == 1):
+            mask = self.probs > contour
+
         # That's only good for very small skymaps though, as it can add
         # too many low-probability tiles.
         # So only use that if it selects less than X tiles
