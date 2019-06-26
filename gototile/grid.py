@@ -176,6 +176,28 @@ class SkyGrid(object):
 
         return self.probs
 
+    def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=100):
+        """Select tiles based off of thegiven contour."""
+        # Initially mask to cover the entire given contour level
+        mask = self.min_contours < contour
+
+        # That's only good for very small skymaps though, as it can add
+        # too many low-probability tiles.
+        # So only use that if it selects less than X tiles
+        if sum(mask) > mean_limit:
+            # Use the mean contours instead
+            mask = self.mean_contours < contour
+
+        # Also limit to given max tiles
+        if sum(mask) > max_tiles:
+            # Limit by probability
+            prob_limit = sorted(self.probs, reverse=True)[max_tiles]
+            mask = self.probs > prob_limit
+
+        # Returned the masked tile table
+        table = self.get_table()
+        return table[mask]
+
     def _pixels_from_tilenames(self, tilenames):
         """Get the unique pixels contained within the given tile(s)."""
         if isinstance(tilenames, (list, np.ndarray)):
