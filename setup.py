@@ -77,7 +77,7 @@ PACKAGES = ['gototile',
 
 REQUIRES = ['numpy',
             'astropy',
-            'astroplan'
+            'astroplan',
             'healpy',
             'pyephem',
             'PyYAML',
