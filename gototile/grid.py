@@ -29,7 +29,7 @@ from .skymap import read_colormaps
 
 
 
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
@@ -177,7 +177,7 @@ class SkyGrid(object):
         return self.probs
 
     def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=None, min_tile_prob=None):
-        """Select tiles based off of thegiven contour."""
+        """Select tiles based off of the given contour."""
         if not hasattr(self, 'skymap'):
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
@@ -276,6 +276,31 @@ class SkyGrid(object):
             return tilenames[0]
         else:
             return tilenames
+
+    def get_visible_tiles(self, locations, alt_limit=30):
+        """Get the tiles that are visible from the given location(s).
+
+        Note this doesn't account for nightly visiblity, only latitude.
+
+        Parameters
+        ----------
+        locations : `astropy.coordinates.EarthLocation` or list of same
+            location(s) to check visibity from
+
+        alt_limit : float, optional
+            horizon altitude limit to apply
+            default is 30 deg
+        """
+        # Handle multiple locations
+        if isinstance(locations, EarthLocation):
+            locations = [locations]
+
+        # Find dec limits
+        max_dec = max([location.lat + (90 - alt_limit) * u.deg for location in locations])
+        min_dec = min([location.lat - (90 - alt_limit) * u.deg for location in locations])
+        mask = np.array(self.coords.dec < max_dec) & np.array(self.coords.dec > min_dec)
+
+        return list(np.array(self.tilenames)[mask])
 
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
