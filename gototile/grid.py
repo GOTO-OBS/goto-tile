@@ -29,6 +29,8 @@ from .skymap import read_colormaps
 
 
 
+from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
+
 from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
 from astropy.table import QTable
@@ -277,10 +279,8 @@ class SkyGrid(object):
         else:
             return tilenames
 
-    def get_visible_tiles(self, locations, alt_limit=30):
+    def get_visible_tiles(self, locations, alt_limit=30, time_range=None, sun_limit=-15):
         """Get the tiles that are visible from the given location(s).
-
-        Note this doesn't account for nightly visiblity, only latitude.
 
         Parameters
         ----------
@@ -290,15 +290,40 @@ class SkyGrid(object):
         alt_limit : float, optional
             horizon altitude limit to apply
             default is 30 deg
+
+        time_range : 2-tuple of `astropy.time.Time`, optional
+            times to check visibilty between
+            if not given tiles will only be selected based on altitude
+
+        sun_limit : float, optional
+            altitude limit of the Sun to consider night constraints
+            default is -15 deg
         """
         # Handle multiple locations
         if isinstance(locations, EarthLocation):
             locations = [locations]
 
-        # Find dec limits
-        max_dec = max([location.lat + (90 - alt_limit) * u.deg for location in locations])
-        min_dec = min([location.lat - (90 - alt_limit) * u.deg for location in locations])
-        mask = np.array(self.coords.dec < max_dec) & np.array(self.coords.dec > min_dec)
+        if time_range is None:
+            # Find dec limits
+            max_dec = max([location.lat + (90 - alt_limit) * u.deg for location in locations])
+            min_dec = min([location.lat - (90 - alt_limit) * u.deg for location in locations])
+            mask = np.array(self.coords.dec < max_dec) & np.array(self.coords.dec > min_dec)
+        else:
+            mask = np.full(self.ntiles, True)
+            for location in locations:
+                # Create Astroplan observer
+                observer = Observer(location)
+
+                # Create the constraints
+                alt_constraint = AltitudeConstraint(min=alt_limit * u.deg)
+                night_constraint = AtNightConstraint(max_solar_altitude=sun_limit * u.deg)
+                constraints = [alt_constraint, night_constraint]
+
+                # Find which of the grid tiles will be visible
+                new_mask = is_observable(constraints, observer, self.coords, time_range=time_range)
+
+                # Combine the mask with the existing one
+                mask = mask & new_mask
 
         return list(np.array(self.tilenames)[mask])
 
