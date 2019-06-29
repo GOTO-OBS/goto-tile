@@ -3,12 +3,14 @@ from __future__ import division
 import os
 import itertools
 import logging
+import warnings
 import numpy as np
 import astropy
 from astropy.time import Time
 from astropy.coordinates import get_sun, SkyCoord, AltAz
 from astropy import units as u
 from astropy.table import QTable
+from astropy.io.fits.verify import VerifyWarning
 import healpy
 import ephem
 from matplotlib import pyplot as plt
@@ -387,14 +389,15 @@ class SkyMap(object):
             If True, existing file is silently overwritten.
             Otherwise trying to write an existing file raises an OSError.
         """
+        warnings.filterwarnings('ignore', category=VerifyWarning)
         healpy.write_map(filename,
-                         [self.skymap],
-                         nest=self.isnested,
-                         coord=self.coordsys,
-                         column_names=[self.header['ttype1']],
-                         extra_header=[(k.upper(), self.header[k]) for k in self.header],
-                         overwrite=overwrite,
-                         )
+                        [self.skymap],
+                        nest=self.isnested,
+                        coord=self.coordsys,
+                        column_names=[self.header['ttype1']],
+                        extra_header=[(k.upper(), self.header[k]) for k in self.header],
+                        overwrite=overwrite,
+                        )
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
