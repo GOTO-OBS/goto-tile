@@ -74,6 +74,7 @@ class SkyGrid(object):
             else:
                 fov[key] = fov[key].to(u.deg)
         self.fov = fov
+        self.tile_area = (fov['ra'] * fov['dec']).value
 
         # Parse overlap
         if overlap is None:
