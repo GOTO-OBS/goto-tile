@@ -280,13 +280,20 @@ class SkyGrid(object):
         else:
             return tilenames
 
-    def get_visible_tiles(self, locations, alt_limit=30, time_range=None, sun_limit=-15):
+    def get_visible_tiles(self, locations, any_all='any',
+                          alt_limit=30, time_range=None, sun_limit=-15):
         """Get the tiles that are visible from the given location(s).
 
         Parameters
         ----------
         locations : `astropy.coordinates.EarthLocation` or list of same
             location(s) to check visibity from
+
+        any_all : 'any' or 'all', optional
+            If 'any' return tiles that are visible from any of the locations.
+            If 'all' return tiles that are visible from all of the locations.
+            Only valid if len(locations) > 1.
+            Default = 'any'
 
         alt_limit : float, optional
             horizon altitude limit to apply
@@ -304,14 +311,22 @@ class SkyGrid(object):
         if isinstance(locations, EarthLocation):
             locations = [locations]
 
-        if time_range is None:
-            # Find dec limits
-            max_dec = max([location.lat + (90 - alt_limit) * u.deg for location in locations])
-            min_dec = min([location.lat - (90 - alt_limit) * u.deg for location in locations])
-            mask = np.array(self.coords.dec < max_dec) & np.array(self.coords.dec > min_dec)
-        else:
+        if any_all == 'any':
+            mask = np.full(self.ntiles, False)
+        elif any_all == 'all':
             mask = np.full(self.ntiles, True)
-            for location in locations:
+        else:
+            raise ValueError('Invalid value for any_all: "{}"'.format(any_all))
+
+        for location in locations:
+            if time_range is None:
+                # Find dec limits
+                max_dec = location.lat + (90 - alt_limit) * u.deg
+                min_dec = location.lat - (90 - alt_limit) * u.deg
+
+                # Find which of the grid tiles are within the limits
+                new_mask = np.array(self.coords.dec < max_dec) & np.array(self.coords.dec > min_dec)
+            else:
                 # Create Astroplan observer
                 observer = Observer(location)
 
@@ -323,7 +338,10 @@ class SkyGrid(object):
                 # Find which of the grid tiles will be visible
                 new_mask = is_observable(constraints, observer, self.coords, time_range=time_range)
 
-                # Combine the mask with the existing one
+            # Combine the mask with the existing one
+            if any_all == 'any':
+                mask = mask | new_mask
+            elif any_all == 'all':
                 mask = mask & new_mask
 
         return list(np.array(self.tilenames)[mask])
