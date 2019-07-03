@@ -556,7 +556,7 @@ class SkyMap(object):
                         names=col_names, dtype=col_types)
         return table
 
-    def plot(self, title=None, filename=None, dpi=300, figsize=(8,6),
+    def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              coordinates=None, plot_contours=True):
         """Plot the skymap.
@@ -572,8 +572,8 @@ class SkyMap(object):
             if not given then the plot will be displayed with plt.show()
 
         dpi : int, optional
-            DPI to save the plot at
-            default is 300
+            DPI to display the plot at
+            default is 90
 
         figsize : 2-tuple, optional
             size of the matplotlib figure
@@ -593,7 +593,7 @@ class SkyMap(object):
             plot the 50% and 90% contour areas
 
         """
-        figure = plt.figure(figsize=figsize)
+        figure = plt.figure(figsize=figsize, dpi=dpi)
 
         # Can only plot in equatorial coordinates
         # If it's not, temporarily rotate into equatorial and then go back afterwards

@@ -446,7 +446,7 @@ class SkyGrid(object):
         table['freq'].format = '.4f'
         return table
 
-    def plot(self, title=None, filename=None, dpi=300, figsize=(8,6),
+    def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False,
@@ -466,8 +466,8 @@ class SkyGrid(object):
             if not given then the plot will be displayed with plt.show()
 
         dpi : int, optional
-            DPI to save the plot at
-            default is 300
+            DPI to display the plot at
+            default is 90
 
         figsize : 2-tuple, optional
             size of the matplotlib figure
@@ -536,7 +536,7 @@ class SkyGrid(object):
             plot HEALPix pixels colored by the number of tiles they fall within
 
         """
-        fig = plt.figure(figsize=figsize)
+        fig = plt.figure(figsize=figsize, dpi=dpi)
         if not orthoplot:
             axes = plt.axes(projection='astro hours mollweide')
         else:
