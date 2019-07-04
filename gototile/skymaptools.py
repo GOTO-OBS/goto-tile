@@ -20,6 +20,7 @@ from astropy.io.fits import getdata
 import astropy.io.fits as fits
 import reproject as rp
 import pkg_resources
+from functools import lru_cache
 
 
 def coord2pix(nside, coord, nest=False):
@@ -59,7 +60,7 @@ def pix2coord(nside, ipix, nest=False):
 
     Parameters
     ----------
-    nside : int or array-like
+    nside : int
         The healpix nside parameter, must be a power of 2, less than 2**30
     ipix : int or array-like
         Pixel indices
@@ -75,6 +76,25 @@ def pix2coord(nside, ipix, nest=False):
     See Also
     --------
     coord2pix, `healpy.pix2ang`
+    """
+    # Check types
+    if isinstance(ipix, (list, np.ndarray)):
+        ipix = tuple(ipix)
+
+    # Now can safely call the cached function
+    return _pix2coord_cached(nside, ipix, nest)
+
+
+@lru_cache(maxsize=128)
+def _pix2coord_cached(nside, ipix, nest=False):
+    """The same as pix2coord, but the results of this function are cached.
+
+    This uses the `functools.lru_cache` decorator.
+
+    It's useful as this function is often called with the same arguments
+    when creating multiple skymaps with the same resolution.
+
+    Unfortunatly that requires hashable inputs, so need to convert lists and arrays to tuples.
     """
     # Get angular coordinates from healpy
     theta, phi = hp.pix2ang(nside, ipix, nest)

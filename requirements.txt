@@ -1,6 +1,7 @@
 numpy
 matplotlib
 astropy
+astroplan
 pyephem
 healpy
 PyYAML

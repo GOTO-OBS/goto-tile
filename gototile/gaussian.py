@@ -58,7 +58,7 @@ def create_gaussian_map(peak, radius, nside=64, nest=True):
     """
     # Get the celestial coordinates of each pixel
     npix = hp.nside2npix(nside)
-    ipix = np.arange(npix)
+    ipix = range(npix)
     grid = pix2coord(nside, ipix, nest=nest)
 
     # Calculate the probability at each pixel

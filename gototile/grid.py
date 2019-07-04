@@ -29,11 +29,13 @@ from .skymap import read_colormaps
 
 
 
-from astropy.coordinates import SkyCoord
+from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
+
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
-from .skymaptools import pix2coord
+from .skymaptools import coord2pix, pix2coord
 from .gridtools import create_grid, get_tile_vertices, get_tile_edges, get_tile_pixels
 from .math import RAD, PI
 
@@ -72,6 +74,7 @@ class SkyGrid(object):
             else:
                 fov[key] = fov[key].to(u.deg)
         self.fov = fov
+        self.tile_area = (fov['ra'] * fov['dec']).value
 
         # Parse overlap
         if overlap is None:
@@ -150,30 +153,67 @@ class SkyGrid(object):
         # problems with hp.query_polygon in RING ordering.
         # See https://github.com/GOTO-OBS/goto-tile/issues/65
         # Therefore enforce NESTED when applying a skymap to a grid
-        new_skymap = skymap.copy()
-        if not new_skymap.isnested:
-            new_skymap.regrade(order='NESTED')
+        if not skymap.isnested:
+            skymap = skymap.copy()
+            skymap.regrade(order='NESTED')
 
         # Also make sure the skymap is in equatorial coordinates
-        if new_skymap.coordsys != 'C':
-            new_skymap.rotate('C')
+        if skymap.coordsys != 'C':
+            skymap = skymap.copy()
+            skymap.rotate('C')
 
         # Calculate which pixels are within the tiles
-        self.pixels = self.get_pixels(new_skymap.nside)
+        if not hasattr(self, 'nside') or self.nside != skymap.nside:
+            self.nside = skymap.nside
+            self.pixels = self.get_pixels(self.nside)
 
         # Calculate the contained probabilities within each tile
-        probs = np.array([new_skymap.skymap[pix].sum() for pix in self.pixels])
+        self.probs = np.array([np.sum(skymap.skymap[pix]) for pix in self.pixels])
 
-        # Store skymap details on the class
-        self.skymap = new_skymap
-        self.nside = new_skymap.nside
-        self.probs = probs
+        # Calculate the min and mean pixel contours for each tile
+        self.min_contours = np.array([np.min(skymap.contours[pix]) for pix in self.pixels])
+        self.mean_contours = np.array([np.mean(skymap.contours[pix]) for pix in self.pixels])
 
-        return probs
+        # Store skymap on the class
+        self.skymap = skymap
+
+        return self.probs
+
+    def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=None, min_tile_prob=None):
+        """Select tiles based off of the given contour."""
+        if not hasattr(self, 'skymap'):
+            raise ValueError('SkyGrid does not have a SkyMap applied')
+
+        # Initially mask to cover the entire given contour level
+        mask = self.min_contours < contour
+
+        # If it's a super-well constrained target then the contour method won't really work
+        if min(self.min_contours) > contour or any(self.probs == 1):
+            mask = self.probs > contour
+
+        # That's only good for very small skymaps though, as it can add
+        # too many low-probability tiles.
+        # So only use that if it selects less than X tiles
+        if sum(mask) > mean_limit:
+            # Use the mean contours instead
+            mask = self.mean_contours < contour
+
+        # Limit to given max tiles, if limit is given
+        if max_tiles is not None and sum(mask) > max_tiles:
+            # Limit by probability above `max_tiles`th tile
+            mask &= self.probs > sorted(self.probs, reverse=True)[max_tiles]
+
+        # Limit to tiles above min prob, if limit is given
+        if min_tile_prob is not None:
+            mask &= self.probs > min_tile_prob
+
+        # Returned the masked tile table
+        table = self.get_table()
+        return table[mask]
 
     def _pixels_from_tilenames(self, tilenames):
         """Get the unique pixels contained within the given tile(s)."""
-        if isinstance(tilenames, list):
+        if isinstance(tilenames, (list, np.ndarray)):
             # Multiple tiles
             indexes = [self.tilenames.index(tile) for tile in tilenames]
             pixels = []
@@ -187,39 +227,124 @@ class SkyGrid(object):
 
         return pixels
 
-    def get_tile(self, coord):
+    def get_tile(self, coord, overlap=False):
         """Find which tile the given coordinates fall within.
-        If there's an overlap between tiles then a lot of the sky will fall within multiple tiles.
-        This function only returns the closest tile centre for each RA/Dec given.
 
         Parameters
         ----------
         coord : `astropy.coordiantes.SkyCoord`
             The coordinates to find which tile they are within.
 
+        overlap : bool, optional
+            If True then check if the coordinates fall within multiple tiles, and return a list.
+            If False (defualt) just return the closest tile centre.
         """
         # Handle both scalar and vector coordiantes
         if coord.isscalar:
             coord = [coord]
 
-        # Annoyingly SkyCoord.separation requires one or the other to be scalar.
-        # So we need this annoying loop to deal with multiple input coordinates.
         tilenames = []
-        for c in coord:
-            # Get the separation between the coords and the tile centres
-            sep = np.array(c.separation(self.coords))
+        if not overlap:
+            # Annoyingly SkyCoord.separation requires one or the other to be scalar.
+            # So we need this annoying loop to deal with multiple input coordinates.
+            for c in coord:
+                # Get the separation between the coords and the tile centres
+                sep = np.array(c.separation(self.coords))
 
-            # Find which tile has the minimum separation
-            index = np.where(sep == (min(sep)))[0][0]
+                # Find which tile has the minimum separation
+                index = np.where(sep == (min(sep)))[0][0]
 
-            # Get the tile name and add it to the list
-            name = self.tilenames[index]
-            tilenames.append(name)
+                # Get the tile name and add it to the list
+                name = self.tilenames[index]
+                tilenames.append(name)
+        else:
+            # Get the tile pixels
+            if not hasattr(self, 'pixels'):
+                nside = 64
+                pixels = self.get_pixels(nside)
+            else:
+                nside = self.nside
+                pixels = self.pixels
+
+            for c in coord:
+                # Get the HEALPix pixel the coords are within
+                pixel = coord2pix(nside, c, nest=True)
+
+                # Get the tile indicies that contain that pixel and add to list
+                names = [self.tilenames[i] for i in range(self.ntiles)
+                         if pixel in pixels[i]]
+                tilenames.append(names)
 
         if len(tilenames) == 1:
             return tilenames[0]
         else:
             return tilenames
+
+    def get_visible_tiles(self, locations, any_all='any',
+                          alt_limit=30, time_range=None, sun_limit=-15):
+        """Get the tiles that are visible from the given location(s).
+
+        Parameters
+        ----------
+        locations : `astropy.coordinates.EarthLocation` or list of same
+            location(s) to check visibity from
+
+        any_all : 'any' or 'all', optional
+            If 'any' return tiles that are visible from any of the locations.
+            If 'all' return tiles that are visible from all of the locations.
+            Only valid if len(locations) > 1.
+            Default = 'any'
+
+        alt_limit : float, optional
+            horizon altitude limit to apply
+            default is 30 deg
+
+        time_range : 2-tuple of `astropy.time.Time`, optional
+            times to check visibilty between
+            if not given tiles will only be selected based on altitude
+
+        sun_limit : float, optional
+            altitude limit of the Sun to consider night constraints
+            default is -15 deg
+        """
+        # Handle multiple locations
+        if isinstance(locations, EarthLocation):
+            locations = [locations]
+
+        if any_all == 'any':
+            mask = np.full(self.ntiles, False)
+        elif any_all == 'all':
+            mask = np.full(self.ntiles, True)
+        else:
+            raise ValueError('Invalid value for any_all: "{}"'.format(any_all))
+
+        for location in locations:
+            if time_range is None:
+                # Find dec limits
+                max_dec = location.lat + (90 - alt_limit) * u.deg
+                min_dec = location.lat - (90 - alt_limit) * u.deg
+
+                # Find which of the grid tiles are within the limits
+                new_mask = np.array(self.coords.dec < max_dec) & np.array(self.coords.dec > min_dec)
+            else:
+                # Create Astroplan observer
+                observer = Observer(location)
+
+                # Create the constraints
+                alt_constraint = AltitudeConstraint(min=alt_limit * u.deg)
+                night_constraint = AtNightConstraint(max_solar_altitude=sun_limit * u.deg)
+                constraints = [alt_constraint, night_constraint]
+
+                # Find which of the grid tiles will be visible
+                new_mask = is_observable(constraints, observer, self.coords, time_range=time_range)
+
+            # Combine the mask with the existing one
+            if any_all == 'any':
+                mask = mask | new_mask
+            elif any_all == 'all':
+                mask = mask & new_mask
+
+        return list(np.array(self.tilenames)[mask])
 
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
@@ -321,13 +446,13 @@ class SkyGrid(object):
         table['freq'].format = '.4f'
         return table
 
-    def plot(self, title=None, filename=None, dpi=300, figsize=(8,6),
+    def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False,
              highlight=None, highlight_color=None, highlight_label=None,
-             coordinates=None, tilenames=False,
-             plot_skymap=False, plot_stats=False):
+             coordinates=None, tilenames=False, text=False,
+             plot_skymap=False, plot_contours=False, plot_stats=False):
         """Plot the grid.
 
         Parameters
@@ -341,8 +466,8 @@ class SkyGrid(object):
             if not given then the plot will be displayed with plt.show()
 
         dpi : int, optional
-            DPI to save the plot at
-            default is 300
+            DPI to display the plot at
+            default is 90
 
         figsize : 2-tuple, optional
             size of the matplotlib figure
@@ -391,19 +516,27 @@ class SkyGrid(object):
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
 
-        tilenames : list
+        tilenames : list, optional
             should be a list of tile names (as in SkyGrid.tilenames)
             plot the name of the given tiles in their centre
 
+        text : dict, optional
+            the keys should be tile names (as in SkyGrid.tilenames)
+            the values will be plotted as strings at the tile centres
+
         plot_skymap : bool, default = False
             color tiles based on their contained probability
+            will fail unless a skymap has been applied to the grid using SkyGrid.apply_skymap()
+
+        plot_contours : bool, default = False
+            plot 50% and 90% skymap contours
             will fail unless a skymap has been applied to the grid using SkyGrid.apply_skymap()
 
         plot_stats : bool, default = False
             plot HEALPix pixels colored by the number of tiles they fall within
 
         """
-        fig = plt.figure(figsize=figsize)
+        fig = plt.figure(figsize=figsize, dpi=dpi)
         if not orthoplot:
             axes = plt.axes(projection='astro hours mollweide')
         else:
@@ -474,13 +607,27 @@ class SkyGrid(object):
         axes.add_collection(polys2)
 
         # Plot tile names
-        if tilenames:
+        if tilenames and not text:
+            # Should be a list of tilenames
             for name in tilenames:
                 if name not in self.tilenames:
                     continue
                 index = np.where(np.array(self.tilenames)==name)[0][0]
                 coord = self.coords[index]
                 plt.text(coord.ra.deg, coord.dec.deg, name,
+                         color='k', weight='bold', fontsize=6,
+                         ha='center', va='center', clip_on=True,
+                         transform=transform)
+
+        # Plot text
+        if text:
+            # Should be a dict with keys as tile names
+            for name in text:
+                if name not in self.tilenames:
+                    continue
+                index = np.where(np.array(self.tilenames)==name)[0][0]
+                coord = self.coords[index]
+                plt.text(coord.ra.deg, coord.dec.deg, str(text[name]),
                          color='k', weight='bold', fontsize=6,
                          ha='center', va='center', clip_on=True,
                          transform=transform)
@@ -501,6 +648,17 @@ class SkyGrid(object):
             fig.colorbar(polys0, ax=axes, fraction=0.02, pad=0.05)
             polys.set_facecolor('none')
 
+        if plot_contours is True:
+            if not hasattr(self, 'skymap'):
+                raise ValueError('SkyGrid does not have a SkyMap applied')
+
+            # Plot the 50% and 90% skymap contours
+            # Taken from SkyMap.plot()
+            axes.contour_hpx(self.skymap.contours , nested=self.skymap.isnested,
+                             levels = [0.5 * self.skymap.skymap.sum(),
+                                       0.9 * self.skymap.skymap.sum()],
+                             colors='black', linewidths=0.5, zorder=99,)
+
         if plot_stats is True:
             # Colour in areas based on the number of tiles they are within
             polys.set_facecolor('none')
@@ -513,7 +671,7 @@ class SkyGrid(object):
 
             # Get the coordinates of each pixel to plot
             npix = healpy.nside2npix(nside)
-            ipix = np.arange(npix)
+            ipix = range(npix)
             coords = pix2coord(nside, ipix, nest=True)
 
             # Get count statistics
@@ -672,6 +830,10 @@ class SkyGrid(object):
 
         # Highlight paticular tiles
         if highlight is not None:
+            if isinstance(highlight, str):
+                # Might just be one tile
+                highlight = [highlight]
+
             legend_patches = []
             if isinstance(highlight[0], str):
             # Should be a list with keys as tile names
@@ -763,7 +925,7 @@ class SkyGrid(object):
                             )
 
         # Set title
-        if not title:
+        if title is None:
             title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
                                                                     self.fov['dec'],
                                                                     self.overlap['ra'],
