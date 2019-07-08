@@ -211,19 +211,26 @@ class SkyGrid(object):
         table = self.get_table()
         return table[mask]
 
-    def _pixels_from_tilenames(self, tilenames):
+    def _pixels_from_tilenames(self, tilenames, nside=128):
         """Get the unique pixels contained within the given tile(s)."""
+        if hasattr(self, 'pixels'):
+            # If a skymap has been applied: use those pixels
+            tile_pixels = self.pixels
+        else:
+            # Use the given parameters
+            tile_pixels = self.get_pixels(nside)
+
         if isinstance(tilenames, (list, np.ndarray)):
             # Multiple tiles
             indexes = [self.tilenames.index(tile) for tile in tilenames]
             pixels = []
             for i in indexes:
-                pixels += list(self.pixels[i])
+                pixels += list(tile_pixels[i])
             pixels = list(set(pixels))  # remove duplicates
         else:
             # An individual tile
             index = self.tilenames.index(tilenames)
-            pixels = self.pixels[index]
+            pixels = tile_pixels[index]
 
         return pixels
 
@@ -260,7 +267,7 @@ class SkyGrid(object):
         else:
             # Get the tile pixels
             if not hasattr(self, 'pixels'):
-                nside = 64
+                nside = 128
                 pixels = self.get_pixels(nside)
             else:
                 nside = self.nside
@@ -367,7 +374,7 @@ class SkyGrid(object):
 
         return prob
 
-    def get_area(self, tilenames):
+    def get_area(self, tilenames, nside=128):
         """Return the sky area contained within the given tile(s) in square degrees.
 
         If multiple tiles are given, the area only be included once in any overlaps.
@@ -378,11 +385,14 @@ class SkyGrid(object):
             The name(s) of the tile(s) to find the area of.
         """
         # Get pixels
-        pixels = self._pixels_from_tilenames(tilenames)
+        pixels = self._pixels_from_tilenames(tilenames, nside)
 
         # Each pixel in the skymap has the same area (HEALPix definition)
         # So just multiply that by number of pixels
-        area = self.skymap.pixel_area * len(pixels)
+        if hasattr(self, 'skymap'):
+            area = self.skymap.pixel_area * len(pixels)
+        else:
+            area = healpy.nside2pixarea(nside, degrees=True) * len(pixels)
 
         return area
 
