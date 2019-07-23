@@ -459,7 +459,7 @@ class SkyGrid(object):
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
-             discrete_colorbar=False, colorbar_limits=None,
+             discrete_colorbar=False, discrete_stepsize=1, colorbar_limits=None,
              highlight=None, highlight_color=None, highlight_label=None,
              coordinates=None, tilenames=False, text=False,
              plot_skymap=False, plot_contours=False, plot_stats=False):
@@ -522,6 +522,10 @@ class SkyGrid(object):
         discrete_colorbar : bool, optional
             if given a color array or dict, whether to plot using a discrete colorbar or not
             default = False
+
+        discrete_stepsize : int, optional
+            if discrete_colorbar is True, the number of steps between labels on the colorbar
+            default = 1
 
         colorbar_limits : 2-tuple, optional
             if given a color array or dict, set the limits of the color bar to (min, max)
@@ -757,18 +761,19 @@ class SkyGrid(object):
                         else:
                             cmap = plt.cm.viridis
 
+                        # Set the colors of the poloygons
+                        # Tiles with no data should stay white
                         cmap.set_bad(color='white')
                         polys.set_cmap(cmap)
                         if colorbar_limits is not None:
                             polys.set_clim(colorbar_limits[0], colorbar_limits[1])
-
 
                         # Display the color bar
                         cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
                         if discrete_colorbar:
                             tick_labels = np.arange(colorbar_limits[0],
                                                     colorbar_limits[1]+1,
-                                                    1, dtype=int)
+                                                    discrete_stepsize, dtype=int)
                             tick_location = tick_labels + 0.5
                             cb.set_ticks(tick_location)
                             cb.set_ticklabels(tick_labels)
