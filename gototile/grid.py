@@ -459,7 +459,7 @@ class SkyGrid(object):
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
-             discrete_colorbar=False,
+             discrete_colorbar=False, colorbar_limits=None,
              highlight=None, highlight_color=None, highlight_label=None,
              coordinates=None, tilenames=False, text=False,
              plot_skymap=False, plot_contours=False, plot_stats=False):
@@ -522,6 +522,11 @@ class SkyGrid(object):
         discrete_colorbar : bool, optional
             if given a color array or dict, whether to plot using a discrete colorbar or not
             default = False
+
+        colorbar_limits : 2-tuple, optional
+            if given a color array or dict, set the limits of the color bar to (min, max)
+            if None the range will be that of the data
+            default = None
 
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
@@ -727,39 +732,43 @@ class SkyGrid(object):
                     polys.set_facecolor(np.array(color_array))
                 except:
                     try:
-                        if discrete_colorbar:
-                            # See above link in plot_stats
-                            # Create the new map
-                            cmap = plt.cm.jet_r
-                            cmaplist = [cmap(i) for i in range(cmap.N)]
-                            cmaplist[0] = (1.0, 1.0, 1.0, 1.0)  # Force 0 to white
-                            cmap = cmap.from_list('Custom', cmaplist, cmap.N)
-                            cmap.set_bad(color='white')
-                            polys.set_cmap(cmap)
-
-                            # Normalize
-                            boundaries = np.linspace(0,
-                                                     max(color.values())+1,
-                                                     max(color.values())+2)
-                            norm = BoundaryNorm(boundaries, cmap.N)
-                            polys.set_norm(norm)
-                        else:
-                            cmap = plt.cm.viridis
-                            cmap.set_bad(color='white')
-                            polys.set_cmap(cmap)
-
+                        # Create the color array
                         color_array = np.array([np.nan] * len(new_tilenames))
                         for k in color.keys():
                             i = [i for i, x in enumerate(new_tilenames) if x == k]
                             color_array[i] = color[k]
                         color_array = np.array(color_array)
+
+                        # Mask out the NaNs
                         masked_array = np.ma.masked_where(np.isnan(color_array), color_array)
                         polys.set_array(masked_array)
+
+                        if discrete_colorbar:
+                            # See above link in plot_stats
+                            cmap = plt.cm.jet_r
+                            if colorbar_limits is None:
+                                colorbar_limits = (np.floor(np.min(masked_array)),
+                                                   np.ceil(np.max(masked_array)))
+                            boundaries = np.linspace(colorbar_limits[0],
+                                                     colorbar_limits[1]+1,
+                                                     (colorbar_limits[1]+1-colorbar_limits[0]+1))
+                            norm = BoundaryNorm(boundaries, cmap.N)
+                            polys.set_norm(norm)
+                        else:
+                            cmap = plt.cm.viridis
+
+                        cmap.set_bad(color='white')
+                        polys.set_cmap(cmap)
+                        if colorbar_limits is not None:
+                            polys.set_clim(colorbar_limits[0], colorbar_limits[1])
+
 
                         # Display the color bar
                         cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
                         if discrete_colorbar:
-                            tick_labels = np.arange(0, np.max(masked_array)+1, 1, dtype=int)
+                            tick_labels = np.arange(colorbar_limits[0],
+                                                    colorbar_limits[1]+1,
+                                                    1, dtype=int)
                             tick_location = tick_labels + 0.5
                             cb.set_ticks(tick_location)
                             cb.set_ticklabels(tick_labels)
