@@ -459,7 +459,8 @@ class SkyGrid(object):
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
-             discrete_colorbar=False, discrete_stepsize=1, colorbar_limits=None,
+             discrete_colorbar=False, discrete_stepsize=1,
+             colorbar_limits=None, colorbar_orientation='v',
              highlight=None, highlight_color=None, highlight_label=None,
              coordinates=None, tilenames=False, text=False,
              plot_skymap=False, plot_contours=False, plot_stats=False):
@@ -531,6 +532,10 @@ class SkyGrid(object):
             if given a color array or dict, set the limits of the color bar to (min, max)
             if None the range will be that of the data
             default = None
+
+        colorbar_orientation : 'v' or 'h', optional
+            if given a color array or dict, display the colorbar either vertically or horizontally
+            default = 'v'
 
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
@@ -769,7 +774,11 @@ class SkyGrid(object):
                             polys.set_clim(colorbar_limits[0], colorbar_limits[1])
 
                         # Display the color bar
-                        cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
+                        if colorbar_orientation.lower()[0] == 'h':
+                            cb = fig.colorbar(polys, ax=axes, fraction=0.03, pad=0.05, aspect=50,
+                                              orientation='horizontal')
+                        else:
+                            cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
                         if discrete_colorbar:
                             tick_labels = np.arange(colorbar_limits[0],
                                                     colorbar_limits[1]+1,
