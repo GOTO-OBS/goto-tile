@@ -459,7 +459,8 @@ class SkyGrid(object):
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
              orthoplot=False, center=(0,45),
              color=None, linecolor=None, linewidth=None, alpha=0.3,
-             discrete_colorbar=False,
+             discrete_colorbar=False, discrete_stepsize=1,
+             colorbar_limits=None, colorbar_orientation='v',
              highlight=None, highlight_color=None, highlight_label=None,
              coordinates=None, tilenames=False, text=False,
              plot_skymap=False, plot_contours=False, plot_stats=False):
@@ -522,6 +523,19 @@ class SkyGrid(object):
         discrete_colorbar : bool, optional
             if given a color array or dict, whether to plot using a discrete colorbar or not
             default = False
+
+        discrete_stepsize : int, optional
+            if discrete_colorbar is True, the number of steps between labels on the colorbar
+            default = 1
+
+        colorbar_limits : 2-tuple, optional
+            if given a color array or dict, set the limits of the color bar to (min, max)
+            if None the range will be that of the data
+            default = None
+
+        colorbar_orientation : 'v' or 'h', optional
+            if given a color array or dict, display the colorbar either vertically or horizontally
+            default = 'v'
 
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
@@ -721,42 +735,57 @@ class SkyGrid(object):
                 try:
                     color_array = np.array(['none'] * len(new_tilenames), dtype=object)
                     for k in color.keys():
-                        # Thanks to the edge tiles there may be multiple Polygonswith the same name
+                        # Thanks to the edge tiles there may be multiple Polygons with the same name
                         i = [i for i, x in enumerate(new_tilenames) if x == k]
                         color_array[i] = color[k]
                     polys.set_facecolor(np.array(color_array))
                 except:
                     try:
-                        color_array = np.array([0] * len(new_tilenames))
+                        # Create the color array
+                        color_array = np.array([np.nan] * len(new_tilenames))
                         for k in color.keys():
                             i = [i for i, x in enumerate(new_tilenames) if x == k]
                             color_array[i] = color[k]
-                        polys.set_array(np.array(color_array))
+                        color_array = np.array(color_array)
+
+                        # Mask out the NaNs
+                        masked_array = np.ma.masked_where(np.isnan(color_array), color_array)
+                        polys.set_array(masked_array)
 
                         if discrete_colorbar:
                             # See above link in plot_stats
-                            # Create the new map
                             cmap = plt.cm.jet_r
-                            cmaplist = [cmap(i) for i in range(cmap.N)]
-                            cmaplist[0] = (1.0, 1.0, 1.0, 1.0)  # Force 0 to white
-                            cmap = cmap.from_list('Custom', cmaplist, cmap.N)
-
-                            # Normalize
-                            k = max(color_array)
-                            norm = BoundaryNorm(np.linspace(0, k+1, k+2), cmap.N)
-
-                            # Apply the map and normalization
-                            polys.set_cmap(cmap)
+                            if colorbar_limits is None:
+                                colorbar_limits = (np.floor(np.min(masked_array)),
+                                                   np.ceil(np.max(masked_array)))
+                            boundaries = np.linspace(colorbar_limits[0],
+                                                     colorbar_limits[1]+1,
+                                                     (colorbar_limits[1]+1-colorbar_limits[0]+1))
+                            norm = BoundaryNorm(boundaries, cmap.N)
                             polys.set_norm(norm)
+                        else:
+                            cmap = plt.cm.viridis
 
-                            # Add the colorbar
+                        # Set the colors of the poloygons
+                        # Tiles with no data should stay white
+                        cmap.set_bad(color='white')
+                        polys.set_cmap(cmap)
+                        if colorbar_limits is not None:
+                            polys.set_clim(colorbar_limits[0], colorbar_limits[1])
+
+                        # Display the color bar
+                        if colorbar_orientation.lower()[0] == 'h':
+                            cb = fig.colorbar(polys, ax=axes, fraction=0.03, pad=0.05, aspect=50,
+                                              orientation='horizontal')
+                        else:
                             cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
-                            tick_labels = np.arange(0, k+1, 1)
+                        if discrete_colorbar:
+                            tick_labels = np.arange(colorbar_limits[0],
+                                                    colorbar_limits[1]+1,
+                                                    discrete_stepsize, dtype=int)
                             tick_location = tick_labels + 0.5
                             cb.set_ticks(tick_location)
                             cb.set_ticklabels(tick_labels)
-                        else:
-                            fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
 
                     except:
                         raise ValueError('Invalid entries in color array')
