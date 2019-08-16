@@ -593,7 +593,7 @@ class SkyMap(object):
             plot the 50% and 90% contour areas
 
         """
-        figure = plt.figure(figsize=figsize, dpi=dpi)
+        fig = plt.figure(figsize=figsize, dpi=dpi)
 
         # Can only plot in equatorial coordinates
         # If it's not, temporarily rotate into equatorial and then go back afterwards
@@ -652,4 +652,4 @@ class SkyMap(object):
             plt.savefig(filename, dpi=dpi)
         else:
             plt.show()
-        plt.close(figure)
+        plt.close(fig)
