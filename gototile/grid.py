@@ -978,4 +978,4 @@ class SkyGrid(object):
             plt.savefig(filename, dpi=dpi)
         else:
             plt.show()
-        plt.close(figure)
+        plt.close(fig)
