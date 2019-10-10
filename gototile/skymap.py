@@ -342,7 +342,7 @@ class SkyMap(object):
         except ValueError:
             raise ValueError('Length of data is invalid')
 
-        order = 'NESTED' if nested else 'RING',
+        order = 'NESTED' if nested else 'RING'
         coordsys = coordsys[0]
 
         return cls(data, order, coordsys)
@@ -650,6 +650,6 @@ class SkyMap(object):
         # Save or show
         if filename:
             plt.savefig(filename, dpi=dpi)
+            plt.close(fig)
         else:
             plt.show()
-        plt.close(fig)
