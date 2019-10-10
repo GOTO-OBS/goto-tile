@@ -342,7 +342,7 @@ class SkyMap(object):
         except ValueError:
             raise ValueError('Length of data is invalid')
 
-        order = 'NESTED' if nested else 'RING',
+        order = 'NESTED' if nested else 'RING'
         coordsys = coordsys[0]
 
         return cls(data, order, coordsys)
