@@ -650,6 +650,6 @@ class SkyMap(object):
         # Save or show
         if filename:
             plt.savefig(filename, dpi=dpi)
+            plt.close(fig)
         else:
             plt.show()
-        plt.close(fig)
