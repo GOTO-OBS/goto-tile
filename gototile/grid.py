@@ -457,12 +457,12 @@ class SkyGrid(object):
         return table
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
-             orthoplot=False, center=(0,45),
+             plot_type='mollweide', center=(0,45), radius=10,
              color=None, linecolor=None, linewidth=None, alpha=0.3,
              discrete_colorbar=False, discrete_stepsize=1,
              colorbar_limits=None, colorbar_orientation='v',
              highlight=None, highlight_color=None, highlight_label=None,
-             coordinates=None, tilenames=False, text=False,
+             coordinates=None, tilenames=None, text=None,
              plot_skymap=False, plot_contours=False, plot_stats=False):
         """Plot the grid.
 
@@ -484,12 +484,18 @@ class SkyGrid(object):
             size of the matplotlib figure
             default is (8,6) - matching the GraceDB plots
 
-        orthoplot : bool, default = False
-            plot the sphere in a orthographic projection, centred on `centre`
+        plot_type : str, one of 'mollweide', 'globe' or 'zoom', default = 'mollweide'
+            type of axes to plot on
+            if 'globe' the orthographic plot will be centred on `centre`
+            if 'zoom' the plot will be centred on `centre` and have a radius of `radius`
 
         center : tuple or `astropy.coordinates.SkyCoord`, default (0,45)
-            coordinates to center the orthographic plot on
+            coordinates to center either a globe or zoom plot on
             if given as a tuple units will be considered to be degrees
+
+        radius : float, default 10
+            size of the zoomed plot, in degrees
+            apparently it can only be a square
 
         highlight : list of str or list of list or str, optional
             a list of tile names (as in SkyGrid.tilenames) to highlight
@@ -561,12 +567,19 @@ class SkyGrid(object):
 
         """
         fig = plt.figure(figsize=figsize, dpi=dpi)
-        if not orthoplot:
+
+        if isinstance(center, tuple):
+            center = SkyCoord(center[0], center[1], unit='deg')
+
+        if plot_type == 'mollweide':
             axes = plt.axes(projection='astro hours mollweide')
-        else:
-            if isinstance(center, tuple):
-                center = SkyCoord(center[0], center[1], unit='deg')
+        elif plot_type == 'globe':
             axes = plt.axes(projection='astro globe', center=center)
+        elif plot_type == 'zoom':
+            axes = plt.axes(projection='astro zoom', center=center, radius=radius*u.deg)
+        else:
+            raise ValueError('"{}" is not a recognised plot type.')
+
         axes.grid()
         axes.set_axisbelow(False)
         transform = axes.get_transform('world')
@@ -586,7 +599,7 @@ class SkyGrid(object):
 
             # Check if the tile passes over the RA=0 line:
             overlaps_meridian = any(ra<90) and any(ra>270)
-            if (not overlaps_meridian) or orthoplot:
+            if (not overlaps_meridian) or plot_type != 'mollweide':
                 # Need to reverse and transpose to get into the correct format for Polygon
                 polygons.append(Polygon(np.array((ra[::-1], dec[::-1])).T))
                 new_tilenames.append(tilename)
@@ -631,7 +644,7 @@ class SkyGrid(object):
         axes.add_collection(polys2)
 
         # Plot tile names
-        if tilenames and not text:
+        if tilenames is not None and text is None:
             # Should be a list of tilenames
             for name in tilenames:
                 if name not in self.tilenames:

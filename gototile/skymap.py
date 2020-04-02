@@ -557,7 +557,7 @@ class SkyMap(object):
         return table
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
-             orthoplot=False, center=(0,45),
+             plot_type='mollweide', center=(0,45), radius=10,
              coordinates=None, plot_contours=True):
         """Plot the skymap.
 
@@ -579,12 +579,18 @@ class SkyMap(object):
             size of the matplotlib figure
             default is (8,6) - matching the GraceDB plots
 
-        orthoplot : bool, default = False
-            plot the sphere in a orthographic projection, centred on `centre`
+        plot_type : str, one of 'mollweide', 'globe' or 'zoom', default = 'mollweide'
+            type of axes to plot on
+            if 'globe' the orthographic plot will be centred on `centre`
+            if 'zoom' the plot will be centred on `centre` and have a radius of `radius`
 
         center : tuple or `astropy.coordinates.SkyCoord`, default (0,45)
-            coordinates to center the orthographic plot on
+            coordinates to center either a globe or zoom plot on
             if given as a tuple units will be considered to be degrees
+
+        radius : float, default 10
+            size of the zoomed plot, in degrees
+            apparently it can only be a square
 
         coordinates : `astropy.coordinates.SkyCoord`, optional
             any coordinates to also plot on the image
@@ -603,12 +609,18 @@ class SkyMap(object):
         else:
             old_coordsys = None
 
-        if not orthoplot:
+        if isinstance(center, tuple):
+            center = SkyCoord(center[0], center[1], unit='deg')
+
+        if plot_type == 'mollweide':
             axes = plt.axes(projection='astro hours mollweide')
-        else:
-            if isinstance(center, tuple):
-                center = SkyCoord(center[0], center[1], unit='deg')
+        elif plot_type == 'globe':
             axes = plt.axes(projection='astro globe', center=center)
+        elif plot_type == 'zoom':
+            axes = plt.axes(projection='astro zoom', center=center, radius=radius*u.deg)
+        else:
+            raise ValueError('"{}" is not a recognised plot type.')
+
         axes.grid()
         transform = axes.get_transform('world')
 
