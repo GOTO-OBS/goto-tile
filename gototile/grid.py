@@ -462,7 +462,7 @@ class SkyGrid(object):
              discrete_colorbar=False, discrete_stepsize=1,
              colorbar_limits=None, colorbar_orientation='v',
              highlight=None, highlight_color=None, highlight_label=None,
-             coordinates=None, tilenames=False, text=False,
+             coordinates=None, tilenames=None, text=None,
              plot_skymap=False, plot_contours=False, plot_stats=False):
         """Plot the grid.
 
@@ -644,7 +644,7 @@ class SkyGrid(object):
         axes.add_collection(polys2)
 
         # Plot tile names
-        if tilenames and not text:
+        if tilenames is not None and text is None:
             # Should be a list of tilenames
             for name in tilenames:
                 if name not in self.tilenames:
