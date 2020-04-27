@@ -353,6 +353,25 @@ class SkyGrid(object):
 
         return list(np.array(self.tilenames)[mask])
 
+    def get_coordinates(self, tilenames):
+        """Return the central coordinates of the given tile(s).
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the coordinates of.
+
+        """
+        if isinstance(tilenames, str):
+            tilenames = [tilenames]
+
+        # Get indexes
+        index = [self.tilenames.index(tile) for tile in tilenames]
+        if len(index) == 1:
+            index = index[0]
+
+        return self.coords[index]
+
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
 
