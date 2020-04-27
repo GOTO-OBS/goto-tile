@@ -372,6 +372,14 @@ class SkyGrid(object):
 
         return self.coords[index]
 
+    def get_vertices(self, tilenames):
+        # Can't implement while gridtools.get_tile_vertices only returns cartesian coordinates.
+        raise NotImplementedError
+
+    def get_edges(self, tilenames, steps=5):
+        # Can't implement while gridtools.get_tile_edges only returns cartesian coordinates.
+        raise NotImplementedError
+
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
 
