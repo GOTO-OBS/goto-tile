@@ -4,6 +4,8 @@ astropy
 astroplan
 pyephem
 healpy
+pandas
 PyYAML
+requests
 scipy
 ligo.skymap
