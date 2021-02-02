@@ -374,7 +374,7 @@ def calculate_tiling(skymap, telescopes, date=None,
     #         newskymap = allskymap.copy()
     #         for telescope in telescopes:
     #             telescope.skymap = allskymap.copy()
-    elif nightsky:
+    if nightsky:
         indiceslist = []
         for telescope in telescopes:
             vismap, indices = get_visiblemap(
