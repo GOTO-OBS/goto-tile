@@ -243,7 +243,7 @@ class SkyMap(object):
         return np.arange(self.npix)[mask]
 
     @classmethod
-    def from_fits(cls, fits_file):
+    def from_fits(cls, fits_file, coordsys='C'):
         """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.
 
         Parameters
@@ -251,6 +251,11 @@ class SkyMap(object):
         fits_file : str, `astropy.io.fits.HDU` or `astropy.io.fits.HDUList`
             Path to the FITS file (if str) or FITS HDU,
             to be passed to `healpy.read_map`.
+
+        coordsys : str, default='C'
+            The coordinate system the data uses.
+            'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
+            Used as a fallback if 'COORDSYS' is not defined in the FITS header.
 
         Returns
         -------
@@ -292,10 +297,11 @@ class SkyMap(object):
             raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
         del header['ORDERING']
 
-        coordsys = header['COORDSYS'][0].upper()
+        if 'COORDSYS' in header:
+            coordsys = header['COORDSYS'][0].upper()
+            del header['COORDSYS']
         if coordsys not in ('G', 'E', 'C'):
             raise ValueError('COORDSYS card in header has unknown value: {}'.format(coordsys))
-        del header['COORDSYS']
 
         # Delete a load more keys that are unnecessary to save
         for key in ['BITPIX', 'EXTNAME', 'FIRSTPIX', 'GCOUNT', 'INDXSCHM',
