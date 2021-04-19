@@ -441,15 +441,20 @@ def get_tile_edges_astropy(centre, fov, edge_points=5):
 
 
 class PolygonQuery(object):
-    def __init__(self, nside):
+    def __init__(self, nside, nested=True, inclusive=True):
         self.nside = nside
+        self.nested = nested
+        self.inclusive = inclusive
     def __call__(self, vertices):
         # Note nest is always True
         # See https://github.com/GOTO-OBS/goto-tile/issues/65
-        return hp.query_polygon(self.nside, vertices, nest=True, inclusive=True, fact=32)
+        ipix= hp.query_polygon(self.nside, vertices, nest=True, inclusive=self.inclusive, fact=32)
+        if not self.nested:
+            ipix = np.array(sorted(hp.nest2ring(self.nside, ipix)))
+        return ipix
 
 
-def get_tile_pixels(vertices, nside):
+def get_tile_pixels(vertices, nside=256, order='NESTED', inclusive=True):
     """Find the HEALPix pixels within the given vertices.
 
     Parameters
@@ -458,26 +463,37 @@ def get_tile_pixels(vertices, nside):
         A 1D array containing arrays of shape (4,3) defining 4 vertices in cartesian coordinates,
         for each tile.
 
-    nside : float
-        The HEALPix Nside resolution parameter.
+    nside : float, default=256
+        The HEALPix Nside resolution parameter
+    order : string, default='NESTED'
+        The HEALPix ordering scheme to use
+    inclusive : bool, default=True
+        See `healpy.query_polygon`
     """
-    polygon_query = PolygonQuery(nside)
+    nested = order == 'NESTED'
+    polygon_query = PolygonQuery(nside, nested, inclusive)
 
     pool = multiprocessing.Pool()
     pixels = pool.map(polygon_query, vertices)
     pool.close()
     pool.join()
 
-    return np.array(pixels)
+    return pixels
 
 
-def get_tile_pixels_astropy(tile_edges, nside=256, order='NESTED', inclusive=True):
+def get_tile_pixels_astropy(vertices, nside=256, order='NESTED', inclusive=True):
     """Find the HEALPix pixels within the given vertices.
 
     Parameters
     ----------
-    tile_edges : `astropy.coordinates.SkyCoord`
-        Coordinates describing the edges of each tile
+    vertices : `astropy.coordinates.SkyCoord`
+        Coordinates describing the 4 vertices of each tile.
+        Can either have shape=(4) (for a single tile) or shape=(X,4) (for X tiles).
+        Note using more than those 4 points (e.g. finding more edge points using `get_tile_edges`)
+            will result in a "degenerate corner" error from HEALPix once it finds three points that
+            lie in the same plane. Therefore always use the output from `get_tile_vertices` in this
+            function, not `get_tile_edges`.
+
     nside : float, default=256
         The HEALPix Nside resolution parameter
     order : string, default='NESTED'
@@ -487,17 +503,31 @@ def get_tile_pixels_astropy(tile_edges, nside=256, order='NESTED', inclusive=Tru
 
     Returns
     -------
-    ipix : list of `numpy.array`
+    ipix : `numpy.array` or list of `numpy.array`
         The indices of the pixels contained within each tile.
-        Note that at high resolutions tiles might contain different numbers of pixels,
-        which is why this is not necessarily a 2D array.
+        If `vertices` has shape=(4) this will be a single array of pixel indicies, for shape=(X,4)
+            it will be a list of len=X.
+        Note that tiles can contain different numbers of pixels, which is why this is not
+            necessarily a 2D array.
 
     """
-    xyz_points = tile_edges.cartesian.get_xyz(xyz_axis=2).value
+    scalar = False
+    if vertices.ndim == 1:
+        if vertices.shape[0] != 4:
+            raise ValueError('Too many edge points defined, only the 4 vertices are required')
+        scalar = True
+        xyz_points = np.array([vertices.cartesian.get_xyz(xyz_axis=1).value])
+    else:
+        if vertices.shape[1] != 4:
+            raise ValueError('Too many edge points defined, only the 4 vertices are required')
+        xyz_points = vertices.cartesian.get_xyz(xyz_axis=2).value
 
+    # Run polygon query
     # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
     ipix = [hp.query_polygon(nside, p, nest=True, inclusive=inclusive, fact=32) for p in xyz_points]
     if order == 'RING':
         ipix = [np.array(sorted(hp.nest2ring(nside, ip))) for ip in ipix]
 
+    if scalar:
+        ipix = ipix[0]
     return ipix

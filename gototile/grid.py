@@ -373,10 +373,12 @@ class SkyGrid(object):
         return self.coords[index]
 
     def get_vertices(self, tilenames):
+        """Return coordinates of the four corners of the given tile(s)."""
         # Can't implement while gridtools.get_tile_vertices only returns cartesian coordinates.
         raise NotImplementedError
 
     def get_edges(self, tilenames, steps=5):
+        """Return coordinates along the edges of the given tile(s)."""
         # Can't implement while gridtools.get_tile_edges only returns cartesian coordinates.
         raise NotImplementedError
 
