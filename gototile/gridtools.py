@@ -397,6 +397,8 @@ def get_tile_edges_astropy(centre, fov, edge_points=5):
 
     # If edge_points=0 then just return the corners
     if edge_points == 0:
+        if scalar:
+            return corners[0]
         return corners
 
     # Split out arrays for each corner
