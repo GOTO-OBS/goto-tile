@@ -749,7 +749,7 @@ class SkyGrid(object):
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
             # Create the new map
-            cmap = plt.cm.jet
+            cmap = plt.cm.get_cmap('gist_rainbow')
             cmaplist = [cmap(i) for i in range(cmap.N)]
             cmap = cmap.from_list('Custom', cmaplist, cmap.N)
 
@@ -761,7 +761,7 @@ class SkyGrid(object):
             points = axes.scatter(coords.ra.deg, coords.dec.deg,
                                   transform=transform,
                                   s=1, c=count,
-                                  cmap='gist_rainbow', norm=norm,
+                                  cmap=cmap, norm=norm,
                                   zorder=0)
 
             # Add the colorbar
@@ -799,19 +799,19 @@ class SkyGrid(object):
 
                         if discrete_colorbar:
                             # See above link in plot_stats
-                            cmap = plt.cm.jet_r
+                            cmap = copy(plt.cm.jet_r)
                             if colorbar_limits is None:
-                                colorbar_limits = (np.floor(np.min(masked_array)),
-                                                   np.ceil(np.max(masked_array)))
+                                colorbar_limits = (int(np.floor(np.min(masked_array))),
+                                                   int(np.ceil(np.max(masked_array))))
                             boundaries = np.linspace(colorbar_limits[0],
                                                      colorbar_limits[1]+1,
                                                      (colorbar_limits[1]+1-colorbar_limits[0]+1))
                             norm = BoundaryNorm(boundaries, cmap.N)
                             polys.set_norm(norm)
                         else:
-                            cmap = plt.cm.viridis
+                            cmap = copy(plt.cm.viridis)
 
-                        # Set the colors of the poloygons
+                        # Set the colors of the polygons
                         # Tiles with no data should stay white
                         cmap.set_bad(color='white')
                         polys.set_cmap(cmap)
@@ -873,7 +873,7 @@ class SkyGrid(object):
                 if not len(linecolor) == self.ntiles:
                     raise ValueError('List of linecolors must be same length as grid.ntiles')
 
-                # Sould be a list of color string
+                # Should be a list of color string
                 try:
                     polys2.set_edgecolor(np.array(linecolor[new_indexes]))
                 except:
@@ -902,7 +902,7 @@ class SkyGrid(object):
                 if not len(linewidth) == self.ntiles:
                     raise ValueError('List of linewidths must be same length as grid.ntiles')
 
-                # Sould be a list of floats
+                # Should be a list of floats
                 try:
                     polys2.set_linewidth(np.array(linewidth[new_indexes]))
                 except:
@@ -962,8 +962,8 @@ class SkyGrid(object):
                         linewidth_array = np.array([0] * len(new_tilenames))
                         for k in tilelist:
                             i = [i for i, x in enumerate(new_tilenames) if x == k]
-                            color = colors[j % len(colors)]
-                            linecolor_array[i] = color
+                            linecolor = colors[j % len(colors)]
+                            linecolor_array[i] = linecolor
                             linewidth_array[i] = 1.5
                         # Create polygons
                         polys4 = copy(polys2)
@@ -976,7 +976,7 @@ class SkyGrid(object):
                         if highlight_label is not None:
                             label = highlight_label[j] + ' ({} tiles)'.format(len(tilelist))
                             patch = Patch(facecolor='none',
-                                          edgecolor=color,
+                                          edgecolor=linecolor,
                                           linewidth=1.5,
                                           label=label,
                                           )
