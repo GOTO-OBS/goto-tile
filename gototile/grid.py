@@ -287,14 +287,26 @@ class SkyGrid(object):
         else:
             return tilenames
 
-    def get_visible_tiles(self, locations, any_all='any',
-                          alt_limit=30, time_range=None, sun_limit=-15):
+    def get_visible_tiles(self, locations, time_range=None, alt_limit=30, sun_limit=-15,
+                          any_all='any'):
         """Get the tiles that are visible from the given location(s).
 
         Parameters
         ----------
         locations : `astropy.coordinates.EarthLocation` or list of same
-            location(s) to check visibity from
+            location(s) to check visibility from
+
+        time_range : 2-tuple of `astropy.time.Time`, optional
+            times to check visibility between
+            if not given tiles will only be selected based on altitude
+
+        alt_limit : float, optional
+            horizon altitude limit to apply
+            default is 30 deg
+
+        sun_limit : float, optional
+            altitude limit of the Sun to consider night constraints
+            default is -15 deg
 
         any_all : 'any' or 'all', optional
             If 'any' return tiles that are visible from any of the locations.
@@ -302,17 +314,6 @@ class SkyGrid(object):
             Only valid if len(locations) > 1.
             Default = 'any'
 
-        alt_limit : float, optional
-            horizon altitude limit to apply
-            default is 30 deg
-
-        time_range : 2-tuple of `astropy.time.Time`, optional
-            times to check visibilty between
-            if not given tiles will only be selected based on altitude
-
-        sun_limit : float, optional
-            altitude limit of the Sun to consider night constraints
-            default is -15 deg
         """
         # Handle multiple locations
         if isinstance(locations, EarthLocation):
