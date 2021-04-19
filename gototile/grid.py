@@ -484,6 +484,7 @@ class SkyGrid(object):
         table = QTable([in_tiles, pix, freq],
                        names=col_names, dtype=col_types)
         table['freq'].format = '.4f'
+        table = table.group_by('in_tiles')
         return table
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
