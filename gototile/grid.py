@@ -133,16 +133,15 @@ class SkyGrid(object):
         newgrid = SkyGrid(self.fov, self.overlap)
         return newgrid
 
-    def get_pixels(self, nside):
-        """Calculate the HEALPix indicies within each tile."""
+    def _get_tile_pixels(self, nside):
+        """Calculate the HEALPix indices within each tile."""
         pixels = get_tile_pixels(self.vertices, nside)
-        return np.array(pixels)
+        return np.array(pixels, dtype=object)
 
     def apply_skymap(self, skymap):
-        """Apply a SkyMap to the grid.
+        """Apply a SkyMap to the grid, calculating the contained probability within each tile.
 
-        This means caculate the contained probabiltiy within each tile.
-        The probability contained within each tile will be stored in self.probs.
+        The tile probabilities are stored in self.probs, and the contour levels in self.contours.
 
         Parameters
         ----------
@@ -162,41 +161,91 @@ class SkyGrid(object):
             skymap = skymap.copy()
             skymap.rotate('C')
 
-        # Calculate which pixels are within the tiles
-        if not hasattr(self, 'nside') or self.nside != skymap.nside:
-            self.nside = skymap.nside
-            self.pixels = self.get_pixels(self.nside)
-
-        # Calculate the contained probabilities within each tile
-        self.probs = np.array([np.sum(skymap.skymap[pix]) for pix in self.pixels])
-
-        # Calculate the min and mean pixel contours for each tile
-        self.min_contours = np.array([np.min(skymap.contours[pix]) for pix in self.pixels])
-        self.mean_contours = np.array([np.mean(skymap.contours[pix]) for pix in self.pixels])
-
         # Store skymap on the class
         self.skymap = skymap
 
+        # Calculate which pixels are within the tiles
+        # (if we've already done it we can save time by not regenerating the pixel map)
+        if not hasattr(self, 'nside') or self.nside != skymap.nside:
+            self.nside = skymap.nside
+            self.pixels = self._get_tile_pixels(self.nside)
+
+        # Calculate the tile probabilities ant contour levels
+        self.probs = self._get_tile_probs()
+        self.contours = self._get_tile_contours()
+
         return self.probs
 
-    def select_tiles(self, contour=0.9, mean_limit=10, max_tiles=None, min_tile_prob=None):
+    def _get_tile_probs(self):
+        """Calculate the contained probabilities within each tile."""
+        return np.array([np.sum(self.skymap.skymap[pix]) for pix in self.pixels])
+
+    def _get_tile_contours(self, prob_limit=7):
+        """Calculate the minimum contour level of each pixel.
+
+        Unlike for SkyMaps (see `gototile.skymap.SkyMap._get_contours()`), the calculation for tiles
+        is complicated because they can overlap, so the same pixel could be included within multiple
+        tiles.
+
+        This method iterates through the tiles by selecting the one with highest probability,
+        adding it to the list, then blanking out that portion of the sky and recalculating the
+        remaining tile probabilities.
+
+        As this can take quite a while the probability limit (`prob_limit`) is a way to ignore
+        tiles with a probability of less than 10^-1**prob_limit (i.e. if the prob_limit is 3 then
+        it will only consider tiles with a probability of more than 0.001). The default is 7, which
+        will make no difference unless you are considering the 99.9999999% skymap contour level...
+
+        The result is a minimum contour level for every tile, starting at 0 for the highest
+        probability tile and increasing from there. To select all tiles within a given contour X you
+        can mask for those with a contour level < X.
+
+        You could argue that a faster method would be to only recalculate the probability of the
+        tiles that overlap with the high tile. That's true, but the issue is finding which tiles
+        overlap. You'll have to loop through every tile and compare its pixels to those of
+        the high tile, and do that every time. It's just not worth it. Even if you pre-calculate
+        which tiles overlap before you start you don't save any time, because that takes ages
+        for any reasonable nside resolution.
+        """
+        pixel_probs = self.skymap.skymap.copy()
+        if prob_limit:
+            # Exclude tiles containing a probability of less than 10^-prob_limit
+            tile_mask = self.probs > 10**(-1 * prob_limit)
+        else:
+            tile_mask = np.full(self.ntiles, True)
+        tile_pixels = self.pixels[tile_mask]
+        tile_probs = np.array([np.sum(pixel_probs[pix]) for pix in tile_pixels])
+
+        sorted_contours = [0]
+        sorted_index = []
+        for i in range(len(tile_pixels)):
+            # Find the tile with the highest probability
+            high_tile_prob = max(tile_probs)
+            high_tile_index = np.where(tile_probs == high_tile_prob)[0][0]
+            # The tile contour value is the probability + cumulative sum of previous tiles
+            high_tile_contour = high_tile_prob + sorted_contours[i]
+            # Store the tile index and contour value
+            sorted_index.append(high_tile_index)
+            sorted_contours.append(high_tile_contour)
+            # Black out the already-counted pixels
+            high_tile_pixels = tile_pixels[high_tile_index]
+            pixel_probs[high_tile_pixels] = 0
+            # Recalculate the probability within all tiles
+            tile_probs = np.array([np.sum(pixel_probs[tile_pix]) for tile_pix in tile_pixels])
+
+        # Start from a contour level of 1, only replace those within the mask
+        contours = np.ones(self.ntiles)
+        contours[tile_mask] = np.array(sorted_contours)[np.array(sorted_index).argsort()]
+
+        return contours
+
+    def select_tiles(self, contour=0.9, max_tiles=None, min_tile_prob=None):
         """Select tiles based off of the given contour."""
         if not hasattr(self, 'skymap'):
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
         # Initially mask to cover the entire given contour level
-        mask = self.min_contours < contour
-
-        # If it's a super-well constrained target then the contour method won't really work
-        if min(self.min_contours) > contour or any(self.probs == 1):
-            mask = self.probs > contour
-
-        # That's only good for very small skymaps though, as it can add
-        # too many low-probability tiles.
-        # So only use that if it selects less than X tiles
-        if sum(mask) > mean_limit:
-            # Use the mean contours instead
-            mask = self.mean_contours < contour
+        mask = self.contours < contour
 
         # Limit to given max tiles, if limit is given
         if max_tiles is not None and sum(mask) > max_tiles:
@@ -218,7 +267,7 @@ class SkyGrid(object):
             tile_pixels = self.pixels
         else:
             # Use the given parameters
-            tile_pixels = self.get_pixels(nside)
+            tile_pixels = self._get_tile_pixels(nside)
 
         if isinstance(tilenames, (list, np.ndarray)):
             # Multiple tiles
@@ -239,14 +288,14 @@ class SkyGrid(object):
 
         Parameters
         ----------
-        coord : `astropy.coordiantes.SkyCoord`
+        coord : `astropy.coordinates.SkyCoord`
             The coordinates to find which tile they are within.
 
         overlap : bool, optional
             If True then check if the coordinates fall within multiple tiles, and return a list.
-            If False (defualt) just return the closest tile centre.
+            If False (default) just return the closest tile centre.
         """
-        # Handle both scalar and vector coordiantes
+        # Handle both scalar and vector coordinates
         if coord.isscalar:
             coord = [coord]
 
@@ -268,7 +317,7 @@ class SkyGrid(object):
             # Get the tile pixels
             if not hasattr(self, 'pixels'):
                 nside = 128
-                pixels = self.get_pixels(nside)
+                pixels = self._get_tile_pixels(nside)
             else:
                 nside = self.nside
                 pixels = self.pixels
@@ -277,7 +326,7 @@ class SkyGrid(object):
                 # Get the HEALPix pixel the coords are within
                 pixel = coord2pix(nside, c, nest=True)
 
-                # Get the tile indicies that contain that pixel and add to list
+                # Get the tile indices that contain that pixel and add to list
                 names = [self.tilenames[i] for i in range(self.ntiles)
                          if pixel in pixels[i]]
                 tilenames.append(names)
@@ -452,7 +501,7 @@ class SkyGrid(object):
             nside = self.nside
         else:
             # Use the given parameters
-            tile_pixels = self.get_pixels(nside)
+            tile_pixels = self._get_tile_pixels(nside)
 
         # Number of pixels
         npix = healpy.nside2npix(nside)

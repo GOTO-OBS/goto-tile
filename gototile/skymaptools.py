@@ -537,7 +537,7 @@ def tile_skymap(skymap, grid, observed=None):
         The all-sky grid to apply the map to
 
     observed : list of int or str, optional
-        A list containing tile indicies or names that have already been observed (if any).
+        A list containing tile indices or names that have already been observed (if any).
         Any tiles in this list will have their probability of any HEALPix pixels
         within set to zero, thereby reducing the contained probability of any
         overlapping tiles.
@@ -545,7 +545,7 @@ def tile_skymap(skymap, grid, observed=None):
     utils.test_iers()
 
     # Get the pixels within each grid tile
-    tile_pixels = grid.get_pixels(skymap.nside, skymap.isnested)
+    tile_pixels = grid._get_tile_pixels(skymap.nside, skymap.isnested)
 
     # Get all the pixels within observed tiles
     bad_pix = set()

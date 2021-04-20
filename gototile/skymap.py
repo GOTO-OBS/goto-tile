@@ -168,12 +168,12 @@ class SkyMap(object):
         self._get_contours()
 
     def _get_contours(self):
-        """Store the contour infomation of each pixel.
+        """Calculate the minimum contour level of each pixel.
 
-        The cumulative probability of the pixels sorted in order corresponds to the
-        minimum probability contour that that pixel is within.
+        This is done using the cumulative sum method, (vaguely) based on code from
+        http://www.virgo-gw.eu/skymap.html
 
-        For example, a very small skymap has the following table:
+        For example, consider a very small skymap with the following table:
 
         pix | prob
           1 |  0.1
@@ -181,35 +181,49 @@ class SkyMap(object):
           3 |  0.2
           4 |  0.3
 
-        Sorted by probability, and finding the cumulative sum:
+        Sort by probability, and find the cumulative sum:
 
-        pix | prob | cumprob
+        pix | prob | cumsum(prob)
           2 |  0.4 |  0.4
           4 |  0.3 |  0.7
           3 |  0.2 |  0.9
           1 |  0.1 |  1.0
 
-        So only pixel 2 is within the 50% probability contour (== confidence region),
-        while 2, 4 and 3 are within the 90% region.
-        Obviously all 4 pixels are within the 100% region.
+        Now shift so the cumprob starts at zero, and that's the minimum contour level that each
+        pixel is within.
 
-        This means if we sort back to the origional order the minimum confidence region each
-        pixel is in is easy to find by seeing if cumprob(pixel) < percentage:
+        pix | prob | contour
+          2 |  0.4 |  0.0
+          4 |  0.3 |  0.4
+          3 |  0.2 |  0.7
+          1 |  0.1 |  0.9
 
-        pix | prob | cumprob | in 90%? | in 50%?
-          1 |  0.1 |  1.0    | False   | False
-          2 |  0.4 |  0.4    | True    | True
-          3 |  0.2 |  0.9    | True    | False
-          4 |  0.3 |  0.7    | True    | False
+        Consider asking for the minimum number of pixels to cover increasing contour levels:
+            -  0%-40%: you only need pixel 2
+            - 40%-70%: you need pixels 2 & 3
+            - 70%-90%: you need pixels 2, 3 & 4
+            - 90%+:    you need all four pixels
+        That's why we shift everything up so the first pixel has a contour value of 0%, because you
+        should always include at least one pixel to cover the smallest contour levels.
+
+        If we sort back to the original order the minimum confidence region each
+        pixel is in is easy to find by seeing if contour(pixel) < percentage:
+
+        pix | prob | contour | in 90%? | in 50%?
+          1 |  0.1 |  0.9    | False   | False
+          2 |  0.4 |  0.0    | True    | True
+          3 |  0.2 |  0.7    | True    | False
+          4 |  0.3 |  0.4    | True    | True
+
+        If you select the pixels for which contour(pixel) < percentage you will always cover
+        AT LEAST percentage (you may well cover more of course).
 
         See also:
             SkyMap._pixels_within_contour(percentage)
             SkyMap.get_contour(coord)
             SkyMap.within_contour(coord, percentage)
-
-        This is (vaguely) based on code from http://www.virgo-gw.eu/skymap.html
         """
-        # Get the indixes sorted by probability (reversed, so highest first)
+        # Get the indices sorted by probability (reversed, so highest first)
         # Note what we call the 'pixels' are really just the index numbers of the skymap,
         # i.e. probability of pixel X = self.skymap[X]
         sorted_pixels = self.skymap.argsort()[::-1]
@@ -220,22 +234,17 @@ class SkyMap(object):
         # Create cumulative sum array of each pixel in the skymap
         cumprob = np.cumsum(sorted_skymap)
 
-        # "Un-sort" the cumulative array back to the normal pixel order
-        contours = cumprob[sorted_pixels.argsort()]
+        # Shift so we start at 0
+        sorted_contours = np.append([0], cumprob[:-1])
 
-        # And save the contours on the SkyMap
-        self.contours = contours
+        # "Un-sort" the contour array back to the normal pixel order and save
+        self.contours = sorted_contours[sorted_pixels.argsort()]
 
     def _pixels_within_contour(self, percentage):
         """Find pixel indices confined in a given percentage contour (range 0-1)."""
 
         if not 0 <= percentage <= 1:
             raise ValueError('Percentage must be in range 0-1')
-
-        # Return early if the percentage is too low
-        # NB for the record min(self.contours) == max(self.skymap)
-        if percentage < min(self.contours):
-            return []
 
         # Find the pixels within the given contour
         mask = self.contours < percentage
