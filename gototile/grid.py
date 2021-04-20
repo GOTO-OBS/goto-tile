@@ -165,10 +165,8 @@ class SkyGrid(object):
         self.skymap = skymap
 
         # Calculate which pixels are within the tiles
-        # (if we've already done it we can save time by not regenerating the pixel map)
-        if not hasattr(self, 'nside') or self.nside != skymap.nside:
-            self.nside = skymap.nside
-            self.pixels = self._get_tile_pixels(self.nside)
+        self.nside = skymap.nside
+        self.pixels = self._get_tile_pixels(self.nside)
 
         # Calculate the tile probabilities ant contour levels
         self.probs = self._get_tile_probs()
@@ -263,7 +261,7 @@ class SkyGrid(object):
     def _pixels_from_tilenames(self, tilenames, nside=128):
         """Get the unique pixels contained within the given tile(s)."""
         if hasattr(self, 'pixels'):
-            # If a skymap has been applied: use those pixels
+            # A skymap has been applied, use those pixels
             tile_pixels = self.pixels
         else:
             # Use the given parameters
@@ -314,13 +312,14 @@ class SkyGrid(object):
                 name = self.tilenames[index]
                 tilenames.append(name)
         else:
-            # Get the tile pixels
-            if not hasattr(self, 'pixels'):
-                nside = 128
-                pixels = self._get_tile_pixels(nside)
-            else:
+            if hasattr(self, 'pixels'):
+                # A skymap has been applied, use those pixels
                 nside = self.nside
                 pixels = self.pixels
+            else:
+                # Use the given parameters
+                nside = 128
+                pixels = self._get_tile_pixels(nside)
 
             for c in coord:
                 # Get the HEALPix pixel the coords are within
@@ -490,13 +489,13 @@ class SkyGrid(object):
             probs = np.zeros(self.ntiles)
 
         table = QTable([self.tilenames, self.coords.ra, self.coords.dec, probs],
-                        names=col_names, dtype=col_types)
+                       names=col_names, dtype=col_types)
         return table
 
     def _get_pixel_count(self, nside=128):
         """Get the count of the number of times each pixel is contained within a grid tile."""
         if hasattr(self, 'pixels'):
-            # If a skymap has been applied: use those pixels
+            # A skymap has been applied, use those pixels
             tile_pixels = self.pixels
             nside = self.nside
         else:
@@ -528,7 +527,7 @@ class SkyGrid(object):
 
         in_tiles = [i for i in counter]
         pix = [counter[i] for i in counter]
-        freq = [counter[i]/len(count) for i in counter]
+        freq = [counter[i] / len(count) for i in counter]
 
         table = QTable([in_tiles, pix, freq],
                        names=col_names, dtype=col_types)
