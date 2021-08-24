@@ -79,6 +79,9 @@ def create_grid(fov, overlap, kind='minverlap'):
         return create_grid_minverlap(fov, overlap)
     elif kind == 'enhanced':
         return create_grid_enhanced(fov, overlap)
+    elif kind.startswith('enhanced'):
+        params = [i == '1' for i in kind.strip('enhanced')]
+        return create_grid_enhanced(fov, overlap, *params)
     else:
         raise ValueError('Unknown grid tiling method: "{}"'.format(kind))
 
