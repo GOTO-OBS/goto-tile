@@ -1,23 +1,175 @@
-"""Routines to parse user arguments and input"""
+#! /usr/bin/env python3
+"""Core functionality"""
 
 import argparse
+import logging
 import os
+import pickle
 import sys
+
+import astropy
 from astropy.time import Time, TimeDelta
 from astropy import units
 from astropy.coordinates import SkyCoord
-from . import settings
-from . import telescope as telmodule
+
+from gototile import settings
+from gototile import telescope as telmodule
+from gototile.skymaptools import calculate_tiling
+from gototile.skymap import SkyMap
+from gototile.utils import pointings_to_text
+
+import numpy as np
 
 
-def parse_args(args=None):
+def run(skymap, telescopes, nside=None, date=None,
+        coverage=None, maxtiles=100, within=None,
+        nightsky=False, catalog=None, tilespath='./tiles',
+        njobs=1, command='',
+        outputoptions=None, plotoptions=None):
+
+    if coverage is None:
+        coverage = {'min': 0.05, 'max': 0.95}
+    if catalog is None:
+        catalog = {'path': None, 'key': None}
+    if nside is None:
+        nside = getattr(settings, 'NSIDE')
+    if outputoptions is None:
+        outputoptions = {}
+    if plotoptions is None:
+        plotoptions = {}
+
+    # Replace telescope classes or class names with their instances
+    for i, telescope in enumerate(telescopes):
+        if isinstance(telescope, type):
+            telescopes[i] = telescope()
+        elif isinstance(telescope, str):
+            telclass = getattr(telmodule, telescope)
+            telescopes[i] = telclass()
+
+    skymap.regrade(nside=nside)
+
+    date = skymap.date_det if date is None else date
+
+    pointings, tiledmap, allskymap = calculate_tiling(
+        skymap, telescopes, date=date, coverage=coverage,
+        maxtiles=maxtiles, within=within,
+        nightsky=nightsky, catalog=catalog,
+        tilespath=tilespath, njobs=njobs)
+
+    gwtot = tiledmap.sum()
+    allsky = allskymap.sum()
+    pointings.meta['comments'] = [
+        "Tiling map obtained for {}".format(date.datetime),
+        "The total probability visible during the next observing "
+        "period is {:.3f}".format(gwtot),
+        "This is {:5.2f}% of the original skymap".format((gwtot / allsky) * 100.)
+    ]
+    pointings.meta['command'] = command
+    pointings.meta['time-created'] = Time.now().datetime.strftime(
+        "%Y-%m-%dT%H:%M:%S")
+    pointings.meta['time-planning'] = date.datetime.strftime(
+        "%Y-%m-%dT%H:%M:%S")
+
+    if outputoptions.get('text'):
+        table = pointings_to_text(pointings, catalog=catalog)
+        table.write(outputoptions['text'], format='ascii.ecsv', overwrite=True)
+
+    if outputoptions.get('latex'):
+        # Very similar to output, but with less precision (more human readable when rendered)
+        table = pointings[['fieldname', 'prob', 'cumprob', 'telescope']].copy()
+        table['prob'] = ["{:.2f}".format(100 * prob)
+                         for prob in table['prob']]
+        table['cumprob'] = ["{:.2f}".format(100 * prob)
+                            for prob in table['cumprob']]
+        table['ra'] = ["{:.2f}".format(center.ra.deg)
+                       for center in pointings['center']]
+        table['dec'] = ["{:.2f}".format(center.dec.deg)
+                        for center in pointings['center']]
+        table['time'] = [time.datetime.strftime('%Y-%m-%d %H:%M')
+                         for time in pointings['time']]
+        table['dt'] = ["{:.2f}".format(dt.jd * 24) for dt in pointings['dt']]
+        table[['telescope', 'fieldname', 'ra', 'dec', 'time', 'dt',
+               'prob', 'cumprob']].write(outputoptions['latex'],
+                                         format='latex', overwrite=True)
+
+    if outputoptions.get('pickle'):  # For re-use within Python
+        with open(outputoptions['pickle'], 'wb') as outfile:
+            pickle.dump(pointings, outfile, protocol=2)
+
+    if plotoptions.get('output'):
+        # options = dict(sun=plotoptions.get('sun'),
+        #                moon=plotoptions.get('moon'),
+        #                coverage=plotoptions.get('coverage'),
+        #                delay=plotoptions.get('delay'))
+        skymap.plot(filename=plotoptions['output'],
+                    # telescopes=telescopes,
+                    # date=date,
+                    # pointings=pointings,
+                    # geoplot=plotoptions.get('geo'),
+                    # catalog=catalog,
+                    # nightsky=nightsky,
+                    title=plotoptions.get('title'),
+                    # options=options
+                    )
+
+    return pointings
+
+
+def print_pointings(pointings):
+    print("\n".join(pointings.meta['comments']))
+    print("# fieldname  RA       Dec   obs-sky-frac   cum-obs-sky-frac   "
+          "tileprob   cum-prob  coverage (%)  telescope  dt (hour)       time",
+          end=" ")
+    if (len(pointings) and np.any([len(sources) > 0 for sources in pointings['sources']])):
+        print("# of cat. srcs")
+    else:
+        print("")
+    for pointing in pointings:
+        print("{p[fieldname]} {ra:8.3f}  {dec:+8.3f}  {p[prob]:13.6f}  "
+              "{p[cumprob]:17.6f}  {p[relprob]:9.6f}  {p[cumrelprob]:9.6f}  "
+              "{coverage:12.2f}  {p[telescope]:>9s}  "
+              "{dt:10.2f} {p[time].datetime:%Y-%m-%d %H:%M} UT".format(
+                  p=pointing, ra=pointing['center'].ra.deg,
+                  dec=pointing['center'].dec.deg,
+                  coverage=pointing['cumprob'] * 100,
+                  dt=pointing['dt'].jd * 24),
+              end=' ')
+        if len(pointing['sources']):
+            print("{:-8d}".format(len(pointing['sources'])))
+        else:
+            print("")
+
+
+if __name__ == '__main__':
+    def parse_date(string):
+        """Turn a string into an astropy.time.Time date"""
+        if string is None:
+            return None
+        if string == 'now':
+            return Time.now()
+        if string.lower().endswith('jd'):
+            if string.lower().endswith('mjd'):
+                return Time(float(string[:-3]), format='mjd', scale='utc')
+            return Time(float(string[:-2]), format='jd', scale='utc')
+        return Time(string)
+
+    def parse_object(args):
+        if ':' in args[0] and ':' in args[1]:
+            coords = SkyCoord(args[0], args[1], unit=(units.hour, units.degree))
+        else:
+            try:
+                float(args[0]), float(args[1])
+            except ValueError:
+                coords = SkyCoord(args[0], args[1])
+            else:
+                coords = SkyCoord(args[0], args[1], unit=units.degree)
+        coords.name = args[2]
+        return coords
 
     description = ("This script creates pointings for selected telescopes, "
                    "with given skymap files.")
-
-    parser = argparse.ArgumentParser(
-        description = description,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-gaussian", nargs=3, type=float, action='append',
                         default=[], help="Create a gaussian skymap with the given "
@@ -37,7 +189,7 @@ def parse_args(args=None):
                         "attempt tiling")
     parser.add_argument('-s', '--scope',
                         choices=['gn4', 'gn8', 'gs4', 'gs8', 'gls4', 'gls8',
-                                 'swasp','vista'],
+                                 'swasp', 'vista'],
                         default=[], action='append',
                         help=("Telescope to use. GOTO-4 (default), GOTO-8, "
                               "SuperWASP-North, VISTA. Repeat when using "
@@ -62,8 +214,8 @@ def parse_args(args=None):
     parser.add_argument('--exptime', type=float,
                         help="Use this exposure times, in seconds. "
                         "Applies to *all* telescopes")
-    parser.add_argument('-c', '--catalog', 
-                        choices=['GLADE','GWGC'],
+    parser.add_argument('-c', '--catalog',
+                        choices=['GLADE', 'GWGC'],
                         help="Use a catalog to convolve with; specify as an "
                         "astropy readable table format")
     parser.add_argument('--catalog-weight-key',
@@ -114,7 +266,7 @@ def parse_args(args=None):
                        help="Verbose level")
     group.add_argument('-q', '--quiet', action='store_true',
                        help="Turn off warnings")
-    args = parser.parse_args(args=args)
+    args = parser.parse_args()
 
     if args.dump_scopes:
         telmodule.print_config_file()
@@ -148,7 +300,7 @@ def parse_args(args=None):
     args.scope = telescopes
 
     if args.scopefile:
-        telconfigs = telmoculde.read_config_file(args.scopefile)
+        telconfigs = telmodule.read_config_file(args.scopefile)
         for config in telconfigs:
             telescope = telmodule.build_scope(config)
             args.scope.append(telescope)
@@ -196,45 +348,46 @@ def parse_args(args=None):
         else:
             args.plot = 'output.png'
 
-    return args
+    # set logging
+    loglevel = ['WARNING', 'INFO', 'DEBUG'][args.verbose]
+    logging.basicConfig(level=loglevel,
+                        format='%(asctime)s -- %(funcName)s [%(levelname)s]: %(message)s',
+                        datefmt='%Y-%m-%dT%H:%M:%S'
+                        )
+    astropy.log.setLevel(loglevel)
+    if args.quiet:
+        logging.getLogger().setLevel(logging.ERROR)
+        astropy.log.setLevel('ERROR')
+        astropy.log.disable_warnings_logging()
 
-
-def parse_date(string):
-    """Turn a string into an astropy.time.Time date"""
-    if string is None:
-        return None
-    if string == 'now':
-        return Time.now()
-    if string.lower().endswith('jd'):
-        if string.lower().endswith('mjd'):
-            return Time(float(string[:-3]), format='mjd', scale='utc')
-        return Time(float(string[:-2]), format='jd', scale='utc')
-    return Time(string)
-
-
-def parse_object(args):
-    if ':' in args[0] and ':' in args[1]:
-        coords = SkyCoord(args[0], args[1], unit=(units.hour, units.degree))
+    date = parse_date(args.date)
+    command = " ".join(sys.argv)
+    outputoptions = {'text': args.output,
+                     'latex': args.latex,
+                     'pickle': args.pickle}
+    plotoptions = {'output': args.plot,
+                   'geo': args.geoplot,
+                   'title': args.title,
+                   'sun': args.sun,
+                   'moon': args.moon,
+                   'objects': [parse_object(obj) for obj in args.object],
+                   'coverage': args.plot_coverage,
+                   'delay': args.plot_delay}
+    if (args.skymap is None) and (args.gaussian == []):
+        print('ERROR: Skymap argument is missing. Please provide skymap or gaussian arguments.')
+    elif args.skymap is not None:
+        args.skymap = SkyMap.from_fits(args.skymap)
     else:
-        try:
-            float(args[0]), float(args[1])
-        except ValueError:
-            coords = SkyCoord(args[0], args[1])
-        else:
-            coords = SkyCoord(args[0], args[1], unit=units.degree)
-    coords.name = args[2]
-    return coords
+        args.skymap = SkyMap.from_position(args.gaussian[0][0],
+                                           args.gaussian[0][1],
+                                           args.gaussian[0][2])
 
-
-def parse_site(site):
-    if site is None:
-        return site
-    try:
-        lon = Angle(site[0])
-    except units.UnitsError:
-        lon = Angle(site[0], unit=units.hour)
-    lat = Angle(site[1], unit=units.degree)
-    height = float(site[2])
-    location = EarthLocation.from_geodetic(lon, lat, height)
-    location.name = site[3] if len(site) == 4 else ""
-    return location
+    pointings = run(args.skymap, args.scope, date=date,
+                    coverage=args.coverage,
+                    maxtiles=args.maxtiles, within=args.within,
+                    nightsky=args.nightsky, catalog=args.catalog,
+                    tilespath=args.tiles, njobs=args.njobs,
+                    command=command,
+                    outputoptions=outputoptions,
+                    plotoptions=plotoptions)
+    print_pointings(pointings)

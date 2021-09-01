@@ -268,6 +268,7 @@ class SkyMap(object):
                                          field=None,
                                          nest=None,
                                          verbose=False,
+                                         dtype=None,
                                          )
 
         # Convert header to dict

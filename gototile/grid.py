@@ -597,6 +597,8 @@ class SkyGrid(object):
 
         if isinstance(center, tuple):
             center = SkyCoord(center[0], center[1], unit='deg')
+        if isinstance(center, SkyCoord):
+            center = center.to_string('hmsdms')
 
         if plot_type == 'mollweide':
             axes = plt.axes(projection='astro hours mollweide')
