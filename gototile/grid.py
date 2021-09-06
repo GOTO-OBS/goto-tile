@@ -27,6 +27,12 @@ from .gridtools import get_tile_edges_astropy as get_tile_edges
 from .gridtools import get_tile_pixels_astropy as get_tile_pixels
 from .skymaptools import coord2pix, pix2coord
 
+NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1)],
+               'GOTO-4': [(3.7, 4.9), (0.1, 0.1)],
+               'GOTO8p': [(7.8, 5.1), (0.1, 0.1)],
+               'GOTO-8p': [(7.8, 5.1), (0.1, 0.1)],
+               }
+
 
 class SkyGrid(object):
     """An all-sky grid of defined tiles.
@@ -120,6 +126,45 @@ class SkyGrid(object):
         """Return a new instance containing a copy of the sky grid data."""
         newgrid = SkyGrid(self.fov, self.overlap)
         return newgrid
+
+    @classmethod
+    def from_name(cls, name):
+        """Initialize a `~gototile.skymap.SkyGrid` object from a name string.
+
+        Parameters
+        ----------
+        name : str
+            the name of the telescope or grid to use.
+            either follows the format `allsky-{fov_ra}x{fov_dec}-{overlap_ra}-{overlap_dec}`,
+            or one of the predefined names given by `SkyGrid.get_names()`
+
+        Returns
+        -------
+        `~gototile.skymap.SkyGrid`
+            SkyGrid object
+        """
+        if name.startswith('allsky'):
+            try:
+                fov = (float(name.split('-')[1].split('x')[0]),
+                       float(name.split('-')[1].split('x')[1]))
+                overlap = (float(name.split('-')[2]), float(name.split('-')[3]))
+            except Exception:
+                template = 'allsky-{fov_ra}x{fov_dec}-{overlap_ra}-{overlap_dec}`'
+                raise ValueError(f'Grid name "{name}" not recognised, '
+                                 'Name format should match ', template)
+        else:
+            if name in NAMED_GRIDS:
+                fov, overlap = NAMED_GRIDS[name]
+            else:
+                raise ValueError(f'Grid name "{name}" not recognised, '
+                                 'check SkyGrid.get_named_grids() for known grids.')
+
+        return cls(fov, overlap)
+
+    @staticmethod
+    def get_named_grids():
+        """Get a dictionary of pre-defined grid parameters for use with `SkyGrid.from_name()`."""
+        return NAMED_GRIDS
 
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid, calculating the contained probability within each tile.

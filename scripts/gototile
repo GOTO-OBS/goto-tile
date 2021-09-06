@@ -194,7 +194,7 @@ if __name__ == '__main__':
                                       'Either chose a pre-defined telescope from the list given '
                                       'or define a custom grid.')
     mxg = group.add_mutually_exclusive_group(required=True)
-    mxg.add_argument('-t', '--telescope', type=str, choices=['GOTO4', 'GOTO8p'],
+    mxg.add_argument('-t', '--telescope', type=str, choices=SkyGrid.get_named_grids().keys(),
                      help='Which pre-defined telescope system to simulate.')
     mxg.add_argument('-g', '--grid', type=float, nargs=4,
                      metavar=('FOV_RA', 'FOV_DEC', 'OVERLAP_RA', 'OVERLAP_DEC'),
@@ -263,14 +263,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Select the grid based on the system
-    if args.telescope == 'GOTO4':
-        print('Using defined sky grid for GOTO4 prototype (3.7, 4.9, 0.1, 0.1)')
-        grid = SkyGrid(fov=(3.7, 4.9), overlap=(0.1, 0.1))
-    elif args.telescope == 'GOTO8p':
-        print('Using provisional sky grid for GOTO8 (7.8, 5.1, 0.1, 0.1)')
-        grid = SkyGrid(fov=(7.8, 5.1), overlap=(0.1, 0.1))
+    if args.telescope in SkyGrid.get_named_grids():
+        fov, overlap = SkyGrid.get_named_grids()[args.telescope]
+        print(f'Using defined sky grid "{args.telescope}": fov={fov}, overlap={overlap}')
+        grid = SkyGrid(fov, overlap)
     elif args.grid:
-        grid = SkyGrid(fov=(args.grid[0], args.grid[1]), overlap=(args.grid[2], args.grid[3]))
+        fov = (args.grid[0], args.grid[1])
+        overlap = (args.grid[2], args.grid[3])
+        print(f'Using new sky grid: fov={fov}, overlap={overlap}')
+        grid = SkyGrid(fov, overlap)
     else:
         raise ValueError('Missing telescope or grid parameters')
     print(f'Generated grid containing {grid.ntiles} tiles')
