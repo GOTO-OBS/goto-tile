@@ -11,6 +11,8 @@ from astropy.table import QTable
 
 import healpy
 
+import ligo.skymap.plot  # noqa: F401  (for extra projections)
+
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')

@@ -12,6 +12,8 @@ from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
 from astropy.table import QTable
 
+import ligo.skymap.plot  # noqa: F401  (for extra projections)
+
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
