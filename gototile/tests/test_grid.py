@@ -12,7 +12,7 @@ def test_gridding():
     nside = 512
     for overlap in [0.0, 0.5, 0.8]:
         grid = SkyGrid(fov, overlap=overlap)
-        tile_pixels = grid._get_tile_pixels(nside)
+        tile_pixels = grid.get_tile_pixels(nside)
 
         assert len(tile_pixels) == grid.ntiles
         tile_pixcount = np.array([len(pixlist) for pixlist in tile_pixels])

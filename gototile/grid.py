@@ -117,11 +117,6 @@ class SkyGrid(object):
         newgrid = SkyGrid(self.fov, self.overlap)
         return newgrid
 
-    def _get_tile_pixels(self, nside):
-        """Calculate the HEALPix indices within each tile."""
-        pixels = get_tile_pixels(self.vertices, nside)
-        return np.array(pixels, dtype=object)
-
     def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid, calculating the contained probability within each tile.
 
@@ -150,13 +145,18 @@ class SkyGrid(object):
 
         # Calculate which pixels are within the tiles
         self.nside = skymap.nside
-        self.pixels = self._get_tile_pixels(self.nside)
+        self.pixels = self.get_tile_pixels(self.nside)
 
         # Calculate the tile probabilities and contour levels
         self.probs = self._get_tile_probs()
         self.contours = self._get_tile_contours()
 
         return self.probs
+
+    def get_tile_pixels(self, nside):
+        """Calculate the HEALPix indices within each tile."""
+        pixels = get_tile_pixels(self.vertices, nside)
+        return np.array(pixels, dtype=object)
 
     def _get_tile_probs(self):
         """Calculate the contained probabilities within each tile."""
@@ -249,7 +249,7 @@ class SkyGrid(object):
             tile_pixels = self.pixels
         else:
             # Use the given parameters
-            tile_pixels = self._get_tile_pixels(nside)
+            tile_pixels = self.get_tile_pixels(nside)
 
         if isinstance(tilenames, (list, np.ndarray)):
             # Multiple tiles
@@ -303,7 +303,7 @@ class SkyGrid(object):
             else:
                 # Use the given parameters
                 nside = 128
-                pixels = self._get_tile_pixels(nside)
+                pixels = self.get_tile_pixels(nside)
 
             for c in coord:
                 # Get the HEALPix pixel the coords are within
@@ -484,7 +484,7 @@ class SkyGrid(object):
             nside = self.nside
         else:
             # Use the given parameters
-            tile_pixels = self._get_tile_pixels(nside)
+            tile_pixels = self.get_tile_pixels(nside)
 
         # Number of pixels
         npix = healpy.nside2npix(nside)

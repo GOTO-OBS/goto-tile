@@ -545,7 +545,7 @@ def tile_skymap(skymap, grid, observed=None):
     utils.test_iers()
 
     # Get the pixels within each grid tile
-    tile_pixels = grid._get_tile_pixels(skymap.nside, skymap.isnested)
+    tile_pixels = grid.get_tile_pixels(skymap.nside, skymap.isnested)
 
     # Get all the pixels within observed tiles
     bad_pix = set()
