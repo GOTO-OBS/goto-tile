@@ -1,25 +1,17 @@
-from __future__ import division
+"""Module containing utility functions for the SkyGrid class."""
 
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-import itertools as it
-import gzip
-import os
+import itertools
 import math
-import tempfile
-import logging
 import multiprocessing
+
 import numpy as np
 import healpy as hp
 
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from astropy.table import QTable
 
-from .math import spherical_to_cartesian, cartesian_to_spherical, intersect, interpolate, cartesian_to_celestial
-from .math import RAD, PI
+from .math import spherical_to_cartesian, cartesian_to_spherical
+from .math import RAD, intersect, interpolate
 
 
 def create_grid(fov, overlap, kind='minverlap'):
@@ -97,11 +89,11 @@ def create_grid_product(fov, overlap):
 
     # Create the dec strips
     pole = 90 // step_dec * step_dec
-    decs = np.arange(-pole, pole+step_dec/2, step_dec)
+    decs = np.arange(-pole, pole + step_dec / 2, step_dec)
 
     # Arrange the tiles in RA
     ras = np.arange(0.0, 360., step_ra)
-    allras, alldecs = zip(*[(ra, dec) for ra, dec in it.product(ras, decs)])
+    allras, alldecs = zip(*[(ra, dec) for ra, dec in itertools.product(ras, decs)])
     allras, alldecs = np.asarray(allras), np.asarray(alldecs)
 
     return allras, alldecs
@@ -118,13 +110,13 @@ def create_grid_cosine(fov, overlap):
 
     # Create the dec strips
     pole = 90 // step_dec * step_dec
-    decs = np.arange(-pole, pole+step_dec/2, step_dec)
+    decs = np.arange(-pole, pole + step_dec / 2, step_dec)
 
     # Arrange the tiles in RA
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., step_ra/np.cos(dec*RAD))
+        ras = np.arange(0.0, 360., step_ra / np.cos(dec * RAD))
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
     allras = np.concatenate(allras)
@@ -147,14 +139,14 @@ def create_grid_cosine_symmetric(fov, overlap):
 
     # Create the dec strips
     pole = 90 // step_dec * step_dec
-    decs = np.arange(-pole, pole+step_dec/2, step_dec)
+    decs = np.arange(-pole, pole + step_dec / 2, step_dec)
 
     # Arrange the tiles in RA
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., step_ra/np.cos(dec*RAD))
-        ras += (360-ras[-1])/2  # Rotate the strips so they're symmetric
+        ras = np.arange(0.0, 360., step_ra / np.cos(dec * RAD))
+        ras += (360 - ras[-1]) / 2  # Rotate the strips so they're symmetric
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
     allras = np.concatenate(allras)
@@ -172,8 +164,8 @@ def create_grid_minverlap(fov, overlap):
     """
     # Create the dec strips
     pole = 90
-    n_tiles = math.ceil(pole/((1-overlap['dec'])*fov['dec']))
-    step_dec = pole/n_tiles
+    n_tiles = math.ceil(pole / ((1 - overlap['dec']) * fov['dec']))
+    step_dec = pole / n_tiles
     north_decs = np.arange(pole, 0, step_dec * -1)
     south_decs = north_decs * -1
     decs = np.concatenate([south_decs, np.array([0]), north_decs[::-1]])
@@ -182,8 +174,8 @@ def create_grid_minverlap(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        n_tiles = math.ceil(360/((1-overlap['ra'])*fov['ra']/np.cos(dec*RAD)))
-        step_ra = 360/n_tiles
+        n_tiles = math.ceil(360 / ((1 - overlap['ra']) * fov['ra'] / np.cos(dec * RAD)))
+        step_ra = 360 / n_tiles
         ras = np.arange(0, 360, step_ra)
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
@@ -314,9 +306,7 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
 def get_tile_vertices(coords, fov):
     """Get points defining the tile vertices from a list of coordinates and field of view.
 
-    Understanding this is a work in progress...
-
-    Returns a numpy array of shape (4,3) - 4 vertices (courners) each with x,y,z coordinates
+    Returns a numpy array of shape (4,3) - 4 vertices (corners) each with x,y,z coordinates
 
     NB: ew = RA
         ns = Dec
@@ -324,7 +314,8 @@ def get_tile_vertices(coords, fov):
         b = lat = latitude = Dec
         """
     # Get latitude/longitude arrays in radians
-    # (NB this isn't tecnically latitude/longitude, but it's what spherical coordinate formulae use)
+    # (NB this isn't technically latitude/longitude,
+    #  but it's what spherical coordinate formulae use)
     lon = coords.ra.to('radian').value
     lat = coords.dec.to('radian').value
 
@@ -344,7 +335,6 @@ def get_tile_vertices(coords, fov):
     poles['n'] = spherical_to_cartesian(*poles['n'])
     poles['s'] = spherical_to_cartesian(*poles['s'])
 
-
     # Get phi angles in radians
     # (NB divided by 2, since angle from centre to edge is half the FoV)
     phi_ra = fov['ra'].to('radian').value / 2
@@ -363,10 +353,10 @@ def get_tile_vertices(coords, fov):
     edges['w'] = xyz * fcos + poles['w'] * fsin
     lw, bw = cartesian_to_spherical(*edges['w'])
 
-    ls, bs = lon, lat-phi_dec
+    ls, bs = lon, lat - phi_dec
     edges['s'] = spherical_to_cartesian(ls, bs)
 
-    ln, bn = lon, lat+phi_dec
+    ln, bn = lon, lat + phi_dec
     edges['n'] = spherical_to_cartesian(ln, bn)
 
     # Something
@@ -521,10 +511,11 @@ class PolygonQuery(object):
         self.nside = nside
         self.nested = nested
         self.inclusive = inclusive
+
     def __call__(self, vertices):
         # Note nest is always True
         # See https://github.com/GOTO-OBS/goto-tile/issues/65
-        ipix= hp.query_polygon(self.nside, vertices, nest=True, inclusive=self.inclusive, fact=32)
+        ipix = hp.query_polygon(self.nside, vertices, nest=True, inclusive=self.inclusive, fact=32)
         if not self.nested:
             ipix = np.array(sorted(hp.nest2ring(self.nside, ipix)))
         return ipix
@@ -581,7 +572,7 @@ def get_tile_pixels_astropy(vertices, nside=256, order='NESTED', inclusive=True)
     -------
     ipix : `numpy.array` or list of `numpy.array`
         The indices of the pixels contained within each tile.
-        If `vertices` has shape=(4) this will be a single array of pixel indicies, for shape=(X,4)
+        If `vertices` has shape=(4) this will be a single array of pixel indices, for shape=(X,4)
             it will be a list of len=X.
         Note that tiles can contain different numbers of pixels, which is why this is not
             necessarily a 2D array.

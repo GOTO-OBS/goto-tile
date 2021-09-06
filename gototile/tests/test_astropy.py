@@ -48,7 +48,7 @@ def test_edges():
     # Test with more edge points
     for edge_points in [1, 2, 4]:
         v_old = gridtools.get_tile_vertices(test_coords, fov)
-        e_old = [gridtools.get_tile_edges(v, steps=edge_points+2) for v in v_old]
+        e_old = [gridtools.get_tile_edges(v, steps=edge_points + 2) for v in v_old]
         e_old = np.roll(e_old, -1 * (edge_points + 1), axis=1)
         e_new = gridtools.get_tile_edges_astropy(test_coords, fov, edge_points=edge_points)
 

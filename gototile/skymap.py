@@ -1,31 +1,25 @@
-from __future__ import division
+"""Module containing the SkyMap class."""
 
 import os
-import itertools
-import logging
 import warnings
-import numpy as np
-import astropy
-from astropy.time import Time
-from astropy.coordinates import get_sun, SkyCoord, AltAz
+
 from astropy import units as u
-from astropy.table import QTable
+from astropy.coordinates import SkyCoord
 from astropy.io.fits.verify import VerifyWarning
+from astropy.time import Time
+from astropy.table import QTable
+
 import healpy
-import ephem
+
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
-import ligo.skymap.plot
+
+import numpy as np
 
 from . import settings
 from .gaussian import create_gaussian_map
 from .skymaptools import coord2pix, pix2coord
-
-try:
-    stringtype = basestring  # Python 2
-except NameError:
-    stringtype = str  # Python 3
 
 
 def read_colormaps(name='cylon'):
@@ -36,7 +30,7 @@ def read_colormaps(name='cylon'):
     data = np.loadtxt(filename, delimiter=',')
     cmap = LinearSegmentedColormap.from_list(name, data)
     cm.register_cmap(cmap=cmap)
-    cmap = LinearSegmentedColormap.from_list(name+'_r', data[::-1])
+    cmap = LinearSegmentedColormap.from_list(name + '_r', data[::-1])
     cm.register_cmap(cmap=cmap)
 
 
@@ -90,7 +84,7 @@ class SkyMap(object):
         if 'object' in header:
             self.object = header['object']
         elif self.filename:
-            self.object =  os.path.basename(self.filename).split('.')[0]
+            self.object = os.path.basename(self.filename).split('.')[0]
         else:
             self.object = 'unknown'
         self.objid = self.object
@@ -290,10 +284,10 @@ class SkyMap(object):
             skymap = skymap[0]
             # Remove other column info from the header, so we don't get confused
             # The keys follow the pattern T---i, e.g. TFORM1, TTYPE1, TUNIT1
-            keys = [k[:-1] for k in header if (k[0]=='T' and k[-1]=='1')]
+            keys = [k[:-1] for k in header if (k[0] == 'T' and k[-1] == '1')]
             for key in keys:
                 for i in range(2, header['TFIELDS'] + 1):
-                    del header[key+str(i)]
+                    del header[key + str(i)]
         del header['TFIELDS']
 
         # Get primary properties from header
@@ -354,7 +348,7 @@ class SkyMap(object):
 
         # Check the data is a valid length
         try:
-            nside = healpy.npix2nside(len(data))
+            healpy.npix2nside(len(data))
         except ValueError:
             raise ValueError('Length of data is invalid')
 
@@ -406,14 +400,13 @@ class SkyMap(object):
             Otherwise trying to write an existing file raises an OSError.
         """
         warnings.filterwarnings('ignore', category=VerifyWarning)
-        healpy.write_map(filename,
-                        [self.skymap],
-                        nest=self.isnested,
-                        coord=self.coordsys,
-                        column_names=[self.header['ttype1']],
-                        extra_header=[(k.upper(), self.header[k]) for k in self.header],
-                        overwrite=overwrite,
-                        )
+        healpy.write_map(filename, [self.skymap],
+                         nest=self.isnested,
+                         coord=self.coordsys,
+                         column_names=[self.header['ttype1']],
+                         extra_header=[(k.upper(), self.header[k]) for k in self.header],
+                         overwrite=overwrite,
+                         )
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
@@ -444,7 +437,6 @@ class SkyMap(object):
         # Save the new skymap
         self._save_skymap(new_skymap, order=order)
 
-
     def rotate(self, coordsys='C'):
         """Convert coordinate systems.
 
@@ -460,7 +452,7 @@ class SkyMap(object):
 
         rotator = healpy.Rotator(coord=(self.coordsys, coordsys))
 
-        # NOTE: rotator expectes order=RING in and returns order=RING out
+        # NOTE: rotator expects order=RING in and returns order=RING out
         # If this skymap is NESTED we need to regrade before and after
         if self.order == 'NESTED':
             in_skymap = healpy.ud_grade(self.skymap, nside_out=self.nside,
@@ -569,11 +561,11 @@ class SkyMap(object):
         coords = self.coords
 
         table = QTable([ipix, coords.ra, coords.dec, self.skymap],
-                        names=col_names, dtype=col_types)
+                       names=col_names, dtype=col_types)
         return table
 
-    def plot(self, title=None, filename=None, dpi=90, figsize=(8,6),
-             plot_type='mollweide', center=(0,45), radius=10,
+    def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
+             plot_type='mollweide', center=(0, 45), radius=10,
              coordinates=None, plot_contours=True):
         """Plot the skymap.
 
@@ -627,13 +619,15 @@ class SkyMap(object):
 
         if isinstance(center, tuple):
             center = SkyCoord(center[0], center[1], unit='deg')
+        if isinstance(center, SkyCoord):
+            center = center.to_string('hmsdms')
 
         if plot_type == 'mollweide':
             axes = plt.axes(projection='astro hours mollweide')
         elif plot_type == 'globe':
             axes = plt.axes(projection='astro globe', center=center)
         elif plot_type == 'zoom':
-            axes = plt.axes(projection='astro zoom', center=center, radius=radius*u.deg)
+            axes = plt.axes(projection='astro zoom', center=center, radius=radius * u.deg)
         else:
             raise ValueError('"{}" is not a recognised plot type.')
 
@@ -645,11 +639,13 @@ class SkyMap(object):
 
         # Plot 50% and 90% contours
         if plot_contours:
-            cs = axes.contour_hpx(self.contours , nested=self.isnested,
-                                  levels = [0.5 * self.skymap.sum(),
-                                            0.9 * self.skymap.sum()],
+            cs = axes.contour_hpx(self.contours, nested=self.isnested,
+                                  levels=[0.5 * self.skymap.sum(),
+                                          0.9 * self.skymap.sum()],
                                   colors='black', linewidths=0.5, zorder=99,)
-        #axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
+            label_contours = False
+            if label_contours:
+                axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
 
         # Plot coordinates if given
         if coordinates:
@@ -660,11 +656,11 @@ class SkyMap(object):
                 coordinates = SkyCoord([coordinates])
             for coord in coordinates:
                 axes.text(coord.ra.value, coord.dec.value,
-                            coord.to_string('hmsdms').replace(' ','\n')+'\n',
-                            transform=transform,
-                            ha='center', va='bottom',
-                            size='x-small', zorder=12,
-                            )
+                          coord.to_string('hmsdms').replace(' ', '\n') + '\n',
+                          transform=transform,
+                          ha='center', va='bottom',
+                          size='x-small', zorder=12,
+                          )
 
         # Remember to rotate back!
         if old_coordsys:
