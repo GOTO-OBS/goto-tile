@@ -21,8 +21,10 @@ from matplotlib.patches import Patch, Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
 
-from .math import cartesian_to_celestial
-from .gridtools import create_grid, get_tile_vertices, get_tile_edges, get_tile_pixels
+from .gridtools import create_grid
+from .gridtools import get_tile_vertices_astropy as get_tile_vertices
+from .gridtools import get_tile_edges_astropy as get_tile_edges
+from .gridtools import get_tile_pixels_astropy as get_tile_pixels
 from .skymaptools import coord2pix, pix2coord
 
 
@@ -89,7 +91,7 @@ class SkyGrid(object):
         self.coords = SkyCoord(ras, decs, unit=u.deg)
         self.ntiles = len(self.coords)
 
-        # Get the tile vertices
+        # Get the tile vertices - 4 points on the corner of each tile
         self.vertices = get_tile_vertices(self.coords, self.fov)
 
         # Give the tiles unique ids
@@ -396,6 +398,10 @@ class SkyGrid(object):
         tilenames : str or list of str
             The name(s) of the tile(s) to find the coordinates of.
 
+        Returns
+        -------
+        coords : `astropy.coordinates.SkyCoord`
+            The central coordinates of the given tile(s).
         """
         if isinstance(tilenames, str):
             tilenames = [tilenames]
@@ -408,14 +414,58 @@ class SkyGrid(object):
         return self.coords[index]
 
     def get_vertices(self, tilenames):
-        """Return coordinates of the four corners of the given tile(s)."""
-        # Can't implement while gridtools.get_tile_vertices only returns cartesian coordinates.
-        raise NotImplementedError
+        """Return coordinates of the four corners of the given tile(s).
 
-    def get_edges(self, tilenames, steps=5):
-        """Return coordinates along the edges of the given tile(s)."""
-        # Can't implement while gridtools.get_tile_edges only returns cartesian coordinates.
-        raise NotImplementedError
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the vertices of.
+
+        Returns
+        -------
+        coords : `astropy.coordinates.SkyCoord`
+            The coordinates of the vertices of the given tile(s).
+            Will be an array of shape shape (n, 4), where n = len(tilenames).
+        """
+        if isinstance(tilenames, str):
+            tilenames = [tilenames]
+
+        # Get indexes
+        index = [self.tilenames.index(tile) for tile in tilenames]
+        if len(index) == 1:
+            index = index[0]
+
+        return self.vertices[index]
+
+    def get_edges(self, tilenames, edge_points=5):
+        """Return coordinates along the edges of the given tile(s).
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the edges of.
+        steps : int, optional
+            The number of points to find along each tile edge.
+            If edge_points=0 only the 4 corners will be returned.
+            Default=5.
+
+        Returns
+        -------
+        coords : `astropy.coordinates.SkyCoord`
+            The coordinates of the edge points of the given tile(s).
+            Will be an array with shape (n, 4*(edge_points+1)), where n = len(tilenames).
+
+        """
+        if isinstance(tilenames, str):
+            tilenames = [tilenames]
+
+        # Get indexes
+        index = [self.tilenames.index(tile) for tile in tilenames]
+        if len(index) == 1:
+            index = index[0]
+
+        coords = get_tile_edges(self.coords, self.fov, edge_points)
+        return coords[index]
 
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
@@ -651,18 +701,18 @@ class SkyGrid(object):
         axes.set_axisbelow(False)
         transform = axes.get_transform('world')
 
+        # We can't just plot the four corners (already saved under self.vertices) because that will
+        # plot straight lines between them. That will look bad, because we're on a sphere.
+        # Instead we get some intermediate points along the edges, so they look better when plotted.
+        # (Admittedly this is only obvious with very large tiles, but it's still good to do).
+        edge_points = get_tile_edges(self.coords, self.fov, edge_points=5)
+
         # Create the tile polygons
         polygons = []
         new_tilenames = []
-        for vertices, tilename in zip(self.vertices, self.tilenames):
-            # vertices is a (4,3) numpy array - 4 vertices each with x,y,z cartesian coordinates
-            # Just plotting those corners with Polygons will draw straight lines between them,
-            # which isn't correct since we're on a sphere.
-            # Instead, get some intermediate points along the edges by drawing great circles.
-            points = get_tile_edges(vertices, steps=5)
-
+        for points, tilename in zip(edge_points, self.tilenames):
             # Convert point coordinates to ra,dec
-            ra, dec = cartesian_to_celestial(*points.T)
+            ra, dec = points.ra.deg, points.dec.deg
 
             # Check if the tile passes over the RA=0 line:
             overlaps_meridian = any(ra < 90) and any(ra > 270)
