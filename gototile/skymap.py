@@ -9,7 +9,7 @@ from astropy.io.fits.verify import VerifyWarning
 from astropy.time import Time
 from astropy.table import QTable
 
-import healpy
+import healpy as hp
 
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
@@ -148,8 +148,8 @@ class SkyMap(object):
         """Save the skymap data and add attributes."""
         self.skymap = skymap
         self.npix = len(skymap)
-        self.nside = healpy.npix2nside(self.npix)
-        self.pixel_area = healpy.nside2pixarea(self.nside, degrees=True)
+        self.nside = hp.npix2nside(self.npix)
+        self.pixel_area = hp.nside2pixarea(self.nside, degrees=True)
         if order:
             self.order = order
             self.isnested = order == 'NESTED'
@@ -268,13 +268,13 @@ class SkyMap(object):
             SkyMap object.
         """
         # Load the skymap and header
-        skymap, header = healpy.read_map(fits_file,
-                                         h=True,
-                                         field=None,
-                                         nest=None,
-                                         verbose=False,
-                                         dtype=None,
-                                         )
+        skymap, header = hp.read_map(fits_file,
+                                     h=True,
+                                     field=None,
+                                     nest=None,
+                                     verbose=False,
+                                     dtype=None,
+                                     )
 
         # Convert header to dict
         header = dict(header)
@@ -294,7 +294,7 @@ class SkyMap(object):
 
         # Get primary properties from header
         nside = header['NSIDE']
-        if nside != healpy.npix2nside(len(skymap)):
+        if nside != hp.npix2nside(len(skymap)):
             raise ValueError("NSIDE from header ({}) doesn't match skymap length".format(nside))
         del header['NSIDE']
 
@@ -350,7 +350,7 @@ class SkyMap(object):
 
         # Check the data is a valid length
         try:
-            healpy.npix2nside(len(data))
+            hp.npix2nside(len(data))
         except ValueError:
             raise ValueError('Length of data is invalid')
 
@@ -402,13 +402,13 @@ class SkyMap(object):
             Otherwise trying to write an existing file raises an OSError.
         """
         warnings.filterwarnings('ignore', category=VerifyWarning)
-        healpy.write_map(filename, [self.skymap],
-                         nest=self.isnested,
-                         coord=self.coordsys,
-                         column_names=[self.header['ttype1']],
-                         extra_header=[(k.upper(), self.header[k]) for k in self.header],
-                         overwrite=overwrite,
-                         )
+        hp.write_map(filename, [self.skymap],
+                     nest=self.isnested,
+                     coord=self.coordsys,
+                     column_names=[self.header['ttype1']],
+                     extra_header=[(k.upper(), self.header[k]) for k in self.header],
+                     overwrite=overwrite,
+                     )
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
@@ -432,9 +432,9 @@ class SkyMap(object):
             return
 
         # Regrade the current skymap
-        new_skymap = healpy.ud_grade(self.skymap, nside_out=nside,
-                                     order_in=self.order, order_out=order,
-                                     power=power, pess=pess, dtype=dtype)
+        new_skymap = hp.ud_grade(self.skymap, nside_out=nside,
+                                 order_in=self.order, order_out=order,
+                                 power=power, pess=pess, dtype=dtype)
 
         # Save the new skymap
         self._save_skymap(new_skymap, order=order)
@@ -452,13 +452,13 @@ class SkyMap(object):
         if self.coordsys == coordsys:
             return
 
-        rotator = healpy.Rotator(coord=(self.coordsys, coordsys))
+        rotator = hp.Rotator(coord=(self.coordsys, coordsys))
 
         # NOTE: rotator expects order=RING in and returns order=RING out
         # If this skymap is NESTED we need to regrade before and after
         if self.order == 'NESTED':
-            in_skymap = healpy.ud_grade(self.skymap, nside_out=self.nside,
-                                        order_in='NESTED', order_out='RING')
+            in_skymap = hp.ud_grade(self.skymap, nside_out=self.nside,
+                                    order_in='NESTED', order_out='RING')
         else:
             in_skymap = self.skymap.copy()
 
@@ -467,8 +467,8 @@ class SkyMap(object):
 
         # Convert back to NESTED if needed
         if self.order == 'NESTED':
-            out_skymap = healpy.ud_grade(out_skymap, nside_out=self.nside,
-                                         order_in='RING', order_out='NESTED')
+            out_skymap = hp.ud_grade(out_skymap, nside_out=self.nside,
+                                     order_in='RING', order_out='NESTED')
 
         # Save the new skymap
         self._save_skymap(out_skymap, coordsys=coordsys)

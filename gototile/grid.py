@@ -2,8 +2,6 @@
 
 import collections
 import os
-import numpy as np
-import healpy
 from copy import copy
 
 from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
@@ -11,6 +9,8 @@ from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observ
 from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
 from astropy.table import QTable
+
+import healpy as hp
 
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
@@ -20,6 +20,8 @@ if 'DISPLAY' not in os.environ:
 from matplotlib.patches import Patch, Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
+
+import numpy as np
 
 from .gridtools import create_grid
 from .gridtools import get_tile_vertices_astropy as get_tile_vertices
@@ -551,7 +553,7 @@ class SkyGrid(object):
         if hasattr(self, 'skymap'):
             area = self.skymap.pixel_area * len(pixels)
         else:
-            area = healpy.nside2pixarea(nside, degrees=True) * len(pixels)
+            area = hp.nside2pixarea(nside, degrees=True) * len(pixels)
 
         return area
 
@@ -584,7 +586,7 @@ class SkyGrid(object):
             tile_pixels = self.get_tile_pixels(nside)
 
         # Number of pixels
-        npix = healpy.nside2npix(nside)
+        npix = hp.nside2npix(nside)
 
         # For each pixel, create a count of the number of tiles it falls within
         count = np.array([0] * npix)
@@ -869,7 +871,7 @@ class SkyGrid(object):
                 nside = 128
 
             # Get the coordinates of each pixel to plot
-            npix = healpy.nside2npix(nside)
+            npix = hp.nside2npix(nside)
             ipix = range(npix)
             coords = pix2coord(nside, ipix, nest=True)
 
