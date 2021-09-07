@@ -1,26 +1,26 @@
-from __future__ import absolute_import, division, print_function
-import os
+"""Module containing utility functions for the SkyGrid class."""
+
 import logging
-import astropy.coordinates as acoord
-from astropy.coordinates import SkyCoord, AltAz, EarthLocation
+import multiprocessing
+import os
+from functools import lru_cache
+
+from astropy.coordinates import SkyCoord, AltAz
 from astropy.time import Time, TimeDelta
 from astropy.table import QTable
 from astropy import units
 from astropy import units as u
 from astropy.utils import iers
+
 import ephem
-import sys
-import multiprocessing
-import numpy as np
+
 import healpy as hp
+
+import numpy as np
+
 from . import settings
 from . import math
 from . import utils
-from astropy.io.fits import getdata
-import astropy.io.fits as fits
-import reproject as rp
-import pkg_resources
-from functools import lru_cache
 
 
 def coord2pix(nside, coord, nest=False):
@@ -94,7 +94,7 @@ def _pix2coord_cached(nside, ipix, nest=False):
     It's useful as this function is often called with the same arguments
     when creating multiple skymaps with the same resolution.
 
-    Unfortunatly that requires hashable inputs, so need to convert lists and arrays to tuples.
+    Unfortunately that requires hashable inputs, so need to convert lists and arrays to tuples.
     """
     # Get angular coordinates from healpy
     theta, phi = hp.pix2ang(nside, ipix, nest)
@@ -537,7 +537,7 @@ def tile_skymap(skymap, grid, observed=None):
         The all-sky grid to apply the map to
 
     observed : list of int or str, optional
-        A list containing tile indicies or names that have already been observed (if any).
+        A list containing tile indices or names that have already been observed (if any).
         Any tiles in this list will have their probability of any HEALPix pixels
         within set to zero, thereby reducing the contained probability of any
         overlapping tiles.
@@ -545,7 +545,7 @@ def tile_skymap(skymap, grid, observed=None):
     utils.test_iers()
 
     # Get the pixels within each grid tile
-    tile_pixels = grid.get_pixels(skymap.nside, skymap.isnested)
+    tile_pixels = grid.get_tile_pixels(skymap.nside, skymap.isnested)
 
     # Get all the pixels within observed tiles
     bad_pix = set()
