@@ -254,8 +254,7 @@ class SkyMap(object):
         Parameters
         ----------
         fits_file : str, `astropy.io.fits.HDU` or `astropy.io.fits.HDUList`
-            Path to the FITS file (if str) or FITS HDU,
-            to be passed to `healpy.read_map`.
+            Path to the FITS file (if str) or FITS HDU, passed to `astropy.io.fits.open`.
 
         coordsys : str, default='C'
             The coordinate system the data uses.
