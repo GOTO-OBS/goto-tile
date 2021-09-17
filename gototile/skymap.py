@@ -37,7 +37,7 @@ def read_colormaps(name='cylon'):
 
 
 class SkyMap(object):
-    """A probability skymap.
+    """A spherical data skymap.
 
     The SkyMap is a wrapper around the healpy skymap numpy.array,
     returned by healpy.fitsfunc.read_map. The SkyMap class holds track
@@ -162,19 +162,8 @@ class SkyMap(object):
         self.ipix = np.arange(self.npix)
         self.coords = self._pix2coord(self.ipix)
 
-        # Calculate the probability contours
+        # Calculate the pixel contour levels
         self.contours = get_data_contours(self.data)
-
-    def _pixels_within_contour(self, percentage):
-        """Find pixel indices confined in a given percentage contour (range 0-1)."""
-
-        if not 0 <= percentage <= 1:
-            raise ValueError('Percentage must be in range 0-1')
-
-        # Find the pixels within the given contour
-        mask = self.contours < percentage
-
-        return self.ipix[mask]
 
     @classmethod
     def from_fits(cls, fits_file, coordsys='C'):
@@ -311,11 +300,11 @@ class SkyMap(object):
         # Create an Astropy SkyCoord at the peak
         peak = SkyCoord(ra, dec, unit='deg')
 
-        # Get the gaussian probability data
-        prob_map = create_gaussian_map(peak, radius, nside, nest=True)
+        # Get the gaussian skymap data
+        data = create_gaussian_map(peak, radius, nside, nest=True)
 
         # Create a new SkyMap
-        return cls.from_data(prob_map)
+        return cls.from_data(data)
 
     def save(self, filename, overwrite=True):
         """Save the SkyMap as a FITS file.
@@ -402,21 +391,21 @@ class SkyMap(object):
         self._save_data(out_data, coordsys=coordsys)
 
     def normalise(self):
-        """Normalise the sky map so the probability sums to unity."""
+        """Normalise the sky map so the it sums to unity (e.g. for probability maps)."""
         norm_data = self.data / self.data.sum()
 
         # Save the new data
         self._save_data(norm_data)
 
-    def get_probability(self, coord, radius=0):
-        """Return the probability at a given sky coordinate.
+    def get_value(self, coord, radius=0):
+        """Return the value of the skymap at a given sky coordinate.
 
         Parameters
         ----------
         coord : `astropy.coordinates.SkyCoord`
-            The point to find the probability at.
+            Position coordinates.
         radius : float, optional
-            If given, the radius in degrees of a circle to integrate the probability within.
+            If given, the radius in degrees of a circle to integrate the skymap within.
         """
         # Find distance to points
         sep = np.array(coord.separation(self.coords))
@@ -424,63 +413,55 @@ class SkyMap(object):
         if radius == 0:
             # Just get the radius of the nearest pixel (not very useful)
             ipix = np.where(sep == (min(sep)))[0][0]
-            prob = self.data[ipix]
+            return self.data[ipix]
         else:
             # Find all the pixels within the radius and sum them (more useful)
             ipix = np.where(sep < radius)[0]
-            prob = self.data[ipix].sum()
-
-        return prob
+            return self.data[ipix].sum()
 
     def get_contour(self, coord):
-        """Return the lowest probability contor the given sky coordinate is within.
+        """Return the lowest contour level the given sky coordinate is within.
 
         Parameters
         ----------
         coord : `astropy.coordinates.SkyCoord`
-            The point to find the probability at.
+            Position coordinates.
         """
         # Get the pixel that the coordinates are within
         ipix = self._coord2pix(coord)
 
         return self.contours[ipix]
 
-    def within_contour(self, coord, percentage):
-        """Find if the given position is within the given confidence level.
+    def within_contour(self, coord, contour_level):
+        """Find if the given position is within the area of the given contour level.
 
         Parameters
         ----------
         coord : `astropy.coordinates.SkyCoord`
-            The point to find the probability at.
-        percentage : float
-            The confidence level, percentage in the range 0-1.
+            Position coordinates.
+        contour_level : float
+            The contour level to query.
         """
-        if not 0 <= percentage <= 1:
-            raise ValueError('Percentage must be in range 0-1')
-
         contour = self.get_contour(coord)
 
-        return contour < percentage
+        return contour < contour_level
 
-    def get_contour_area(self, percentage):
-        """Return the area of a given probability contour area, in square degrees.
+    def get_contour_area(self, contour_level):
+        """Return the area of a given contour region, in square degrees.
 
         Parameters
         ----------
-        percentage : float
-            The confidence level, percentage in the range 0-1.
+        contour_level : float
+            The contour level to query.
         """
-        if not 0 <= percentage <= 1:
-            raise ValueError('Percentage must be in range 0-1')
-
-        # Get pixels within that contour
-        ipix = self._pixels_within_contour(percentage)
+        # Get pixels within that contour level
+        ipix = self.ipix[self.contours < contour_level]
 
         return len(ipix) * self.pixel_area
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
-        col_names = ['ipix', 'ra', 'dec', 'prob']
+        col_names = ['ipix', 'ra', 'dec', 'value']
         col_types = ['U', u.deg, u.deg, 'f8']
 
         table = QTable([self.ipix, self.coords.ra, self.coords.dec, self.data],

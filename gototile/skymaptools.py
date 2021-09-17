@@ -29,30 +29,30 @@ def get_data_contours(data):
     This is done using the cumulative sum method, (vaguely) based on code from
     http://www.virgo-gw.eu/skymap.html
 
-    For example, consider a very small skymap with the following table:
+    For example, consider a very small, normalised skymap with the following table:
 
-    ipix | prob
+    ipix | value
        1 |  0.1
        2 |  0.4
        3 |  0.2
        4 |  0.3
 
-    Sort by probability, and find the cumulative sum:
+    Sort by value, and find the cumulative sum:
 
-    ipix | prob | cumsum(prob)
-       2 |  0.4 |  0.4
-       4 |  0.3 |  0.7
-       3 |  0.2 |  0.9
-       1 |  0.1 |  1.0
+    ipix | value | cumsum(value)
+       2 |   0.4 |  0.4
+       4 |   0.3 |  0.7
+       3 |   0.2 |  0.9
+       1 |   0.1 |  1.0
 
-    Now shift so the cumprob starts at zero, and that's the minimum contour level that each
+    Now shift so the cumsum starts at zero, and that's the minimum contour level that each
     pixel is within.
 
-    ipix | prob | contour
-       2 |  0.4 |  0.0
-       4 |  0.3 |  0.4
-       3 |  0.2 |  0.7
-       1 |  0.1 |  0.9
+    ipix | value | contour
+       2 |   0.4 |  0.0
+       4 |   0.3 |  0.4
+       3 |   0.2 |  0.7
+       1 |   0.1 |  0.9
 
     Consider asking for the minimum number of pixels to cover increasing contour levels:
         -  0%-40%: you only need pixel 2
@@ -65,28 +65,27 @@ def get_data_contours(data):
     If we sort back to the original order the minimum confidence region each
     pixel is in is easy to find by seeing if contour(pixel) < percentage:
 
-    ipix | prob | contour | in 90%? | in 50%?
-       1 |  0.1 |  0.9    | False   | False
-       2 |  0.4 |  0.0    | True    | True
-       3 |  0.2 |  0.7    | True    | False
-       4 |  0.3 |  0.4    | True    | True
+    ipix | value | contour | in 90%? | in 50%?
+       1 |   0.1 |  0.9    | False   | False
+       2 |   0.4 |  0.0    | True    | True
+       3 |   0.2 |  0.7    | True    | False
+       4 |   0.3 |  0.4    | True    | True
 
     If you select the pixels for which contour(pixel) < percentage you will always cover
     AT LEAST percentage (you may well cover more of course).
     """
-    # Get the indices sorted by probability (reversed, so highest first)
-    # Note what we call the 'pixels' are really just the index numbers of the data array (ipix),
-    # i.e. probability of pixel X = self.data[X]
+    # Get the indices sorted by value (reversed, so highest first)
+    # Note 'ipix' are the index numbers of the data array, i.e. the value of pixel X = self.data[X]
     sorted_ipix = data.argsort()[::-1]
 
     # Sort the data using this mapping
     sorted_data = data[sorted_ipix]
 
     # Create cumulative sum array of each pixel in the array
-    cumprob = np.cumsum(sorted_data)
+    cumulative_data = np.cumsum(sorted_data)
 
     # Shift so we start at 0
-    sorted_contours = np.append([0], cumprob[:-1])
+    sorted_contours = np.append([0], cumulative_data[:-1])
 
     # "Un-sort" the contour array back to the normal pixel order
     contours = sorted_contours[sorted_ipix.argsort()]
