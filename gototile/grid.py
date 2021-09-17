@@ -182,7 +182,7 @@ class SkyGrid(object):
         # problems with hp.query_polygon in RING ordering.
         # See https://github.com/GOTO-OBS/goto-tile/issues/65
         # Therefore enforce NESTED when applying a skymap to a grid
-        if not skymap.isnested:
+        if not skymap.is_nested:
             skymap = skymap.copy()
             skymap.regrade(order='NESTED')
 
@@ -855,7 +855,7 @@ class SkyGrid(object):
 
             # Plot the 50% and 90% skymap contours
             # Taken from SkyMap.plot()
-            axes.contour_hpx(self.skymap.contours, nested=self.skymap.isnested,
+            axes.contour_hpx(self.skymap.contours, nested=self.skymap.is_nested,
                              levels=[0.5 * self.skymap.skymap.sum(),
                                      0.9 * self.skymap.skymap.sum()],
                              colors='black', linewidths=0.5, zorder=99,)

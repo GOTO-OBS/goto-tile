@@ -56,19 +56,19 @@ class SkyMap(object):
             around the given position.
     """
 
-    def __init__(self, skymap, order, coordsys='C', header=None):
+    def __init__(self, data, order, coordsys='C', header=None):
         # Header is optional
         if header is None:
             header = {}
 
         # Check types
-        if not isinstance(skymap, np.ndarray):
-            raise TypeError('skymap should be an array, use SkyMap.from_fits()')
+        if not isinstance(data, np.ndarray):
+            raise TypeError('data should be an array, use SkyMap.from_fits()')
         if not isinstance(header, dict):
             raise TypeError('header should be a dict')
 
-        # Parse and store the skymap
-        self._save_skymap(skymap, order, coordsys)
+        # Parse and store the skymap data
+        self._save_data(data, order, coordsys)
 
         # Make sure the header cards are lowercase, and store
         header = {key.lower(): header[key] for key in header}
@@ -104,9 +104,9 @@ class SkyMap(object):
 
     def __eq__(self, other):
         try:
-            if len(self.skymap) != len(other.skymap):
+            if len(self.data) != len(other.data):
                 return False
-            return (np.all(self.skymap == other.skymap) and
+            return (np.all(self.data == other.data) and
                     self.order == other.order and
                     self.coordsys == other.coordsys)
         except AttributeError:
@@ -127,8 +127,8 @@ class SkyMap(object):
         if self.coordsys != other_copy.coordsys:
             other_copy.rotate(self.coordsys)
 
-        new_skymap = result.skymap * other_copy.skymap
-        result._save_skymap(new_skymap)
+        new_data = result.data * other_copy.data
+        result._save_data(new_data)
 
         return result
 
@@ -138,27 +138,29 @@ class SkyMap(object):
 
     def _pix2coord(self, pix):
         """Convert HEALpy pixel indexes to SkyCoords."""
-        return pix2coord(self.nside, pix, nest=self.isnested)
+        return pix2coord(self.nside, pix, nest=self.is_nested)
 
     def _coord2pix(self, coord):
         """Convert SkyCoords to HEALpy pixel indexes."""
-        return coord2pix(self.nside, coord, nest=self.isnested)
+        return coord2pix(self.nside, coord, nest=self.is_nested)
 
-    def _save_skymap(self, skymap, order=None, coordsys=None):
+    def _save_data(self, data, order=None, coordsys=None):
         """Save the skymap data and add attributes."""
-        self.skymap = skymap
-        self.npix = len(skymap)
+        self.data = data
+        self.skymap = data  # Backwards compatability
+        self.npix = len(data)
         self.nside = hp.npix2nside(self.npix)
         self.pixel_area = hp.nside2pixarea(self.nside, degrees=True)
         if order:
             self.order = order
-            self.isnested = order == 'NESTED'
+            self.is_nested = order == 'NESTED'
+            self.isnested = self.is_nested  # Backwards compatability
         if coordsys:
             self.coordsys = coordsys
 
-        # Save the coordinates of each skymap pixel
-        all_pixels = range(self.npix)
-        self.coords = self._pix2coord(all_pixels)
+        # Save the coordinates of each pixel
+        self.ipix = np.arange(self.npix)
+        self.coords = self._pix2coord(self.ipix)
 
         # Calculate the probability contours
         self._get_contours()
@@ -171,28 +173,28 @@ class SkyMap(object):
 
         For example, consider a very small skymap with the following table:
 
-        pix | prob
-          1 |  0.1
-          2 |  0.4
-          3 |  0.2
-          4 |  0.3
+        ipix | prob
+           1 |  0.1
+           2 |  0.4
+           3 |  0.2
+           4 |  0.3
 
         Sort by probability, and find the cumulative sum:
 
-        pix | prob | cumsum(prob)
-          2 |  0.4 |  0.4
-          4 |  0.3 |  0.7
-          3 |  0.2 |  0.9
-          1 |  0.1 |  1.0
+        ipix | prob | cumsum(prob)
+           2 |  0.4 |  0.4
+           4 |  0.3 |  0.7
+           3 |  0.2 |  0.9
+           1 |  0.1 |  1.0
 
         Now shift so the cumprob starts at zero, and that's the minimum contour level that each
         pixel is within.
 
-        pix | prob | contour
-          2 |  0.4 |  0.0
-          4 |  0.3 |  0.4
-          3 |  0.2 |  0.7
-          1 |  0.1 |  0.9
+        ipix | prob | contour
+           2 |  0.4 |  0.0
+           4 |  0.3 |  0.4
+           3 |  0.2 |  0.7
+           1 |  0.1 |  0.9
 
         Consider asking for the minimum number of pixels to cover increasing contour levels:
             -  0%-40%: you only need pixel 2
@@ -205,11 +207,11 @@ class SkyMap(object):
         If we sort back to the original order the minimum confidence region each
         pixel is in is easy to find by seeing if contour(pixel) < percentage:
 
-        pix | prob | contour | in 90%? | in 50%?
-          1 |  0.1 |  0.9    | False   | False
-          2 |  0.4 |  0.0    | True    | True
-          3 |  0.2 |  0.7    | True    | False
-          4 |  0.3 |  0.4    | True    | True
+        ipix | prob | contour | in 90%? | in 50%?
+           1 |  0.1 |  0.9    | False   | False
+           2 |  0.4 |  0.0    | True    | True
+           3 |  0.2 |  0.7    | True    | False
+           4 |  0.3 |  0.4    | True    | True
 
         If you select the pixels for which contour(pixel) < percentage you will always cover
         AT LEAST percentage (you may well cover more of course).
@@ -220,21 +222,21 @@ class SkyMap(object):
             SkyMap.within_contour(coord, percentage)
         """
         # Get the indices sorted by probability (reversed, so highest first)
-        # Note what we call the 'pixels' are really just the index numbers of the skymap,
-        # i.e. probability of pixel X = self.skymap[X]
-        sorted_pixels = self.skymap.argsort()[::-1]
+        # Note what we call the 'pixels' are really just the index numbers of the data array (ipix),
+        # i.e. probability of pixel X = self.data[X]
+        sorted_ipix = self.data.argsort()[::-1]
 
-        # Sort the skymap using this mapping
-        sorted_skymap = self.skymap[sorted_pixels]
+        # Sort the data using this mapping
+        sorted_data = self.data[sorted_ipix]
 
-        # Create cumulative sum array of each pixel in the skymap
-        cumprob = np.cumsum(sorted_skymap)
+        # Create cumulative sum array of each pixel in the array
+        cumprob = np.cumsum(sorted_data)
 
         # Shift so we start at 0
         sorted_contours = np.append([0], cumprob[:-1])
 
         # "Un-sort" the contour array back to the normal pixel order and save
-        self.contours = sorted_contours[sorted_pixels.argsort()]
+        self.contours = sorted_contours[sorted_ipix.argsort()]
 
     def _pixels_within_contour(self, percentage):
         """Find pixel indices confined in a given percentage contour (range 0-1)."""
@@ -245,7 +247,7 @@ class SkyMap(object):
         # Find the pixels within the given contour
         mask = self.contours < percentage
 
-        return np.arange(self.npix)[mask]
+        return self.ipix[mask]
 
     @classmethod
     def from_fits(cls, fits_file, coordsys='C'):
@@ -266,14 +268,14 @@ class SkyMap(object):
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        # Load the skymap and header
-        skymap, header = hp.read_map(fits_file,
-                                     h=True,
-                                     field=None,
-                                     nest=None,
-                                     verbose=False,
-                                     dtype=None,
-                                     )
+        # Load the data and header
+        data, header = hp.read_map(fits_file,
+                                   h=True,
+                                   field=None,
+                                   nest=None,
+                                   verbose=False,
+                                   dtype=None,
+                                   )
 
         # Convert header to dict
         header = dict(header)
@@ -282,7 +284,7 @@ class SkyMap(object):
         # e.g. newer 3D skymaps from LVC (prob, distmu, distsigma, distnorm)
         # We can't deal with them, just take the first map (e.g. probability)
         if header['TFIELDS'] > 1:
-            skymap = skymap[0]
+            data = data[0]
             # Remove other column info from the header, so we don't get confused
             # The keys follow the pattern T---i, e.g. TFORM1, TTYPE1, TUNIT1
             keys = [k[:-1] for k in header if (k[0] == 'T' and k[-1] == '1')]
@@ -293,7 +295,7 @@ class SkyMap(object):
 
         # Get primary properties from header
         nside = header['NSIDE']
-        if nside != hp.npix2nside(len(skymap)):
+        if nside != hp.npix2nside(len(data)):
             raise ValueError("NSIDE from header ({}) doesn't match skymap length".format(nside))
         del header['NSIDE']
 
@@ -320,7 +322,7 @@ class SkyMap(object):
         if isinstance(fits_file, str):
             header['FILENAME'] = fits_file
 
-        return cls(skymap, order, coordsys, header)
+        return cls(data, order, coordsys, header)
 
     @classmethod
     def from_data(cls, data, nested=True, coordsys='C'):
@@ -401,8 +403,8 @@ class SkyMap(object):
             Otherwise trying to write an existing file raises an OSError.
         """
         warnings.filterwarnings('ignore', category=VerifyWarning)
-        hp.write_map(filename, [self.skymap],
-                     nest=self.isnested,
+        hp.write_map(filename, [self.data],
+                     nest=self.is_nested,
                      coord=self.coordsys,
                      column_names=[self.header['ttype1']],
                      extra_header=[(k.upper(), self.header[k]) for k in self.header],
@@ -411,7 +413,7 @@ class SkyMap(object):
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
-        newmap = SkyMap(self.skymap.copy(),
+        newmap = SkyMap(self.data.copy(),
                         self.order,
                         self.coordsys,
                         self.header.copy())
@@ -431,12 +433,12 @@ class SkyMap(object):
             return
 
         # Regrade the current skymap
-        new_skymap = hp.ud_grade(self.skymap, nside_out=nside,
-                                 order_in=self.order, order_out=order,
-                                 power=power, pess=pess, dtype=dtype)
+        new_data = hp.ud_grade(self.data, nside_out=nside,
+                               order_in=self.order, order_out=order,
+                               power=power, pess=pess, dtype=dtype)
 
-        # Save the new skymap
-        self._save_skymap(new_skymap, order=order)
+        # Save the new data
+        self._save_data(new_data, order=order)
 
     def rotate(self, coordsys='C'):
         """Convert coordinate systems.
@@ -456,28 +458,28 @@ class SkyMap(object):
         # NOTE: rotator expects order=RING in and returns order=RING out
         # If this skymap is NESTED we need to regrade before and after
         if self.order == 'NESTED':
-            in_skymap = hp.ud_grade(self.skymap, nside_out=self.nside,
-                                    order_in='NESTED', order_out='RING')
+            in_data = hp.ud_grade(self.data, nside_out=self.nside,
+                                  order_in='NESTED', order_out='RING')
         else:
-            in_skymap = self.skymap.copy()
+            in_data = self.data.copy()
 
         # Rotate the skymap, now we're sure it's in RING order
-        out_skymap = rotator.rotate_map(in_skymap)
+        out_data = rotator.rotate_map(in_data)
 
         # Convert back to NESTED if needed
         if self.order == 'NESTED':
-            out_skymap = hp.ud_grade(out_skymap, nside_out=self.nside,
-                                     order_in='RING', order_out='NESTED')
+            out_data = hp.ud_grade(out_data, nside_out=self.nside,
+                                   order_in='RING', order_out='NESTED')
 
-        # Save the new skymap
-        self._save_skymap(out_skymap, coordsys=coordsys)
+        # Save the new data
+        self._save_data(out_data, coordsys=coordsys)
 
     def normalise(self):
         """Normalise the sky map so the probability sums to unity."""
-        norm_skymap = self.skymap / self.skymap.sum()
+        norm_data = self.data / self.data.sum()
 
-        # Save the new skymap
-        self._save_skymap(norm_skymap)
+        # Save the new data
+        self._save_data(norm_data)
 
     def get_probability(self, coord, radius=0):
         """Return the probability at a given sky coordinate.
@@ -494,12 +496,12 @@ class SkyMap(object):
 
         if radius == 0:
             # Just get the radius of the nearest pixel (not very useful)
-            pixel = np.where(sep == (min(sep)))[0][0]
-            prob = self.skymap[pixel]
+            ipix = np.where(sep == (min(sep)))[0][0]
+            prob = self.data[ipix]
         else:
             # Find all the pixels within the radius and sum them (more useful)
-            pixels = np.where(sep < radius)[0]
-            prob = self.skymap[pixels].sum()
+            ipix = np.where(sep < radius)[0]
+            prob = self.data[ipix].sum()
 
         return prob
 
@@ -512,9 +514,9 @@ class SkyMap(object):
             The point to find the probability at.
         """
         # Get the pixel that the coordinates are within
-        pixel = self._coord2pix(coord)
+        ipix = self._coord2pix(coord)
 
-        return self.contours[pixel]
+        return self.contours[ipix]
 
     def within_contour(self, coord, percentage):
         """Find if the given position is within the given confidence level.
@@ -545,23 +547,16 @@ class SkyMap(object):
             raise ValueError('Percentage must be in range 0-1')
 
         # Get pixels within that contour
-        pixels = self._pixels_within_contour(percentage)
+        ipix = self._pixels_within_contour(percentage)
 
-        # Get the number of pixels
-        npix = len(pixels)
-
-        return npix * self.pixel_area
+        return len(ipix) * self.pixel_area
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
-        col_names = ['pixel', 'ra', 'dec', 'prob']
+        col_names = ['ipix', 'ra', 'dec', 'prob']
         col_types = ['U', u.deg, u.deg, 'f8']
 
-        npix = len(self.skymap)
-        ipix = np.arange(npix)
-        coords = self.coords
-
-        table = QTable([ipix, coords.ra, coords.dec, self.skymap],
+        table = QTable([self.ipix, self.coords.ra, self.coords.dec, self.data],
                        names=col_names, dtype=col_types)
         return table
 
@@ -636,13 +631,13 @@ class SkyMap(object):
         transform = axes.get_transform('world')
 
         # Plot the skymap data
-        axes.imshow_hpx(self.skymap, cmap='cylon', nested=self.isnested)
+        axes.imshow_hpx(self.data, cmap='cylon', nested=self.is_nested)
 
         # Plot 50% and 90% contours
         if plot_contours:
-            cs = axes.contour_hpx(self.contours, nested=self.isnested,
-                                  levels=[0.5 * self.skymap.sum(),
-                                          0.9 * self.skymap.sum()],
+            cs = axes.contour_hpx(self.contours, nested=self.is_nested,
+                                  levels=[0.5 * self.data.sum(),
+                                          0.9 * self.data.sum()],
                                   colors='black', linewidths=0.5, zorder=99,)
             label_contours = False
             if label_contours:

@@ -70,7 +70,7 @@ def map2catalog(skymap, catalog, key='weight'):
     phi = np.deg2rad(catalog['ra']%360)
     theta = np.pi/2 - np.deg2rad(catalog['dec'])
 
-    catalogpixels = hp.ang2pix(skymap.nside, theta, phi, nest=skymap.isnested)
+    catalogpixels = hp.ang2pix(skymap.nside, theta, phi, nest=skymap.is_nested)
     sources = defaultdict(list)
 
     for i, weight in enumerate(catalog[key]):
