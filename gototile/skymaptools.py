@@ -78,6 +78,8 @@ def pix2coord(nside, ipix, nest=False):
     coord2pix, `healpy.pix2ang`
     """
     # Check types
+    if isinstance(nside, (list, np.ndarray)):
+        nside = tuple(nside)
     if isinstance(ipix, (list, np.ndarray)):
         ipix = tuple(ipix)
 
