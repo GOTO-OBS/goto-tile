@@ -216,9 +216,9 @@ class SkyGrid(object):
     def _get_tile_contours(self, prob_limit=7):
         """Calculate the minimum contour level of each pixel.
 
-        Unlike for SkyMaps (see `gototile.skymap.SkyMap._get_contours()`), the calculation for tiles
-        is complicated because they can overlap, so the same pixel could be included within multiple
-        tiles.
+        Unlike for SkyMaps (see `gototile.skymaptools.get_data_contours()`), the calculation for
+        tiles is complicated because they can overlap, so the same pixel could be included within
+        multiple tiles.
 
         This method iterates through the tiles by selecting the one with highest probability,
         adding it to the list, then blanking out that portion of the sky and recalculating the

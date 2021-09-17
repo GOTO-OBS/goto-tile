@@ -23,6 +23,76 @@ from . import math
 from . import utils
 
 
+def get_data_contours(data):
+    """Calculate the minimum contour level of each pixel in a given skymap data array.
+
+    This is done using the cumulative sum method, (vaguely) based on code from
+    http://www.virgo-gw.eu/skymap.html
+
+    For example, consider a very small skymap with the following table:
+
+    ipix | prob
+       1 |  0.1
+       2 |  0.4
+       3 |  0.2
+       4 |  0.3
+
+    Sort by probability, and find the cumulative sum:
+
+    ipix | prob | cumsum(prob)
+       2 |  0.4 |  0.4
+       4 |  0.3 |  0.7
+       3 |  0.2 |  0.9
+       1 |  0.1 |  1.0
+
+    Now shift so the cumprob starts at zero, and that's the minimum contour level that each
+    pixel is within.
+
+    ipix | prob | contour
+       2 |  0.4 |  0.0
+       4 |  0.3 |  0.4
+       3 |  0.2 |  0.7
+       1 |  0.1 |  0.9
+
+    Consider asking for the minimum number of pixels to cover increasing contour levels:
+        -  0%-40%: you only need pixel 2
+        - 40%-70%: you need pixels 2 & 3
+        - 70%-90%: you need pixels 2, 3 & 4
+        - 90%+:    you need all four pixels
+    That's why we shift everything up so the first pixel has a contour value of 0%, because you
+    should always include at least one pixel to cover the smallest contour levels.
+
+    If we sort back to the original order the minimum confidence region each
+    pixel is in is easy to find by seeing if contour(pixel) < percentage:
+
+    ipix | prob | contour | in 90%? | in 50%?
+       1 |  0.1 |  0.9    | False   | False
+       2 |  0.4 |  0.0    | True    | True
+       3 |  0.2 |  0.7    | True    | False
+       4 |  0.3 |  0.4    | True    | True
+
+    If you select the pixels for which contour(pixel) < percentage you will always cover
+    AT LEAST percentage (you may well cover more of course).
+    """
+    # Get the indices sorted by probability (reversed, so highest first)
+    # Note what we call the 'pixels' are really just the index numbers of the data array (ipix),
+    # i.e. probability of pixel X = self.data[X]
+    sorted_ipix = data.argsort()[::-1]
+
+    # Sort the data using this mapping
+    sorted_data = data[sorted_ipix]
+
+    # Create cumulative sum array of each pixel in the array
+    cumprob = np.cumsum(sorted_data)
+
+    # Shift so we start at 0
+    sorted_contours = np.append([0], cumprob[:-1])
+
+    # "Un-sort" the contour array back to the normal pixel order
+    contours = sorted_contours[sorted_ipix.argsort()]
+    return contours
+
+
 def coord2pix(nside, coord, nest=False):
     """Convert sky coordinates to pixel indices.
 
