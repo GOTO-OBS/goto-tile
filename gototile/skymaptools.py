@@ -106,8 +106,8 @@ def coord2pix(nside, coord, nest=False):
 
     Returns
     -------
-    pix : int or array of int
-        The healpix pixel numbers. Scalar if all input are scalar, array otherwise.
+    ipix : int or array of int
+        The healpix pixel indices. Scalar if all input are scalar, array otherwise.
 
     See Also
     --------
@@ -118,10 +118,10 @@ def coord2pix(nside, coord, nest=False):
     phi = coord.ra.rad
 
     # Get pixel numbers from healpy
-    pix = hp.ang2pix(nside, theta, phi, nest)
+    ipix = hp.ang2pix(nside, theta, phi, nest)
 
     # Return pixels
-    return pix
+    return ipix
 
 
 def pix2coord(nside, ipix, nest=False):
@@ -462,7 +462,7 @@ def calculate_tiling(skymap, telescopes, date=None,
         for telescope in telescopes:
             telescope.skymap = skymap.copy()
 
-    # get fractional percentage covered per pix
+    # get fractional percentage covered per pixel
     total = allskymap.skymap.sum()
     newskymap.skymap /= total
     # normalise so allskymap.sum() == 1
@@ -623,8 +623,8 @@ def tile_skymap(skymap, grid, observed=None):
     for tile in observed:
         if isinstance(tile, str):
             tile = grid.tilenames.index(tile)
-        for pix in tile_pixels[tile]:
-            bad_pix.add(pix)
+        for ipix in tile_pixels[tile]:
+            bad_pix.add(ipix)
     bad_pix = np.array(list(bad_pix))
 
     # Make sure the skymap is normalised
