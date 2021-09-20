@@ -2,7 +2,7 @@
 
 import collections
 import os
-from copy import copy
+from copy import copy, deepcopy
 
 from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
 
@@ -126,8 +126,7 @@ class SkyGrid(object):
 
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
-        newgrid = SkyGrid(self.fov, self.overlap)
-        return newgrid
+        return deepcopy(self)
 
     @classmethod
     def from_name(cls, name):
