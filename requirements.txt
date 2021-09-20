@@ -4,6 +4,7 @@ astropy
 astroplan
 pyephem
 healpy
+mhealpy
 pandas
 PyYAML
 requests

@@ -5,7 +5,7 @@ import warnings
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.io.fits.verify import VerifyWarning
+from astropy.io import fits
 from astropy.time import Time
 from astropy.table import QTable
 
@@ -16,6 +16,8 @@ import ligo.skymap.plot  # noqa: F401  (for extra projections)
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
+
+import mhealpy as mhp
 
 import numpy as np
 
@@ -37,11 +39,9 @@ def read_colormaps(name='cylon'):
 
 
 class SkyMap(object):
-    """A spherical data skymap.
+    """A probability skymap.
 
-    The SkyMap is a wrapper around the healpy skymap numpy.array,
-    returned by healpy.fitsfunc.read_map. The SkyMap class holds track
-    of the numpy array, the header information and some options.
+    This class is a wrapper around the `~mhealpy.HealpixMap` class, which supports MOC skymaps.
 
     SkyMaps should be created using one of the following class methods:
         - SkyMap.from_fits(fits_file)
@@ -54,21 +54,27 @@ class SkyMap(object):
             The arguments should be in decimal degrees.
             The sky map will be calculated as a 2D Gaussian distribution
             around the given position.
-    """
 
-    def __init__(self, data, order, coordsys='C', header=None):
+    """
+    def __init__(self, data, order, coordsys='C', header=None, uniq=None, density=False):
         # Header is optional
         if header is None:
             header = {}
 
         # Check types
         if not isinstance(data, np.ndarray):
-            raise TypeError('data should be an array, use SkyMap.from_fits()')
+            raise TypeError('Skymap data should be an array, use SkyMap.from_fits() to load files')
+        if order not in ['NESTED', 'RING', 'NUNIQ']:
+            raise ValueError(f'Unrecognised HEALPix order: "{order}"')
+        if coordsys not in ('G', 'E', 'C'):
+            raise ValueError(f'Unrecognised coordinate system: "{coordsys}"')
+        if uniq is not None and len(data) != len(uniq):
+            raise ValueError(f'UNIQ pixel indices (n={len(uniq)} do not match data (n={len(data)})')
         if not isinstance(header, dict):
-            raise TypeError('header should be a dict')
+            raise TypeError('Header should be a dict')
 
-        # Parse and store the skymap data
-        self._save_data(data, order, coordsys)
+        # Parse and store the data
+        self._save_data(data, order, coordsys, uniq, density)
 
         # Make sure the header cards are lowercase, and store
         header = {key.lower(): header[key] for key in header}
@@ -126,47 +132,115 @@ class SkyMap(object):
             other_copy.regrade(self.nside, self.order)
         if self.coordsys != other_copy.coordsys:
             other_copy.rotate(self.coordsys)
+        if self.density != other_copy.density:
+            other_copy.density = self.density
 
         new_data = result.data * other_copy.data
-        result._save_data(new_data)
+        result._save_data(new_data, order=self.order, coordsys=self.coordsys, density=self.density)
 
         return result
 
     def __repr__(self):
-        template = ('SkyMap(nside={}, order={}, coordsys={}, object={})')
-        return template.format(self.nside, self.order, self.coordsys, self.object)
+        template = ('SkyMap(nside={}, order={}, coordsys={}, density={})')
+        return template.format(self.nside, self.order, self.coordsys, self.density)
 
-    def _pix2coord(self, pix):
+    def _pix2coord(self, ipix):
         """Convert HEALpy pixel indexes to SkyCoords."""
-        return pix2coord(self.nside, pix, nest=self.is_nested)
+        if not self.is_moc:
+            return pix2coord(self.nside, ipix, nest=self.is_nested)
+        else:
+            nside, nested_ipix = mhp.uniq2nest(self.uniq[ipix])
+            return pix2coord(nside, nested_ipix, nest=True)
 
     def _coord2pix(self, coord):
         """Convert SkyCoords to HEALpy pixel indexes."""
-        return coord2pix(self.nside, coord, nest=self.is_nested)
+        if not self.is_moc:
+            return coord2pix(self.nside, coord, nest=self.is_nested)
+        else:
+            nested_ipix = coord2pix(self.nside, coord, nest=True)
+            return self.healpix.nest2pix(nested_ipix)
 
-    def _save_data(self, data, order=None, coordsys=None):
+    def _save_data(self, data, order=None, coordsys=None, uniq=None, density=None):
         """Save the skymap data and add attributes."""
-        self.data = data
-        self.skymap = data  # Backwards compatability
-        self.npix = len(data)
-        self.nside = hp.npix2nside(self.npix)
-        self.pixel_area = hp.nside2pixarea(self.nside, degrees=True)
-        if order:
-            self.order = order
-            self.is_nested = order == 'NESTED'
-            self.isnested = self.is_nested  # Backwards compatability
-        if coordsys:
-            self.coordsys = coordsys
+        # Create mhealpy HEALPix class (we access most properties from here)
+        self.healpix = mhp.HealpixMap(data, uniq,
+                                      scheme=order,
+                                      density=density,
+                                      )
 
-        # Save the coordinates of each pixel
+        # Save coordsys (not considered by mhealpy)
+        self.coordsys = coordsys
+
+        # Save pixel indices, Nside values and areas
         self.ipix = np.arange(self.npix)
+        if self.is_moc:
+            self.pix_nside = np.array([2 ** np.floor(np.log2(u / 4) / 2) for u in uniq], dtype=int)
+        else:
+            self.pix_nside = np.array([self.nside] * self.npix, dtype=int)
+        self.pix_area = 4 * np.pi / (12 * np.array(self.pix_nside) ** 2)
+
+        # Find the coordinates of each pixel
         self.coords = self._pix2coord(self.ipix)
 
         # Calculate the pixel contour levels
         self.contours = get_data_contours(self.data)
 
+    @property
+    def data(self):
+        return self.healpix.data
+
+    @property
+    def skymap(self):
+        # backwards-compatable equivalent of SkyMap.data
+        return self.healpix.data
+
+    @property
+    def nside(self):
+        return self.healpix.nside
+
+    @property
+    def npix(self):
+        return self.healpix.npix
+
+    @property
+    def uniq(self):
+        return self.healpix.uniq
+
+    @property
+    def order(self):
+        return self.healpix.scheme
+
+    @property
+    def is_nested(self):
+        return self.healpix.is_nested
+
+    @property
+    def isnested(self):
+        # backwards-compatable equivalent of SkyMap.is_nested
+        return self.healpix.is_nested
+
+    @property
+    def is_moc(self):
+        return self.healpix.is_moc
+
+    @property
+    def density(self):
+        return self.healpix.density()
+
+    @density.setter
+    def density(self, to_density):
+        """Convert between histogram (counts) and density (per steradian) maps."""
+        if not self.density and to_density:
+            # Convert the histogram map to density per base pixel
+            data = self.data / self.pix_area
+        elif self.density and not to_density:
+            # Convert the density map (per steradian) to a histogram
+            data = self.data * self.pix_area
+        # Save the data
+        self._save_data(data, self.order, self.coordsys, self.uniq, to_density)
+
     @classmethod
-    def from_fits(cls, fits_file, coordsys='C'):
+    def from_fits(cls, fits_file, coordsys='C', hdu=1, data_field=None, density=None):
         """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.
 
         Parameters
@@ -178,70 +252,89 @@ class SkyMap(object):
             The coordinate system the data uses.
             'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
             Used as a fallback if 'COORDSYS' is not defined in the FITS header.
+        hdu : int, default=1
+            HDU number to load data from, if given a file or HDUList with multiple headers.
+        data_field : int, default=None
+            Field number to read the skymap data from.
+            If not given data will be read from field 0 by default, UNLESS the first field
+            is labled 'UNIQ' in which case it's a multi-order map and the data should be in
+            field 1.
+        density : bool or None, default=None
+            Is the skymap data given in individual counts per pixel (histogram) or as a density
+            (per steradian)?
+            If not given the data type will be assumed based on the "unit" label for the data
+            column, if any, and otherwise will default to `False`.
 
         Returns
         -------
         `~gototile.skymap.SkyMap``
             SkyMap object.
         """
-        # Load the data and header
-        data, header = hp.read_map(fits_file,
-                                   h=True,
-                                   field=None,
-                                   nest=None,
-                                   verbose=False,
-                                   dtype=None,
-                                   )
+        # If a path has been given then open the file
+        file_open = False
+        if isinstance(fits_file, str):
+            hdu_list = fits.open(fits_file)
+            hdu = hdu_list[hdu]
+            file_open = True
+        elif isinstance(fits_file, fits.hdu.HDUList):
+            hdu = fits_file[hdu]
+        else:
+            hdu = fits_file
+        header = dict(hdu.header)
 
-        # Convert header to dict
-        header = dict(header)
-
-        # Some skymaps have multiple components
-        # e.g. newer 3D skymaps from LVC (prob, distmu, distsigma, distnorm)
-        # We can't deal with them, just take the first map (e.g. probability)
-        if header['TFIELDS'] > 1:
-            data = data[0]
-            # Remove other column info from the header, so we don't get confused
-            # The keys follow the pattern T---i, e.g. TFORM1, TTYPE1, TUNIT1
-            keys = [k[:-1] for k in header if (k[0] == 'T' and k[-1] == '1')]
-            for key in keys:
-                for i in range(2, header['TFIELDS'] + 1):
-                    del header[key + str(i)]
-        del header['TFIELDS']
-
-        # Get primary properties from header
-        nside = header['NSIDE']
-        if nside != hp.npix2nside(len(data)):
-            raise ValueError("NSIDE from header ({}) doesn't match skymap length".format(nside))
-        del header['NSIDE']
-
-        order = header['ORDERING'].upper()
-        if order not in ('NESTED', 'RING'):
-            raise ValueError('ORDERING card in header has unknown value: {}'.format(order))
-        del header['ORDERING']
-
-        if 'COORDSYS' in header:
-            coordsys = header['COORDSYS'][0].upper()
-            del header['COORDSYS']
-        if coordsys not in ('G', 'E', 'C'):
-            raise ValueError('COORDSYS card in header has unknown value: {}'.format(coordsys))
-
-        # Delete a load more keys that are unnecessary to save
-        for key in ['BITPIX', 'EXTNAME', 'FIRSTPIX', 'GCOUNT', 'INDXSCHM',
-                    'LASTPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'PCOUNT',
-                    'PIXTYPE', 'TFIELDS', 'XTENSION',
-                    ]:
-            if key in header:
-                del header[key]
-
-        # Store the file name if the header was from a file
+        # Store the file name in the header
         if isinstance(fits_file, str):
             header['FILENAME'] = fits_file
 
-        return cls(data, order, coordsys, header)
+        # Check that the file is valid HEALPix
+        if ('PIXTYPE' not in header or header['PIXTYPE'].upper() != 'HEALPIX' or
+                'ORDERING' not in header):
+            raise ValueError('FITS file is not in a valid HEALPix format')
+        order = header['ORDERING'].upper()
+
+        # We also need the coordinate system from the header
+        if 'COORDSYS' in header:
+            coordsys = header['COORDSYS'][0].upper()
+
+        # Load the skymap data
+        if data_field is not None:
+            data = hdu.data.field[data_field]
+            if 'UNIQ' in hdu.data.columns:
+                uniq = hdu.data['UNIQ']
+            else:
+                uniq = None
+        elif hdu.data.columns[0].name == 'UNIQ':
+            data_field = 1
+            data = hdu.data.field(data_field)
+            uniq = hdu.data.field(0)
+        else:
+            data_field = 0
+            data = hdu.data.field(0)
+            uniq = None
+
+        # Check we could find UNIQ pixel indices
+        if order == 'NUNIQ' and uniq is None:
+            raise ValueError('Skymap order = "NUNIQ", but could not find UNIQ pixel indices')
+
+        # Attempt to determine if the data is in density units
+        if density is None:
+            if 'DENSITY' in hdu.data.columns[data_field].name:
+                density = True
+            elif (hdu.data.columns[data_field].unit is not None and
+                  ('/sr' in hdu.data.columns[data_field].unit or
+                   'sr-1' in hdu.data.columns[data_field].unit)):
+                density = True
+            else:
+                density = False
+
+        # Remember to close the file
+        if file_open:
+            hdu_list.close()
+
+        return cls(data, order, coordsys, header, uniq, density)
 
     @classmethod
-    def from_data(cls, data, nested=True, coordsys='C'):
+    def from_data(cls, data, order, coordsys='C', density=False, uniq=None):
         """Initialize a `~gototile.skymap.SkyMap` object from an array of data.
 
         Parameters
@@ -249,13 +342,17 @@ class SkyMap(object):
         data : list or `numpy.array`
             an array of data to map onto a HEALPix sphere
             the length of the data must match one of the valid HEALPix resolutions
+        order : str
+            The HEALPix ordering for the data, either 'RING', 'NESTED' or 'NUNIQ'
 
-        nested : bool
-            if True the data has order=NESTED, if False then order=RING
-
-        coordsys : str
+        coordsys : str, default=C
             The coordinate system the data uses.
             'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
+        density : bool, default=False
+            Is the skymap data given in individual counts per pixel (histogram) or as a density
+            (per steradian)?
+        uniq : list of int or None, default=None
+            UNIQ pixel indices for each pixel in `data`, only required if `order='NUNIQ'`.
 
         Returns
         -------
@@ -265,16 +362,8 @@ class SkyMap(object):
         if not isinstance(data, np.ndarray):
             data = np.array(data)
 
-        # Check the data is a valid length
-        try:
-            hp.npix2nside(len(data))
-        except ValueError:
-            raise ValueError('Length of data is invalid')
-
-        order = 'NESTED' if nested else 'RING'
-        coordsys = coordsys[0]
-
-        return cls(data, order, coordsys)
+        # This method doesn't really do anything any more, but I suppose it might still be useful.
+        return cls(data, order, coordsys, uniq=uniq, density=density)
 
     @classmethod
     def from_position(cls, ra, dec, radius, nside=64):
@@ -304,7 +393,7 @@ class SkyMap(object):
         data = create_gaussian_map(peak, radius, nside, nest=True)
 
         # Create a new SkyMap
-        return cls.from_data(data)
+        return cls.from_data(data, order='NESTED')
 
     def save(self, filename, overwrite=True):
         """Save the SkyMap as a FITS file.
@@ -318,43 +407,47 @@ class SkyMap(object):
             If True, existing file is silently overwritten.
             Otherwise trying to write an existing file raises an OSError.
         """
-        warnings.filterwarnings('ignore', category=VerifyWarning)
-        hp.write_map(filename, [self.data],
-                     nest=self.is_nested,
-                     coord=self.coordsys,
-                     column_names=[self.header['ttype1']],
-                     extra_header=[(k.upper(), self.header[k]) for k in self.header],
-                     overwrite=overwrite,
-                     )
+        warnings.filterwarnings('ignore', category=fits.verify.VerifyWarning)
+        if self.header is not None:
+            header = [(k.upper(), self.header[k]) for k in self.header]
+        else:
+            header = None
+        self.healpix.write_map(filename,
+                               coordsys=self.coordsys,
+                               extra_header=header,
+                               overwrite=overwrite,
+                               )
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
         newmap = SkyMap(self.data.copy(),
                         self.order,
                         self.coordsys,
-                        self.header.copy())
+                        self.header.copy() if self.header is not None else None,
+                        self.uniq,
+                        self.density)
         return newmap
 
-    def regrade(self, nside=None, order='NESTED',
-                power=-2, pess=False, dtype=None):
-        """Up- or downgrade the sky map  HEALPix resolution.
+    def regrade(self, nside=None, order='NESTED'):
+        """Up- or downgrade the sky map HEALPix resolution, or change the pixel ordering.
 
-        See the `healpy.pixelfunc.ud_grade()` documentation for the parameters.
+        Note this function can flatten multi-order skymaps (i.e. convert from NUNIQ to NESTED or
+        RING ordering), but not the other way around (i.e. confert flat slymaps to multi-order).
         """
-        if not nside:
+        if nside is None:
             nside = self.nside
+        if order == 'NUNIQ':
+            raise ValueError('Can not regrade to NUNIQ ordering')
         if order not in ['NESTED', 'RING']:
-            raise ValueError('Pixel order must be NESTED or RING, not {}'.format(order))
+            raise ValueError(f'Unrecognised HEALPix order: "{order}"')
         if nside == self.nside and order == self.order:
             return
 
-        # Regrade the current skymap
-        new_data = hp.ud_grade(self.data, nside_out=nside,
-                               order_in=self.order, order_out=order,
-                               power=power, pess=pess, dtype=dtype)
+        # Convert the current skymap
+        new_skymap = self.healpix.rasterize(nside, order)
 
         # Save the new data
-        self._save_data(new_data, order=order)
+        self._save_data(new_skymap.data, order=order, coordsys=self.coordsys, density=self.density)
 
     def rotate(self, coordsys='C'):
         """Convert coordinate systems.
@@ -388,14 +481,14 @@ class SkyMap(object):
                                    order_in='RING', order_out='NESTED')
 
         # Save the new data
-        self._save_data(out_data, coordsys=coordsys)
+        self._save_data(out_data, order=self.order, coordsys=coordsys, density=self.density)
 
     def normalise(self):
         """Normalise the sky map so the it sums to unity (e.g. for probability maps)."""
         norm_data = self.data / self.data.sum()
 
         # Save the new data
-        self._save_data(norm_data)
+        self._save_data(norm_data, order=self.order, coordsys=self.coordsys, density=self.density)
 
     def get_value(self, coord, radius=0):
         """Return the value of the skymap at a given sky coordinate.
@@ -446,6 +539,61 @@ class SkyMap(object):
 
         return contour < contour_level
 
+    @property
+    def pixel_area(self):
+        """Return the area of each pixel (only valid for non-NUNIQ skymaps) in square degrees."""
+        if self.order != 'NUNIQ':
+            return 4 * np.pi / (12 * np.array(self.pix_nside) ** 2) * (180 / np.pi) ** 2
+        else:
+            raise ValueError('NUNIQ maps have variable pixel areas.')
+
+    def get_pixel_areas(self, ipix):
+        """Return the areas covered by each of the given skymap pixels in square degrees.
+
+        This is only really useful for NUNIQ skymaps, where the size of each pixel can vary.
+        For non-NUNIQ skymaps the area of every pixel is the same (given by the `SkyMap.pixel_area`)
+        property), so all the values returned by this function will be the same.
+
+        See also `SkyMap.get_pixel_area()`
+
+        Parameters
+        ----------
+        ipix : int or list of int
+            Pixel index, or multiple indices.
+
+        Returns
+        -------
+        areas : int, or array of int
+            The areas covered by the given pixel(s).
+
+        """
+        return self.pix_area(ipix) * (180 / np.pi) ** 2
+
+    def get_pixel_area(self, ipix):
+        """Return the TOTAL area covered by the given skymap pixels in square degrees.
+
+        This is only really useful for NUNIQ skymaps, where the size of each pixel can vary.
+        For non-NUNIQ skymaps the area of every pixel is the same (given by the `SkyMap.pixel_area`)
+        property), so all this function returns is `SkyMap.pixel_area` * len(ipix).
+
+        See also `SkyMap.get_pixel_areas()`
+
+        Parameters
+        ----------
+        ipix : int or array of int
+            Pixel index, or multiple indices.
+
+        Returns
+        -------
+        area : int
+            The total area covered by the given pixel(s).
+        """
+        areas = self.get_pixel_areas(ipix)
+        if isinstance(areas, int):
+            return areas * (180 / np.pi) ** 2
+        else:
+            return sum(areas) * (180 / np.pi) ** 2
+
     def get_contour_area(self, contour_level):
         """Return the area of a given contour region, in square degrees.
 
@@ -457,16 +605,19 @@ class SkyMap(object):
         # Get pixels within that contour level
         ipix = self.ipix[self.contours < contour_level]
 
-        return len(ipix) * self.pixel_area
+        # Return the area covered by those pixels
+        return self.get_pixel_area(ipix)
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
-        col_names = ['ipix', 'ra', 'dec', 'value']
-        col_types = ['U', u.deg, u.deg, 'f8']
+        col_names = ['pixel', 'ra', 'dec', 'value', 'area']
+        col_data = [self.ipix, self.coords.ra, self.coords.dec, self.data,
+                    self.pix_area * 180 / np.pi * u.deg * u.deg]
+        if self.is_moc:
+            col_names += ['uniq', 'nside']
+            col_data += [self.uniq, self.pix_nside]
 
-        table = QTable([self.ipix, self.coords.ra, self.coords.dec, self.data],
-                       names=col_names, dtype=col_types)
-        return table
+        return QTable(col_data, names=col_names)
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
@@ -539,11 +690,19 @@ class SkyMap(object):
         transform = axes.get_transform('world')
 
         # Plot the skymap data
-        axes.imshow_hpx(self.data, cmap='cylon', nested=self.is_nested)
+        if self.is_moc:
+            data = self.healpix.rasterize(self.nside, 'NESTED').data
+        else:
+            data = self.data
+        axes.imshow_hpx(data, cmap='cylon', nested=self.is_nested)
 
         # Plot 50% and 90% contours
         if plot_contours:
-            cs = axes.contour_hpx(self.contours, nested=self.is_nested,
+            if self.is_moc:
+                contours = get_data_contours(data)
+            else:
+                contours = self.contours
+            cs = axes.contour_hpx(contours, nested=self.is_nested,
                                   levels=[0.5 * self.data.sum(),
                                           0.9 * self.data.sum()],
                                   colors='black', linewidths=0.5, zorder=99,)
