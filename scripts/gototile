@@ -37,7 +37,7 @@ def run(grid, skymap=None,
         return
 
     # Apply the skymap to the grid to find the contained probability within each tile
-    print('Applying proability skymap to grid...')
+    print('Applying probability skymap to grid...')
     grid.apply_skymap(skymap)
 
     if not simulate:
