@@ -207,11 +207,11 @@ class SkyMap(object):
         if not self.density and to_density:
             # Convert the histogram map to density per base pixel
             data = self.data / self.pix_area
+            self._save_data(data, self.order, self.coordsys, self.uniq, density=True)
         elif self.density and not to_density:
             # Convert the density map (per steradian) to a histogram
             data = self.data * self.pix_area
-        # Save the data
-        self._save_data(data, self.order, self.coordsys, self.uniq, to_density)
+            self._save_data(data, self.order, self.coordsys, self.uniq, density=True)
 
     @classmethod
     def from_fits(cls, fits_file, coordsys='C', hdu=1, data_field=None, density=None):
