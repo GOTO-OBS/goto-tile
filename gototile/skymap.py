@@ -691,13 +691,14 @@ class SkyMap(object):
         if plot_contours:
             if self.is_moc:
                 # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
-                data = self.healpix.rasterize(self.nside, 'NESTED').data
+                data = self.healpix.rasterize(128, 'NESTED').data
                 contours = get_data_contours(data)
             else:
+                data = self.data
                 contours = self.contours
             cs = axes.contour_hpx(contours, nested=self.is_nested,
-                                  levels=[0.5 * self.data.sum(),
-                                          0.9 * self.data.sum()],
+                                  levels=[0.5 * data.sum(),
+                                          0.9 * data.sum()],
                                   colors='black', linewidths=0.5, zorder=99,)
             label_contours = False
             if label_contours:
