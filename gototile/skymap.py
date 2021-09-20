@@ -611,7 +611,7 @@ class SkyMap(object):
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
-             coordinates=None, plot_contours=True):
+             coordinates=None, plot_contours=True, plot_pixels=False):
         """Plot the skymap.
 
         Parameters
@@ -651,6 +651,8 @@ class SkyMap(object):
         plot_contours : bool, default = True
             plot the 50% and 90% contour areas
 
+        plot_pixels : bool, default = False
+            plot the pixel boundaries (warning: can be excessive for high-resolution maps)
         """
         fig = plt.figure(figsize=figsize, dpi=dpi)
 
@@ -680,15 +682,13 @@ class SkyMap(object):
         transform = axes.get_transform('world')
 
         # Plot the skymap data
-        if self.is_moc:
-            data = self.healpix.rasterize(self.nside, 'NESTED').data
-        else:
-            data = self.data
-        axes.imshow_hpx(data, cmap='cylon', nested=self.is_nested)
+        self.healpix.plot(axes, cmap='cylon')
 
         # Plot 50% and 90% contours
         if plot_contours:
             if self.is_moc:
+                # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
+                data = self.healpix.rasterize(self.nside, 'NESTED').data
                 contours = get_data_contours(data)
             else:
                 contours = self.contours
@@ -699,6 +699,10 @@ class SkyMap(object):
             label_contours = False
             if label_contours:
                 axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
+
+        # Plot the skymap pixel boundaries
+        if plot_pixels:
+            self.healpix.plot_grid(axes, linewidth=0.1, color='black')
 
         # Plot coordinates if given
         if coordinates:
