@@ -2,6 +2,7 @@
 
 import os
 import warnings
+from copy import deepcopy
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
@@ -56,11 +57,7 @@ class SkyMap(object):
             around the given position.
 
     """
-    def __init__(self, data, order, coordsys='C', header=None, uniq=None, density=False):
-        # Header is optional
-        if header is None:
-            header = {}
-
+    def __init__(self, data, order, coordsys='C', uniq=None, density=False):
         # Check types
         if not isinstance(data, np.ndarray):
             raise TypeError('Skymap data should be an array, use SkyMap.from_fits() to load files')
@@ -70,43 +67,20 @@ class SkyMap(object):
             raise ValueError(f'Unrecognised coordinate system: "{coordsys}"')
         if uniq is not None and len(data) != len(uniq):
             raise ValueError(f'UNIQ pixel indices (n={len(uniq)} do not match data (n={len(data)})')
-        if not isinstance(header, dict):
-            raise TypeError('Header should be a dict')
 
-        # Parse and store the data
-        self._save_data(data, order, coordsys, uniq, density)
-
-        # Make sure the header cards are lowercase, and store
-        header = {key.lower(): header[key] for key in header}
-        self.header = header
-
-        # Store the filename
-        if 'filename' in header:
-            self.filename = header['filename']
-            if self.filename and self.filename.startswith('http'):
-                header['url'] = self.filename
-        else:
-            self.filename = None
-
-        # Get object name, or create one if it isn't in the header
-        if 'object' in header:
-            self.object = header['object']
-        elif self.filename:
-            self.object = os.path.basename(self.filename).split('.')[0]
-        else:
-            self.object = 'unknown'
-        self.objid = self.object
+        # Create empty attributes (filled by from_fits)
+        self.header = None
+        self.filename = None
+        self.object = 'unknown'
+        self.objid = 'unknown'
+        self.date_det = None
 
         # Store creation time
         self.date = Time.now()
         self.mjd = self.date.mjd
 
-        # Store event time, if there is one in the header
-        if 'date-obs' in header:
-            self.date_det = Time(header['date-obs'])
-        else:
-            self.date_det = self.date
-        self.mjd_det = self.date_det.mjd
+        # Parse and store the data
+        self._save_data(data, order, coordsys, uniq, density)
 
     def __eq__(self, other):
         try:
@@ -282,10 +256,6 @@ class SkyMap(object):
             hdu = fits_file
         header = dict(hdu.header)
 
-        # Store the file name in the header
-        if isinstance(fits_file, str):
-            header['FILENAME'] = fits_file
-
         # Check that the file is valid HEALPix
         if ('PIXTYPE' not in header or header['PIXTYPE'].upper() != 'HEALPIX' or
                 'ORDERING' not in header):
@@ -331,7 +301,33 @@ class SkyMap(object):
         if file_open:
             hdu_list.close()
 
-        return cls(data, order, coordsys, header, uniq, density)
+        # Create the skymap class
+        skymap = cls(data, order, coordsys, uniq, density)
+
+        # Make sure the header cards are lowercase, and store on the class
+        skymap.header = {k.lower(): header[k] for k in header}
+
+        # Store the filename in the header and on the class
+        if isinstance(fits_file, str):
+            skymap.header['filename'] = fits_file
+            skymap.filename = fits_file
+            if fits_file.startswith('http'):
+                skymap.header['url'] = fits_file
+
+        # Get object name, or filename if it isn't in the header
+        if 'object' in skymap.header:
+            skymap.object = skymap.header['object']
+        elif skymap.filename is not None:
+            skymap.object = os.path.basename(skymap.filename).split('.')[0]
+        skymap.objid = skymap.object
+
+        # Store event time, if there is one in the header
+        if 'date-obs' in skymap.header:
+            skymap.date_det = Time(skymap.header['date-obs'])
+        else:
+            skymap.date_det = skymap.date
+
+        return skymap
 
     @classmethod
     def from_data(cls, data, order, coordsys='C', density=False, uniq=None):
@@ -420,13 +416,7 @@ class SkyMap(object):
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
-        newmap = SkyMap(self.data.copy(),
-                        self.order,
-                        self.coordsys,
-                        self.header.copy() if self.header is not None else None,
-                        self.uniq,
-                        self.density)
-        return newmap
+        return deepcopy(self)
 
     def regrade(self, nside=None, order='NESTED'):
         """Up- or downgrade the sky map HEALPix resolution, or change the pixel ordering.
