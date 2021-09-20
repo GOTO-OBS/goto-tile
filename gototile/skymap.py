@@ -533,7 +533,7 @@ class SkyMap(object):
     def pixel_area(self):
         """Return the area of each pixel (only valid for non-NUNIQ skymaps) in square degrees."""
         if self.order != 'NUNIQ':
-            return 4 * np.pi / (12 * np.array(self.pix_nside) ** 2) * (180 / np.pi) ** 2
+            return 4 * np.pi / (12 * np.array(self.nside) ** 2) * (180 / np.pi) ** 2
         else:
             raise ValueError('NUNIQ maps have variable pixel areas.')
 
