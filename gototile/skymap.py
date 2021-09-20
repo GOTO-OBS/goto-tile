@@ -611,7 +611,7 @@ class SkyMap(object):
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
-             coordinates=None, plot_contours=True, plot_pixels=False):
+             coordinates=None, plot_contours=True, plot_pixels=False, plot_colorbar=False):
         """Plot the skymap.
 
         Parameters
@@ -653,6 +653,9 @@ class SkyMap(object):
 
         plot_pixels : bool, default = False
             plot the pixel boundaries (warning: can be excessive for high-resolution maps)
+
+        plot_colorbar : bool, default = False
+            plot a colorbar on the figure
         """
         fig = plt.figure(figsize=figsize, dpi=dpi)
 
@@ -682,7 +685,7 @@ class SkyMap(object):
         transform = axes.get_transform('world')
 
         # Plot the skymap data
-        self.healpix.plot(axes, cmap='cylon')
+        self.healpix.plot(axes, cmap='cylon', cbar=plot_colorbar)
 
         # Plot 50% and 90% contours
         if plot_contours:
