@@ -211,7 +211,7 @@ class SkyMap(object):
         elif self.density and not to_density:
             # Convert the density map (per steradian) to a histogram
             data = self.data * self.pix_area
-            self._save_data(data, self.order, self.coordsys, self.uniq, density=True)
+            self._save_data(data, self.order, self.coordsys, self.uniq, density=False)
 
     @classmethod
     def from_fits(cls, fits_file, coordsys='C', hdu=1, data_field=None, density=None):
@@ -422,7 +422,7 @@ class SkyMap(object):
         """Up- or downgrade the sky map HEALPix resolution, or change the pixel ordering.
 
         Note this function can flatten multi-order skymaps (i.e. convert from NUNIQ to NESTED or
-        RING ordering), but not the other way around (i.e. confert flat slymaps to multi-order).
+        RING ordering), but not the other way around (i.e. convert flat slymaps to multi-order).
         """
         if nside is None:
             nside = self.nside
