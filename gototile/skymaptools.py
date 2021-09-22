@@ -604,7 +604,7 @@ def tile_skymap(skymap, grid, observed=None):
     skymap : `gototile.skymap.SkyMap`
         The sky map to apply
 
-    grid : `gototile.skymap.SkyGrid`
+    grid : `gototile.grid.SkyGrid`
         The all-sky grid to apply the map to
 
     observed : list of int or str, optional
