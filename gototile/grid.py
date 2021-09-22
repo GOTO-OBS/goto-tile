@@ -253,6 +253,16 @@ class SkyGrid(object):
         for i in range(len(tile_pixels)):
             # Find the tile with the highest probability
             high_tile_prob = max(tile_probs)
+            if high_tile_prob == 0:
+                # We've already blacked out all the pixels, there's no probability left!
+                # This can happen with really low-resolution skymaps, where the grid tiles are
+                # of the order or larger than the pixels.
+                # Just add all the remaining pixels with a contour value of 1.
+                unassigned_pixels = [i for i in range(len(tile_pixels)) if i not in sorted_index]
+                sorted_index += unassigned_pixels
+                sorted_contours += [1] * len(unassigned_pixels)
+                break
+            # Find the high tile index
             high_tile_index = np.where(tile_probs == high_tile_prob)[0][0]
             # The tile contour value is the probability + cumulative sum of previous tiles
             high_tile_contour = high_tile_prob + sorted_contours[i]
