@@ -136,6 +136,11 @@ class SkyMap(object):
 
     def _save_data(self, data, order=None, coordsys=None, uniq=None, density=None):
         """Save the skymap data and add attributes."""
+        if order != 'NUNIQ':
+            uniq = None
+        elif uniq is None:
+            raise ValueError('Uniq pixels not given for NUNIQ skymap')
+
         # Create mhealpy HEALPix class (we access most properties from here)
         self.healpix = mhp.HealpixMap(data, uniq,
                                       scheme=order,
@@ -151,6 +156,8 @@ class SkyMap(object):
             self.pix_nside = np.array([2 ** np.floor(np.log2(u / 4) / 2) for u in uniq], dtype=int)
         else:
             self.pix_nside = np.array([self.nside] * self.npix, dtype=int)
+        self._nsides = set(self.pix_nside)  # Here to save time in query_polygon
+        self.pix_order = np.array(np.log2(self.pix_nside), dtype=int)
         self.pix_area = 4 * np.pi / (12 * np.array(self.pix_nside) ** 2)
 
         # Find the coordinates of each pixel
@@ -597,6 +604,35 @@ class SkyMap(object):
 
         # Return the area covered by those pixels
         return self.get_pixel_area(ipix)
+
+    def query_polygon(self, vertices, inclusive=True, fact=32):
+        """Returns the pixels whose centers lie within the convex polygon defined
+        by the vertices array (if inclusive is False), or which overlap with
+        this polygon (if inclusive is True).
+
+        Note `vertices` must be in cartesian coordinates.
+
+        See `healpy.query_polygon` or `mhealpy.HealpixMap.query_polygon` for details.
+        """
+        if self.is_moc:
+            # Unfortunately `mhealpy.HealpixMap.query_polygon` is *INCREDIBLY* slow for MOC maps.
+            # The problem is that the `HealpixMap.pix_order_list` function is called every time,
+            # even though we only need it once (and actually not at all).
+            # So here we just have the same function but optimised as much as I can.
+            all_uniq_pix = np.zeros(0, dtype=int)
+            for nside in self._nsides:
+                ipix_nested = hp.query_polygon(nside, vertices, inclusive, fact, nest=True)
+                uniq_pix = ipix_nested + 4 * nside ** 2
+                all_uniq_pix = np.append(all_uniq_pix, uniq_pix)
+            uniq_mask = np.isin(self.uniq, all_uniq_pix)
+            query_pix = self.ipix[uniq_mask]
+            return np.sort(query_pix)
+        else:
+            # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
+            ipix = hp.query_polygon(self.nside, vertices, inclusive, fact, nest=True)
+            if self.order == 'RING':
+                ipix = [np.array(sorted(hp.nest2ring(self.nside, pix))) for pix in ipix]
+            return ipix
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the skymap pixels."""
