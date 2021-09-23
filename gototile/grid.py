@@ -1,7 +1,7 @@
 """Module containing the SkyGrid class."""
 
-import collections
 import os
+from collections import Counter
 from copy import copy, deepcopy
 
 from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
@@ -9,8 +9,6 @@ from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observ
 from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
 from astropy.table import QTable
-
-import healpy as hp
 
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
@@ -26,7 +24,7 @@ import numpy as np
 from .gridtools import create_grid
 from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .gridtools import get_tile_edges_astropy as get_tile_edges
-from .gridtools import get_tile_pixels_astropy as get_tile_pixels
+from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
 NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1)],
@@ -107,6 +105,12 @@ class SkyGrid(object):
         filllen = len(str(max(self.tilenums)))
         self.tilenames = ['T' + str(num).zfill(filllen) for num in self.tilenums]
 
+        # Properties waiting for a skymap to be applied
+        self.skymap = None
+        self.pixels = None
+        self.probs = None
+        self.contours = None
+
     def __eq__(self, other):
         try:
             return (self.fov == other.fov and
@@ -130,7 +134,7 @@ class SkyGrid(object):
 
     @classmethod
     def from_name(cls, name):
-        """Initialize a `~gototile.skymap.SkyGrid` object from a name string.
+        """Initialize a `~gototile.grid.SkyGrid` object from a name string.
 
         Parameters
         ----------
@@ -141,7 +145,7 @@ class SkyGrid(object):
 
         Returns
         -------
-        `~gototile.skymap.SkyGrid`
+        `~gototile.grid.SkyGrid`
             SkyGrid object
         """
         if name.startswith('allsky'):
@@ -167,7 +171,7 @@ class SkyGrid(object):
         """Get a dictionary of pre-defined grid parameters for use with `SkyGrid.from_name()`."""
         return NAMED_GRIDS
 
-    def apply_skymap(self, skymap):
+    def apply_skymap(self, skymap, flatten=False):
         """Apply a SkyMap to the grid, calculating the contained probability within each tile.
 
         The tile probabilities are stored in self.probs, and the contour levels in self.contours.
@@ -177,40 +181,52 @@ class SkyGrid(object):
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
         """
-        # Need to make sure the skymap has order='NESTED' not ring, because it seems there are
-        # problems with hp.query_polygon in RING ordering.
-        # See https://github.com/GOTO-OBS/goto-tile/issues/65
-        # Therefore enforce NESTED when applying a skymap to a grid
-        if not skymap.is_nested:
-            skymap = skymap.copy()
-            skymap.regrade(order='NESTED')
+        # Store a copy of the skymap on the class
+        self.skymap = skymap.copy()
+        self.nside = self.skymap.nside
 
-        # Also make sure the skymap is in equatorial coordinates
-        if skymap.coordsys != 'C':
-            skymap = skymap.copy()
-            skymap.rotate('C')
+        # Flatten multi-order skymaps if requested
+        if self.skymap.is_moc and flatten:
+            self.skymap.regrade(self.skymap.nside, order='NESTED')
 
-        # Store skymap on the class
-        self.skymap = skymap
+        # Ensure the skymap is in equatorial coordinates
+        if self.skymap.coordsys != 'C':
+            self.skymap.rotate('C')
 
-        # Calculate which pixels are within the tiles
-        self.nside = skymap.nside
-        self.pixels = self.get_tile_pixels(self.nside)
+        # Ensure the skymap is in units of probability, not probability density
+        if self.skymap.density:
+            self.skymap.density = False
 
-        # Calculate the tile probabilities and contour levels
+        # Calculate which skymap pixels are contained within each tile,
+        # then find the tile probabilities and contour levels
+        self.pixels = self._get_tile_pixels()
         self.probs = self._get_tile_probs()
         self.contours = self._get_tile_contours()
 
         return self.probs
 
-    def get_tile_pixels(self, nside):
-        """Calculate the HEALPix indices within each tile."""
-        pixels = get_tile_pixels(self.vertices, nside)
-        return np.array(pixels, dtype=object)
+    def _get_tile_pixels(self, skymap=None):
+        """Calculate the skymap pixel indices within each tile."""
+        if skymap is None:
+            skymap = self.skymap
+
+        # Need to provide tile vertices in cartesian coordinates
+        vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
+
+        # Use the mhealpy `query_polygon` method on the skymap.
+        # Unlike healpy's `query_polygon` this can also deal with multi-order skymaps.
+        # HOWEVER it's really, really slow. Which is why we have to flatten skymaps when applying.
+        # `inclusive=True` will include pixels that overlap in area even if the centres aren't
+        # inside the region (`fact` tells how deep to look, at nside=self.nside*fact)
+        ipix = [skymap.query_polygon(v, inclusive=True, fact=32) for v in vertices]
+
+        # Note the number of pixels per tile will vary, so the returned array is an array of lists
+        return np.array(ipix, dtype=object)
 
     def _get_tile_probs(self):
         """Calculate the contained probabilities within each tile."""
-        return np.array([np.sum(self.skymap.skymap[pix]) for pix in self.pixels])
+        probs = [np.sum(self.skymap.data[ipix]) for ipix in self.pixels]
+        return np.array(probs)
 
     def _get_tile_contours(self, prob_limit=7):
         """Calculate the minimum contour level of each pixel.
@@ -239,14 +255,14 @@ class SkyGrid(object):
         which tiles overlap before you start you don't save any time, because that takes ages
         for any reasonable nside resolution.
         """
-        pixel_probs = self.skymap.skymap.copy()
+        pixel_probs = self.skymap.data.copy()
         if prob_limit:
             # Exclude tiles containing a probability of less than 10^-prob_limit
             tile_mask = self.probs > 10**(-1 * prob_limit)
         else:
             tile_mask = np.full(self.ntiles, True)
         tile_pixels = self.pixels[tile_mask]
-        tile_probs = np.array([np.sum(pixel_probs[pix]) for pix in tile_pixels])
+        tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
 
         sorted_contours = [0]
         sorted_index = []
@@ -273,7 +289,7 @@ class SkyGrid(object):
             high_tile_pixels = tile_pixels[high_tile_index]
             pixel_probs[high_tile_pixels] = 0
             # Recalculate the probability within all tiles
-            tile_probs = np.array([np.sum(pixel_probs[tile_pix]) for tile_pix in tile_pixels])
+            tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
 
         # Start from a contour level of 1, only replace those within the mask
         contours = np.ones(self.ntiles)
@@ -283,7 +299,7 @@ class SkyGrid(object):
 
     def select_tiles(self, contour=0.9, max_tiles=None, min_tile_prob=None):
         """Select tiles based off of the given contour."""
-        if not hasattr(self, 'skymap'):
+        if self.skymap is None:
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
         # Initially mask to cover the entire given contour level
@@ -302,40 +318,35 @@ class SkyGrid(object):
         table = self.get_table()
         return table[mask]
 
-    def _pixels_from_tilenames(self, tilenames, nside=128):
-        """Get the unique pixels contained within the given tile(s)."""
-        if hasattr(self, 'pixels'):
-            # A skymap has been applied, use those pixels
-            tile_pixels = self.pixels
-        else:
-            # Use the given parameters
-            tile_pixels = self.get_tile_pixels(nside)
+    def _get_test_map(self, nside=None):
+        """Create a basic empty skymap, useful for statistical calculations.
 
-        if isinstance(tilenames, (list, np.ndarray)):
-            # Multiple tiles
-            indexes = [self.tilenames.index(tile) for tile in tilenames]
-            pixels = []
-            for i in indexes:
-                pixels += list(tile_pixels[i])
-            pixels = list(set(pixels))  # remove duplicates
-        else:
-            # An individual tile
-            index = self.tilenames.index(tilenames)
-            pixels = tile_pixels[index]
-
-        return pixels
+        We could do this in __init__, but why not save time and only do if if we need it?
+        """
+        if hasattr(self, '_base_nside') and self._base_nside == nside:
+            return
+        if nside is None:
+            nside = 128
+        self._base_nside = nside
+        self._base_skymap = SkyMap(np.zeros(12 * self._base_nside ** 2), order='NESTED')
+        self._base_pixels = self._get_tile_pixels(self._base_skymap)
 
     def get_tile(self, coord, overlap=False):
-        """Find which tile the given coordinates fall within.
+        """Find which tile(s) the given coordinates fall within.
 
         Parameters
         ----------
         coord : `astropy.coordinates.SkyCoord`
-            The coordinates to find which tile they are within.
+            The coordinates to find which tile(s) they are within.
 
         overlap : bool, optional
             If True then check if the coordinates fall within multiple tiles, and return a list.
-            If False (default) just return the closest tile centre.
+            If False (default) just return the tile centred closest to the given coordinates.
+
+        Returns
+        -------
+        tilename : str or list of str
+            The name(s) of the tile(s) the coordinates are within
         """
         # Handle both scalar and vector coordinates
         if coord.isscalar:
@@ -346,32 +357,25 @@ class SkyGrid(object):
             # Annoyingly SkyCoord.separation requires one or the other to be scalar.
             # So we need this annoying loop to deal with multiple input coordinates.
             for c in coord:
-                # Get the separation between the coords and the tile centres
+                # Get the separation between the coords and all tile centres
                 sep = np.array(c.separation(self.coords))
 
-                # Find which tile has the minimum separation
+                # Find which tile has the minimum separation (i.e. the closest)
                 index = np.where(sep == (min(sep)))[0][0]
 
                 # Get the tile name and add it to the list
                 name = self.tilenames[index]
                 tilenames.append(name)
         else:
-            if hasattr(self, 'pixels'):
-                # A skymap has been applied, use those pixels
-                nside = self.nside
-                pixels = self.pixels
-            else:
-                # Use the given parameters
-                nside = 128
-                pixels = self.get_tile_pixels(nside)
-
+            # Use the base skymap to find which pixels the coordinates are within
+            self._get_test_map()
             for c in coord:
                 # Get the HEALPix pixel the coords are within
-                pixel = coord2pix(nside, c, nest=True)
+                pixel = coord2pix(self._base_nside, c, nest=True)
 
                 # Get the tile indices that contain that pixel and add to list
                 names = [self.tilenames[i] for i in range(self.ntiles)
-                         if pixel in pixels[i]]
+                         if pixel in self._base_pixels[i]]
                 tilenames.append(names)
 
         if len(tilenames) == 1:
@@ -446,6 +450,17 @@ class SkyGrid(object):
 
         return list(np.array(self.tilenames)[mask])
 
+    def _get_tilename_indices(self, tilenames):
+        """Return the indices of the given tile(s)."""
+        if isinstance(tilenames, str):
+            tilenames = [tilenames]
+
+        indices = [self.tilenames.index(tile) for tile in tilenames]
+        if len(indices) == 1:
+            indices = indices[0]
+
+        return indices
+
     def get_coordinates(self, tilenames):
         """Return the central coordinates of the given tile(s).
 
@@ -458,16 +473,10 @@ class SkyGrid(object):
         -------
         coords : `astropy.coordinates.SkyCoord`
             The central coordinates of the given tile(s).
+
         """
-        if isinstance(tilenames, str):
-            tilenames = [tilenames]
-
-        # Get indexes
-        index = [self.tilenames.index(tile) for tile in tilenames]
-        if len(index) == 1:
-            index = index[0]
-
-        return self.coords[index]
+        indices = self._get_tilename_indices(tilenames)
+        return self.coords[indices]
 
     def get_vertices(self, tilenames):
         """Return coordinates of the four corners of the given tile(s).
@@ -482,16 +491,10 @@ class SkyGrid(object):
         coords : `astropy.coordinates.SkyCoord`
             The coordinates of the vertices of the given tile(s).
             Will be an array of shape shape (n, 4), where n = len(tilenames).
+
         """
-        if isinstance(tilenames, str):
-            tilenames = [tilenames]
-
-        # Get indexes
-        index = [self.tilenames.index(tile) for tile in tilenames]
-        if len(index) == 1:
-            index = index[0]
-
-        return self.vertices[index]
+        indices = self._get_tilename_indices(tilenames)
+        return self.vertices[indices]
 
     def get_edges(self, tilenames, edge_points=5):
         """Return coordinates along the edges of the given tile(s).
@@ -512,16 +515,29 @@ class SkyGrid(object):
             Will be an array with shape (n, 4*(edge_points+1)), where n = len(tilenames).
 
         """
-        if isinstance(tilenames, str):
-            tilenames = [tilenames]
-
-        # Get indexes
-        index = [self.tilenames.index(tile) for tile in tilenames]
-        if len(index) == 1:
-            index = index[0]
-
+        indices = self._get_tilename_indices(tilenames)
         coords = get_tile_edges(self.coords, self.fov, edge_points)
-        return coords[index]
+        return coords[indices]
+
+    def get_pixels(self, tilenames):
+        """Get the skymap pixels contained within the given tile(s).
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the pixels of.
+
+        Returns
+        -------
+        ipix : list of int
+            Pixel indices covering the area of the given tile(s).
+
+        """
+        if self.pixels is None:
+            raise ValueError('SkyGrid does not have a SkyMap applied')
+
+        indices = self._get_tilename_indices(tilenames)
+        return sorted(set([ipix for ipix in self.pixels[indices]]))  # set removes duplicates
 
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
@@ -532,19 +548,20 @@ class SkyGrid(object):
         ----------
         tilenames : str or list of str
             The name(s) of the tile(s) to find the probability within.
+
+        Returns
+        -------
+        probability : int
+            The total skymap value within the area covered by the given tile(s).
+
         """
-        if not hasattr(self, 'probs'):
-            raise ValueError('Grid does not have a SkyMap applied')
+        if self.probs is None:
+            raise ValueError('SkyGrid does not have a SkyMap applied')
 
-        # Get pixels
-        pixels = self._pixels_from_tilenames(tilenames)
+        pixels = self.get_pixels(tilenames)
+        return self.skymap.data[pixels].sum()
 
-        # Sum the probability within those pixels
-        prob = self.skymap.skymap[pixels].sum()
-
-        return prob
-
-    def get_area(self, tilenames, nside=128):
+    def get_area(self, tilenames):
         """Return the sky area contained within the given tile(s) in square degrees.
 
         If multiple tiles are given, the area only be included once in any overlaps.
@@ -553,18 +570,17 @@ class SkyGrid(object):
         ----------
         tilenames : str or list of str
             The name(s) of the tile(s) to find the area of.
+
+        Returns
+        -------
+        area : int
+            The total sky area covered by the given tile(s), in square degrees.
+
         """
-        # Get pixels
-        pixels = self._pixels_from_tilenames(tilenames, nside)
-
-        # Each pixel in the skymap has the same area (HEALPix definition)
-        # So just multiply that by number of pixels
-        if hasattr(self, 'skymap'):
-            area = self.skymap.pixel_area * len(pixels)
-        else:
-            area = hp.nside2pixarea(nside, degrees=True) * len(pixels)
-
-        return area
+        indices = self._get_tilename_indices(tilenames)
+        self._get_test_map()
+        pixels = sorted(set([ipix for ipix in self._base_pixels[indices]]))
+        return self._base_skymap.get_pixel_area(pixels)
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.
@@ -573,57 +589,33 @@ class SkyGrid(object):
             the contained probability within each tile.
         """
         col_names = ['tilename', 'ra', 'dec', 'prob']
-        col_types = ['U', u.deg, u.deg, 'f8']
-
-        if hasattr(self, 'probs'):
-            probs = self.probs
-        else:
-            probs = np.zeros(self.ntiles)
-
-        table = QTable([self.tilenames, self.coords.ra, self.coords.dec, probs],
-                       names=col_names, dtype=col_types)
-        return table
+        col_data = [self.tilenames, self.coords.ra, self.coords.dec,
+                    self.probs if self.probs is not None else np.zeros(self.ntiles)]
+        return QTable(col_data, names=col_names)
 
     def _get_pixel_count(self, nside=128):
-        """Get the count of the number of times each pixel is contained within a grid tile."""
-        if hasattr(self, 'pixels'):
-            # A skymap has been applied, use those pixels
-            tile_pixels = self.pixels
-            nside = self.nside
-        else:
-            # Use the given parameters
-            tile_pixels = self.get_tile_pixels(nside)
+        """For each pixel in the base skymap, count of the number of tiles it falls within."""
+        # Create test skymap, if it hasn't already been generated
+        self._get_test_map(nside)
 
-        # Number of pixels
-        npix = hp.nside2npix(nside)
-
-        # For each pixel, create a count of the number of tiles it falls within
-        count = np.array([0] * npix)
-        for tile_pix in tile_pixels:
-            for pix in tile_pix:
-                count[pix] += 1
-
+        count = np.zeros(12 * self._base_nside ** 2)
+        for ipix in self._base_pixels:
+            count[ipix] += 1
         return count
 
     def get_stats(self, nside=128):
         """Return a table containing grid statistics."""
-        # Get the count
         count = self._get_pixel_count(nside)
-
-        # Create a frequency counter
-        counter = collections.Counter(count)
-
-        # Make table
-        col_names = ['in_tiles', 'pix', 'freq']
-        col_types = ['i', 'i', 'f8']
-
+        counter = Counter(count)
         in_tiles = [i for i in counter]
-        pix = [counter[i] for i in counter]
+        npix = [counter[i] for i in counter]
         freq = [counter[i] / len(count) for i in counter]
 
-        table = QTable([in_tiles, pix, freq],
-                       names=col_names, dtype=col_types)
-        table['freq'].format = '.4f'
+        col_names = ['in_tiles', 'npix', 'freq']
+        col_data = [in_tiles, npix, freq]
+
+        table = QTable(col_data, names=col_names)
+        table['freq'].format = '.2%'
         table = table.group_by('in_tiles')
         return table
 
@@ -844,7 +836,7 @@ class SkyGrid(object):
 
         # Plot skymap probabilities
         if plot_skymap is True:
-            if not hasattr(self, 'skymap'):
+            if self.skymap is None:
                 raise ValueError('SkyGrid does not have a SkyMap applied')
 
             # Set the probability array to the color array, and use the LIGO colormap
@@ -859,7 +851,7 @@ class SkyGrid(object):
             polys.set_facecolor('none')
 
         if plot_contours is True:
-            if not hasattr(self, 'skymap'):
+            if self.skymap is None:
                 raise ValueError('SkyGrid does not have a SkyMap applied')
 
             # Plot the 50% and 90% skymap contours
@@ -873,19 +865,9 @@ class SkyGrid(object):
             # Colour in areas based on the number of tiles they are within
             polys.set_facecolor('none')
 
-            # Use attributes of the skymap if one has been applied
-            if hasattr(self, 'nside'):
-                nside = self.nside
-            else:
-                nside = 128
-
-            # Get the coordinates of each pixel to plot
-            npix = hp.nside2npix(nside)
-            ipix = range(npix)
-            coords = pix2coord(nside, ipix, nest=True)
-
-            # Get count statistics
-            count = self._get_pixel_count(nside)
+            # Get count statistics and the coordinates of each pixel to plot
+            count = self._get_pixel_count()
+            coords = pix2coord(self._base_nside, range(len(count)), nest=True)
 
             # Plot HealPix points coloured by tile count
             # https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
@@ -1156,7 +1138,7 @@ class SkyGrid(object):
                                                                      self.fov['dec'],
                                                                      self.overlap['ra'],
                                                                      self.overlap['dec'])
-            if plot_skymap and hasattr(self, 'skymap'):
+            if plot_skymap and self.skymap is not None:
                 title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
         axes.set_title(title, y=1.05)
 
