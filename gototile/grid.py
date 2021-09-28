@@ -537,6 +537,8 @@ class SkyGrid(object):
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
         indices = self._get_tilename_indices(tilenames)
+        if isinstance(indices, int):
+            indices = [indices]
         all_pix = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
         return sorted(set(all_pix))  # set removes duplicates
 
@@ -579,6 +581,8 @@ class SkyGrid(object):
 
         """
         indices = self._get_tilename_indices(tilenames)
+        if isinstance(indices, int):
+            indices = [indices]
         self._get_test_map()
         all_pix = [ipix for tile_pix in self._base_pixels[indices] for ipix in tile_pix]
         pix = sorted(set(all_pix))  # set removes duplicates
