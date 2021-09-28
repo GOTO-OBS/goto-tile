@@ -540,7 +540,7 @@ class SkyMap(object):
     def pixel_area(self):
         """Return the area of each pixel (only valid for non-NUNIQ skymaps) in square degrees."""
         if self.order != 'NUNIQ':
-            return 4 * np.pi / (12 * np.array(self.nside) ** 2) * (180 / np.pi) ** 2
+            return 4 * np.pi / (12 * np.array(self.nside) ** 2) * ((180 / np.pi) ** 2)
         else:
             raise ValueError('NUNIQ maps have variable pixel areas.')
 
@@ -564,7 +564,7 @@ class SkyMap(object):
             The areas covered by the given pixel(s).
 
         """
-        return self.pix_area(ipix) * (180 / np.pi) ** 2
+        return self.pix_area[ipix] * ((180 / np.pi) ** 2)
 
     def get_pixel_area(self, ipix):
         """Return the TOTAL area covered by the given skymap pixels in square degrees.
@@ -587,9 +587,9 @@ class SkyMap(object):
         """
         areas = self.get_pixel_areas(ipix)
         if isinstance(areas, int):
-            return areas * (180 / np.pi) ** 2
+            return areas
         else:
-            return sum(areas) * (180 / np.pi) ** 2
+            return sum(areas)
 
     def get_contour_area(self, contour_level):
         """Return the area of a given contour region, in square degrees.
@@ -638,7 +638,7 @@ class SkyMap(object):
         """Return an astropy QTable containing infomation on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'value', 'area']
         col_data = [self.ipix, self.coords.ra, self.coords.dec, self.data,
-                    self.pix_area * 180 / np.pi * u.deg * u.deg]
+                    self.pix_area * (180 / np.pi) * u.deg * u.deg]
         if self.is_moc:
             col_names += ['uniq', 'nside']
             col_data += [self.uniq, self.pix_nside]
