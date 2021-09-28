@@ -537,7 +537,8 @@ class SkyGrid(object):
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
         indices = self._get_tilename_indices(tilenames)
-        return sorted(set([ipix for ipix in self.pixels[indices]]))  # set removes duplicates
+        all_pix = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
+        return sorted(set(all_pix))  # set removes duplicates
 
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
@@ -579,8 +580,9 @@ class SkyGrid(object):
         """
         indices = self._get_tilename_indices(tilenames)
         self._get_test_map()
-        pixels = sorted(set([ipix for ipix in self._base_pixels[indices]]))
-        return self._base_skymap.get_pixel_area(pixels)
+        all_pix = [ipix for tile_pix in self._base_pixels[indices] for ipix in tile_pix]
+        pix = sorted(set(all_pix))  # set removes duplicates
+        return self._base_skymap.get_pixel_area(pix)
 
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.
