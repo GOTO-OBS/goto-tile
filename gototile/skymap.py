@@ -275,18 +275,18 @@ class SkyMap(object):
 
         # Load the skymap data
         if data_field is not None:
-            data = hdu.data.field[data_field]
+            data = hdu.data.field(data_field).ravel()
             if 'UNIQ' in hdu.data.columns:
                 uniq = hdu.data['UNIQ']
             else:
                 uniq = None
         elif hdu.data.columns[0].name == 'UNIQ':
             data_field = 1
-            data = hdu.data.field(data_field)
+            data = hdu.data.field(data_field).ravel()
             uniq = hdu.data.field(0)
         else:
             data_field = 0
-            data = hdu.data.field(0)
+            data = hdu.data.field(0).ravel()
             uniq = None
 
         # Check we could find UNIQ pixel indices
