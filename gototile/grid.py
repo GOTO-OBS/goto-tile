@@ -589,6 +589,31 @@ class SkyGrid(object):
         pix = sorted(set(pix))
         return self._base_skymap.get_pixel_area(pix)
 
+    def get_areas(self, tilenames):
+        """Return the areas contained within each of the given tile(s) in square degrees.
+
+        Note although every tile should have the same area (equal to fov_ra * fov_dec) there will
+        be slight differences from the resolution of the HEALPix grid.
+
+        For most cases you'll want to use the `SkyGrid.get_tile_area()` function instead, which
+        gives the COMBINED area of the given tiles (i.e. only including overlapping areas once).
+
+        Parameters
+        ----------
+        tilenames : str or list of str
+            The name(s) of the tile(s) to find the area of.
+
+        Returns
+        -------
+        area : int or list of int
+            The areas covered by the given tile(s), in square degrees.
+
+        """
+        if isinstance(tilenames, str):
+            return self.get_area(tilenames)
+        else:
+            return [self.get_area(tile) for tile in tilenames]
+
     def get_table(self):
         """Return an astropy QTable containing infomation on the defined tiles.
 
