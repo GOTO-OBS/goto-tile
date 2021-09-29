@@ -349,7 +349,9 @@ class SkyGrid(object):
             The name(s) of the tile(s) the coordinates are within
         """
         # Handle both scalar and vector coordinates
+        scalar = False
         if coord.isscalar:
+            scalar = True
             coord = [coord]
 
         tilenames = []
@@ -378,7 +380,7 @@ class SkyGrid(object):
                          if pixel in self._base_pixels[i]]
                 tilenames.append(names)
 
-        if len(tilenames) == 1:
+        if scalar:
             return tilenames[0]
         else:
             return tilenames
@@ -453,13 +455,9 @@ class SkyGrid(object):
     def _get_tilename_indices(self, tilenames):
         """Return the indices of the given tile(s)."""
         if isinstance(tilenames, str):
-            tilenames = [tilenames]
-
-        indices = [self.tilenames.index(tile) for tile in tilenames]
-        if len(indices) == 1:
-            indices = indices[0]
-
-        return indices
+            return self.tilenames.index(tilenames)
+        else:
+            return [self.tilenames.index(tile) for tile in tilenames]
 
     def get_coordinates(self, tilenames):
         """Return the central coordinates of the given tile(s).
@@ -538,9 +536,10 @@ class SkyGrid(object):
 
         indices = self._get_tilename_indices(tilenames)
         if isinstance(indices, int):
-            indices = [indices]
-        all_pix = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
-        return sorted(set(all_pix))  # set removes duplicates
+            pix = self.pixels[indices]
+        else:
+            pix = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
+        return sorted(set(pix))
 
     def get_probability(self, tilenames):
         """Return the contained probability within the given tile(s).
@@ -580,12 +579,14 @@ class SkyGrid(object):
             The total sky area covered by the given tile(s), in square degrees.
 
         """
+        self._get_test_map()
+
         indices = self._get_tilename_indices(tilenames)
         if isinstance(indices, int):
-            indices = [indices]
-        self._get_test_map()
-        all_pix = [ipix for tile_pix in self._base_pixels[indices] for ipix in tile_pix]
-        pix = sorted(set(all_pix))  # set removes duplicates
+            pix = sorted(set(self._base_pixels[indices]))
+        else:
+            pix = [ipix for tile_pix in self._base_pixels[indices] for ipix in tile_pix]
+        pix = sorted(set(pix))
         return self._base_skymap.get_pixel_area(pix)
 
     def get_table(self):
