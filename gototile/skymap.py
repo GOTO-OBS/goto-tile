@@ -721,7 +721,7 @@ class SkyMap(object):
         transform = axes.get_transform('world')
 
         # Plot the skymap data
-        self.healpix.plot(axes, cmap='cylon', cbar=plot_colorbar)
+        self.healpix.plot(axes, rasterize=False, cmap='cylon', cbar=plot_colorbar)
 
         # Plot 50% and 90% contours
         if plot_contours:
