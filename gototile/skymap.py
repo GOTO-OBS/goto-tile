@@ -647,7 +647,8 @@ class SkyMap(object):
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
-             coordinates=None, plot_contours=True, plot_pixels=False, plot_colorbar=False):
+             coordinates=None, plot_contours=True, contour_levels=[0.5, 0.9],
+             plot_pixels=False, plot_colorbar=False):
         """Plot the skymap.
 
         Parameters
@@ -687,6 +688,9 @@ class SkyMap(object):
         plot_contours : bool, default = True
             plot the 50% and 90% contour areas
 
+        contour_levels : list of float, default = [0.5, 0.9]
+            define the contour levels to plot
+
         plot_pixels : bool, default = False
             plot the pixel boundaries (warning: can be excessive for high-resolution maps)
 
@@ -725,17 +729,24 @@ class SkyMap(object):
 
         # Plot 50% and 90% contours
         if plot_contours:
-            if self.is_moc:
-                # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
-                data = self.healpix.rasterize(128, 'NESTED').data
-                contours = get_data_contours(data)
+            contour_levels = sorted(contour_levels)
+            if not self.is_moc:
+                cs = axes.contour_hpx(self.contours / max(self.contours), nested=self.is_nested,
+                                      levels=contour_levels,
+                                      colors='black', linewidths=0.5, zorder=99,)
             else:
-                data = self.data
-                contours = self.contours
-            cs = axes.contour_hpx(contours, nested=self.is_nested,
-                                  levels=[0.5 * data.sum(),
-                                          0.9 * data.sum()],
-                                  colors='black', linewidths=0.5, zorder=99,)
+                # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
+                # this convoluted method creates a flat skymap based on the actual contour levels,
+                # so it should match the moc contour levels
+                mask = np.zeros(len(self.contours))
+                for level in contour_levels:
+                    mask += np.array(self.contours / max(self.contours) > level, dtype=int)
+                healpix = mhp.HealpixMap(mask, self.uniq, scheme='NUNIQ', density=True)
+                contour_data = healpix.rasterize(128, 'NESTED').data
+                cs = axes.contour_hpx(contour_data, nested=True,
+                                      levels=[i + 0.5 for i in range(len(contour_levels))],
+                                      colors='black', linewidths=0.5, zorder=99,)
+
             label_contours = False
             if label_contours:
                 axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
