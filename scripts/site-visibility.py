@@ -13,7 +13,6 @@ import numpy as np
 from astropy import units
 from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.io import fits
-import healpy
 from gototile.skymaptools import findFoV
 from spherical_geometry.vector import radec_to_vector
 from gototile import fits as gtfits

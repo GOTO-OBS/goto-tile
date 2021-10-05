@@ -23,6 +23,75 @@ from . import math
 from . import utils
 
 
+def get_data_contours(data):
+    """Calculate the minimum contour level of each pixel in a given skymap data array.
+
+    This is done using the cumulative sum method, (vaguely) based on code from
+    http://www.virgo-gw.eu/skymap.html
+
+    For example, consider a very small, normalised skymap with the following table:
+
+    ipix | value
+       1 |  0.1
+       2 |  0.4
+       3 |  0.2
+       4 |  0.3
+
+    Sort by value, and find the cumulative sum:
+
+    ipix | value | cumsum(value)
+       2 |   0.4 |  0.4
+       4 |   0.3 |  0.7
+       3 |   0.2 |  0.9
+       1 |   0.1 |  1.0
+
+    Now shift so the cumsum starts at zero, and that's the minimum contour level that each
+    pixel is within.
+
+    ipix | value | contour
+       2 |   0.4 |  0.0
+       4 |   0.3 |  0.4
+       3 |   0.2 |  0.7
+       1 |   0.1 |  0.9
+
+    Consider asking for the minimum number of pixels to cover increasing contour levels:
+        -  0%-40%: you only need pixel 2
+        - 40%-70%: you need pixels 2 & 3
+        - 70%-90%: you need pixels 2, 3 & 4
+        - 90%+:    you need all four pixels
+    That's why we shift everything up so the first pixel has a contour value of 0%, because you
+    should always include at least one pixel to cover the smallest contour levels.
+
+    If we sort back to the original order the minimum confidence region each
+    pixel is in is easy to find by seeing if contour(pixel) < percentage:
+
+    ipix | value | contour | in 90%? | in 50%?
+       1 |   0.1 |  0.9    | False   | False
+       2 |   0.4 |  0.0    | True    | True
+       3 |   0.2 |  0.7    | True    | False
+       4 |   0.3 |  0.4    | True    | True
+
+    If you select the pixels for which contour(pixel) < percentage you will always cover
+    AT LEAST percentage (you may well cover more of course).
+    """
+    # Get the indices sorted by value (reversed, so highest first)
+    # Note 'ipix' are the index numbers of the data array, i.e. the value of pixel X = self.data[X]
+    sorted_ipix = data.argsort()[::-1]
+
+    # Sort the data using this mapping
+    sorted_data = data[sorted_ipix]
+
+    # Create cumulative sum array of each pixel in the array
+    cumulative_data = np.cumsum(sorted_data)
+
+    # Shift so we start at 0
+    sorted_contours = np.append([0], cumulative_data[:-1])
+
+    # "Un-sort" the contour array back to the normal pixel order
+    contours = sorted_contours[sorted_ipix.argsort()]
+    return contours
+
+
 def coord2pix(nside, coord, nest=False):
     """Convert sky coordinates to pixel indices.
 
@@ -37,8 +106,8 @@ def coord2pix(nside, coord, nest=False):
 
     Returns
     -------
-    pix : int or array of int
-        The healpix pixel numbers. Scalar if all input are scalar, array otherwise.
+    ipix : int or array of int
+        The healpix pixel indices. Scalar if all input are scalar, array otherwise.
 
     See Also
     --------
@@ -49,10 +118,10 @@ def coord2pix(nside, coord, nest=False):
     phi = coord.ra.rad
 
     # Get pixel numbers from healpy
-    pix = hp.ang2pix(nside, theta, phi, nest)
+    ipix = hp.ang2pix(nside, theta, phi, nest)
 
     # Return pixels
-    return pix
+    return ipix
 
 
 def pix2coord(nside, ipix, nest=False):
@@ -78,6 +147,8 @@ def pix2coord(nside, ipix, nest=False):
     coord2pix, `healpy.pix2ang`
     """
     # Check types
+    if isinstance(nside, (list, np.ndarray)):
+        nside = tuple(nside)
     if isinstance(ipix, (list, np.ndarray)):
         ipix = tuple(ipix)
 
@@ -391,7 +462,7 @@ def calculate_tiling(skymap, telescopes, date=None,
         for telescope in telescopes:
             telescope.skymap = skymap.copy()
 
-    # get fractional percentage covered per pix
+    # get fractional percentage covered per pixel
     total = allskymap.skymap.sum()
     newskymap.skymap /= total
     # normalise so allskymap.sum() == 1
@@ -533,7 +604,7 @@ def tile_skymap(skymap, grid, observed=None):
     skymap : `gototile.skymap.SkyMap`
         The sky map to apply
 
-    grid : `gototile.skymap.SkyGrid`
+    grid : `gototile.grid.SkyGrid`
         The all-sky grid to apply the map to
 
     observed : list of int or str, optional
@@ -545,15 +616,15 @@ def tile_skymap(skymap, grid, observed=None):
     utils.test_iers()
 
     # Get the pixels within each grid tile
-    tile_pixels = grid.get_tile_pixels(skymap.nside, skymap.isnested)
+    tile_pixels = grid.get_tile_pixels(skymap.nside, skymap.is_nested)
 
     # Get all the pixels within observed tiles
     bad_pix = set()
     for tile in observed:
         if isinstance(tile, str):
             tile = grid.tilenames.index(tile)
-        for pix in tile_pixels[tile]:
-            bad_pix.add(pix)
+        for ipix in tile_pixels[tile]:
+            bad_pix.add(ipix)
     bad_pix = np.array(list(bad_pix))
 
     # Make sure the skymap is normalised

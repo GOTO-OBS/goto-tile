@@ -3,7 +3,6 @@ from __future__ import absolute_import, division
 import os.path
 from collections import defaultdict
 import numpy as np
-import healpy
 import astropy.units as u
 from astropy.coordinates import SkyCoord, AltAz, Angle
 from astropy.table import Table
@@ -71,7 +70,7 @@ def map2catalog(skymap, catalog, key='weight'):
     phi = np.deg2rad(catalog['ra']%360)
     theta = np.pi/2 - np.deg2rad(catalog['dec'])
 
-    catalogpixels = healpy.ang2pix(skymap.nside, theta, phi, nest=skymap.isnested)
+    catalogpixels = hp.ang2pix(skymap.nside, theta, phi, nest=skymap.is_nested)
     sources = defaultdict(list)
 
     for i, weight in enumerate(catalog[key]):

@@ -59,13 +59,13 @@ On its own that's not very helpful, unless you want a quick reference for the nu
 
 That basic gird output can be useful, but where GOTO-tile shines is in combination with transient event skymaps. There are two ways to use a skymap with the grid. The `-s/--skymap` flag can be used to open a FITS skymap file, either by giving it a local path or a web URL. Alternatively the `-G/--gaussian` flag will tell GOTO-tile to generate a basic skymap with a 3D Gaussian profile, using the given RA, Dec and radius parameters.
 
-For example, the below command defines a Gaussian skymap centred on (180, 0) with a radius of 30 degrees. This is then applied to the GOTO4 grid and the output is saved to a CSV and as a plot. Note the tile table now includes a fourth column, probability (`prob`), the total skymap probability contained within each tile. When a skymap is applied the grid is sorted by probability, you cna see that the top two tiles (`T1457` and `T1458`) both contain the most probability (~1.3%) - as you would expect, since they are closest to the peak of the skymap.
+For example, the below command defines a Gaussian skymap centred on (180, 0) with a radius of 30 degrees. This is then applied to the GOTO4 grid and the output is saved to a CSV and as a plot. Note the tile table now includes a fourth column, probability (`prob`), the total skymap probability contained within each tile. When a skymap is applied the grid is sorted by probability, you can see that the top two tiles (`T1457` and `T1458`) both contain the most probability (~1.3%) - as you would expect, since they are closest to the peak of the skymap.
 
     ~$ gototile -t GOTO4 -G 180 0 30 -o out.csv -p GOTO4_gaussian.png
     Using defined sky grid for GOTO4 prototype (3.7, 4.9, 0.1, 0.1)
     Generated grid containing 2913 tiles
     Creating skymap...
-    Applying proability skymap to grid...
+    Applying probability skymap to grid...
         tilename          ra       dec          prob
     0       T1457  178.348624  0.000000  1.336924e-02
     1       T1458  181.651376  0.000000  1.336924e-02
@@ -113,7 +113,7 @@ Below is the full output and resulting plot from a simulation of a real LIGO/Vir
     Generated grid containing 2913 tiles
     Loading skymap...
     Skymap loaded
-    Applying proability skymap to grid...
+    Applying probability skymap to grid...
     Selected 59 tiles based on given limits.
     tilename          ra        dec      prob
     0     T2214  298.723404  30.000000  0.043409

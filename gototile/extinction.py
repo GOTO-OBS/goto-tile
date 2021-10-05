@@ -31,7 +31,7 @@ def create_extinction_skymap(min_weight=0, exp_k=5):
     skymap = SkyMap.from_fits(os.path.join(data_path, filename))
 
     # Scale skymap data between `min_weight` and 1
-    data = skymap.skymap
+    data = skymap.data
     data = (data - np.min(data)) / (np.max(data) - np.min(data))
 
     # Weight and invert the data using an exponential
