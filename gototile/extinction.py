@@ -5,6 +5,7 @@ import numpy as np
 
 from .skymap import SkyMap
 
+
 def create_extinction_skymap(min_weight=0, exp_k=5):
     """Create a skymap of weighted galactic extinction.
 
@@ -35,12 +36,12 @@ def create_extinction_skymap(min_weight=0, exp_k=5):
     data = (data - np.min(data)) / (np.max(data) - np.min(data))
 
     # Weight and invert the data using an exponential
-    weighted_data = np.exp(-exp_k*data)
+    weighted_data = np.exp(-exp_k * data)
 
     # Force minimum weight
     weighted_data = (1 - min_weight) * weighted_data + min_weight
 
     # Update the SkyMap class
-    skymap._save_skymap(weighted_data, skymap.order)
+    skymap._save_data(weighted_data, skymap.order, skymap.coordsys)
 
     return skymap
