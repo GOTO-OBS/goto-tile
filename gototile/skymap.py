@@ -470,7 +470,7 @@ class SkyMap(object):
             in_data = self.data.copy()
 
         # Rotate the skymap, now we're sure it's in RING order
-        out_data = rotator.rotate_map(in_data)
+        out_data = rotator.rotate_map_pixel(in_data)
 
         # Convert back to NESTED if needed
         if self.order == 'NESTED':
