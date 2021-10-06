@@ -194,7 +194,7 @@ def create_catalog_skymap(name, dist_mean=None, dist_err=None, key='weight',
     weights = (1 - min_weight) * weights + min_weight
 
     # Create a SkyMap class (remember it has order=RING)
-    skymap = SkyMap.from_data(weights, nested=False, coordsys='C')
+    skymap = SkyMap.from_data(weights, order='RING', coordsys='C')
 
     # If we were asked for a nested skymap then regrade before returning
     if nest is True:
