@@ -6,26 +6,31 @@ from copy import copy, deepcopy
 
 from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
 
-from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.table import QTable
+
+from descartes import PolygonPatch
 
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
-from matplotlib.patches import Patch, Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
+from matplotlib.patches import Patch, Polygon
 
 import mhealpy as mhp
 
 import numpy as np
 
+from shapely.geometry import Polygon as sPolygon
+from shapely.ops import cascaded_union
+
 from .gridtools import create_grid
-from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .gridtools import get_tile_edges_astropy as get_tile_edges
+from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
@@ -230,7 +235,7 @@ class SkyGrid(object):
         probs = [np.sum(self.skymap.data[ipix]) for ipix in self.pixels]
         return np.array(probs)
 
-    def _get_tile_contours(self, prob_limit=7):
+    def _get_tile_contours(self, prob_limit=5):
         """Calculate the minimum contour level of each pixel.
 
         Unlike for SkyMaps (see `gototile.skymaptools.get_data_contours()`), the calculation for
@@ -301,7 +306,7 @@ class SkyGrid(object):
 
     def select_tiles(self, contour=0.9, max_tiles=None, min_tile_prob=None):
         """Select tiles based off of the given contour."""
-        if self.skymap is None:
+        if self.probs is None or self.contours is None:
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
         # Initially mask to cover the entire given contour level
@@ -641,7 +646,7 @@ class SkyGrid(object):
         """Return a table containing grid statistics."""
         count = self._get_pixel_count(nside)
         counter = Counter(count)
-        in_tiles = [i for i in counter]
+        in_tiles = [int(i) for i in counter]
         npix = [counter[i] for i in counter]
         freq = [counter[i] / len(count) for i in counter]
 
@@ -652,6 +657,74 @@ class SkyGrid(object):
         table['freq'].format = '.2%'
         table = table.group_by('in_tiles')
         return table
+
+    def _get_tile_polygons(self, meridian_split=False):
+        """Create and cache Matplotlib Polygons to use when creating tile plots."""
+        # Used cached versions to save time when repeatedly plotting
+        if not meridian_split and hasattr(self, '_polygons'):
+            return self._polygons
+        elif meridian_split and hasattr(self, '_polygons_split'):
+            return self._polygons_split
+
+        # We can't just plot the four corners (already saved under self.vertices) because that will
+        # plot straight lines between them. That will look bad, because we're on a sphere.
+        # Instead we get some intermediate points along the edges, so they look better when plotted.
+        # (Admittedly this is only obvious with very large tiles, but it's still good to do).
+        if not hasattr(self, 'edges'):
+            self.edges = get_tile_edges(self.coords, self.fov, edge_points=5)
+
+        # Create the tile polygons
+        polygons = []
+        for ra, dec in zip(self.edges.ra.deg, self.edges.dec.deg):
+            # Check if the tile passes over the RA=0 line:
+            overlaps_meridian = any(ra < 90) and any(ra > 270)
+            if meridian_split and overlaps_meridian:
+                # Annoyingly, tiles that pass over the edges of the plot (at RA=0) won't be
+                # filled when using the 'astro hours mollweide' projection.
+                # The best workaround is to make two shapely Polygons, one on each side,
+                # then take the union and use descartes's PolygonPatch to get it back
+                # into the matplotlib format.
+                ra1 = ra.copy()
+                ra1[ra < 180] = 360
+                p1 = sPolygon(np.array((ra1[::-1], dec[::-1])).T)
+                ra2 = ra.copy()
+                ra2[ra > 180] = 0
+                p2 = sPolygon(np.array((ra2[::-1], dec[::-1])).T)
+                union = cascaded_union([p1, p2])
+                polygons.append(PolygonPatch(union))
+            else:
+                # Need to reverse and transpose to get into the correct format for Polygon
+                polygons.append(Polygon(np.array((ra[::-1], dec[::-1])).T))
+
+        if not meridian_split:
+            self._polygons = polygons
+        else:
+            self._polygons_split = polygons
+
+        return polygons
+
+    def plot_tiles(self, axes, *args, **kwargs):
+        """Plot the grid onto the given axes."""
+        # Add default arguments
+        if 'fc' not in kwargs and 'facecolor' not in kwargs:
+            kwargs['fc'] = 'tab:blue'
+        if 'ec' not in kwargs and 'edgecolor' not in kwargs:
+            kwargs['ec'] = 'black'
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.5
+
+        # Get polygons
+        if 'Mollweide' not in axes.__class__.__name__:
+            polygons = self._get_tile_polygons(meridian_split=False)
+        else:
+            polygons = self._get_tile_polygons(meridian_split=True)
+
+        # Create a Collection from the polygons, applying any arguments
+        transform = axes.get_transform('world')
+        collection = PatchCollection(polygons, transform=transform, *args, **kwargs)
+        axes.add_collection(collection)
+
+        return collection
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
@@ -783,64 +856,23 @@ class SkyGrid(object):
         axes.set_axisbelow(False)
         transform = axes.get_transform('world')
 
-        # We can't just plot the four corners (already saved under self.vertices) because that will
-        # plot straight lines between them. That will look bad, because we're on a sphere.
-        # Instead we get some intermediate points along the edges, so they look better when plotted.
-        # (Admittedly this is only obvious with very large tiles, but it's still good to do).
-        edge_points = get_tile_edges(self.coords, self.fov, edge_points=5)
-
-        # Create the tile polygons
-        polygons = []
-        new_tilenames = []
-        for points, tilename in zip(edge_points, self.tilenames):
-            # Convert point coordinates to ra,dec
-            ra, dec = points.ra.deg, points.dec.deg
-
-            # Check if the tile passes over the RA=0 line:
-            overlaps_meridian = any(ra < 90) and any(ra > 270)
-            if (not overlaps_meridian) or plot_type != 'mollweide':
-                # Need to reverse and transpose to get into the correct format for Polygon
-                polygons.append(Polygon(np.array((ra[::-1], dec[::-1])).T))
-                new_tilenames.append(tilename)
-            else:
-                # Annoyingly tiles that pass over the edge of the plot won't be filled
-                # This only applies in 'astro hours mollweide' mode
-                # The best workaround is to plot two Polygons, one on each side
-                ra1 = ra.copy()
-                ra1[ra < 180] = 360
-                polygons.append(Polygon(np.array((ra1[::-1], dec[::-1])).T))
-                ra2 = ra.copy()
-                ra2[ra > 180] = 0
-                polygons.append(Polygon(np.array((ra2[::-1], dec[::-1])).T))
-                # The reason for the tilename array is so we can colour both at once
-                # See where we deal with colours below, it hopefully makes sense there
-                new_tilenames.extend((tilename, tilename))
-        self._polygons = polygons
-        self._new_tilenames = new_tilenames
-
-        # Create a map between the original tiles and the polygons
-        new_indexes = [np.where(np.array(self.tilenames) == name)[0][0] for name in new_tilenames]
-        self._new_indexes = new_indexes
-
-        # Create a collection to plot all at once
-        polys = PatchCollection(polygons, transform=transform)
-
         # Plot the tiles
-        polys.set_facecolor('blue')
-        polys.set_edgecolor('none')
-        polys.set_linewidth(0)
-        polys.set_alpha(alpha)
-        polys.set_zorder(2)
-        axes.add_collection(polys)
+        tile_polys = self.plot_tiles(axes,
+                                     fc='blue',
+                                     ec='none',
+                                     lw=0,
+                                     alpha=alpha,
+                                     zorder=2,
+                                     )
 
         # Also plot on the lines over the top
-        polys2 = copy(polys)
-        polys2.set_facecolor('none')
-        polys2.set_edgecolor('black')
-        polys2.set_linewidth(0.5)
-        polys2.set_alpha(alpha)
-        polys2.set_zorder(3)
-        axes.add_collection(polys2)
+        edge_polys = self.plot_tiles(axes,
+                                     fc='none',
+                                     ec='black',
+                                     lw=0.5,
+                                     alpha=alpha,
+                                     zorder=3,
+                                     )
 
         # Plot tile names
         if tilenames is not None and text is None:
@@ -873,16 +905,22 @@ class SkyGrid(object):
             if self.skymap is None:
                 raise ValueError('SkyGrid does not have a SkyMap applied')
 
-            # Set the probability array to the color array, and use the LIGO colormap
-            # Plot underneath the other polys, so you can overlay the other tiles (e.g. visibility)
-            polys0 = copy(polys)
-            polys0.set_array(np.array(self.probs[new_indexes]))
-            polys0.set_cmap('cylon')
-            polys0.set_alpha(0.5)
-            polys0.set_zorder(1)
-            axes.add_collection(polys0)
-            fig.colorbar(polys0, ax=axes, fraction=0.02, pad=0.05)
-            polys.set_facecolor('none')
+            # Set the probability array to the color array
+            skymap_polys = self.plot_tiles(axes,
+                                           array=np.array(self.probs),
+                                           ec='none',
+                                           lw=0,
+                                           alpha=0.5,
+                                           zorder=1,
+                                           )
+
+            # Use the LIGO colormap
+            skymap_polys.set_cmap('cylon')
+            fig.colorbar(skymap_polys, ax=axes, fraction=0.02, pad=0.05)
+
+            # Plot underneath the other polygons, and make them transparent for now
+            # (unless overwritten later, e.g. for visability)
+            tile_polys.set_facecolor('none')
 
         if plot_contours is True:
             if self.skymap is None:
@@ -914,7 +952,7 @@ class SkyGrid(object):
 
         if plot_stats is True:
             # Colour in areas based on the number of tiles they are within
-            polys.set_facecolor('none')
+            tile_polys.set_facecolor('none')
 
             # Get count statistics and the coordinates of each pixel to plot
             count = self._get_pixel_count()
@@ -952,24 +990,23 @@ class SkyGrid(object):
             if isinstance(color, dict):
                 # Should be a dict with keys as tile names
                 try:
-                    color_array = np.array(['none'] * len(new_tilenames), dtype=object)
-                    for k in color.keys():
-                        # Thanks to the edge tiles there may be multiple Polygons with the same name
-                        i = [i for i, x in enumerate(new_tilenames) if x == k]
-                        color_array[i] = color[k]
-                    polys.set_facecolor(np.array(color_array))
+                    color_array = np.array(['none'] * self.ntiles, dtype=object)
+                    for name in color.keys():
+                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        color_array[index] = color[name]
+                    tile_polys.set_facecolor(np.array(color_array))
                 except Exception:
                     try:
                         # Create the color array
-                        color_array = np.array([np.nan] * len(new_tilenames))
-                        for k in color.keys():
-                            i = [i for i, x in enumerate(new_tilenames) if x == k]
-                            color_array[i] = color[k]
+                        color_array = np.array([np.nan] * self.ntiles)
+                        for name in color.keys():
+                            index = np.where(np.array(self.tilenames) == name)[0][0]
+                            color_array[index] = color[name]
                         color_array = np.array(color_array)
 
                         # Mask out the NaNs
                         masked_array = np.ma.masked_where(np.isnan(color_array), color_array)
-                        polys.set_array(masked_array)
+                        tile_polys.set_array(masked_array)
 
                         if discrete_colorbar:
                             # See above link in plot_stats
@@ -982,23 +1019,24 @@ class SkyGrid(object):
                                                      (colorbar_limits[1] + 1 -
                                                       colorbar_limits[0] + 1))
                             norm = BoundaryNorm(boundaries, cmap.N)
-                            polys.set_norm(norm)
+                            tile_polys.set_norm(norm)
                         else:
                             cmap = copy(plt.cm.viridis)
 
                         # Set the colors of the polygons
                         # Tiles with no data should stay white
                         cmap.set_bad(color='white')
-                        polys.set_cmap(cmap)
+                        tile_polys.set_cmap(cmap)
                         if colorbar_limits is not None:
-                            polys.set_clim(colorbar_limits[0], colorbar_limits[1])
+                            tile_polys.set_clim(colorbar_limits[0], colorbar_limits[1])
 
                         # Display the color bar
                         if colorbar_orientation.lower()[0] == 'h':
-                            cb = fig.colorbar(polys, ax=axes, fraction=0.03, pad=0.05, aspect=50,
+                            cb = fig.colorbar(tile_polys, ax=axes,
+                                              fraction=0.03, pad=0.05, aspect=50,
                                               orientation='horizontal')
                         else:
-                            cb = fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
+                            cb = fig.colorbar(tile_polys, ax=axes, fraction=0.02, pad=0.05)
                         if discrete_colorbar:
                             tick_labels = np.arange(colorbar_limits[0],
                                                     colorbar_limits[1] + 1,
@@ -1017,29 +1055,28 @@ class SkyGrid(object):
 
                 # Could be a list of weights or a list of colors
                 try:
-                    polys.set_facecolor(np.array(color[new_indexes]))
+                    tile_polys.set_facecolor(np.array(color))
                 except Exception:
                     try:
-                        polys.set_array(np.array(color[new_indexes]))
-                        fig.colorbar(polys, ax=axes, fraction=0.02, pad=0.05)
+                        tile_polys.set_array(np.array(color))
+                        fig.colorbar(tile_polys, ax=axes, fraction=0.02, pad=0.05)
                     except Exception:
                         raise ValueError('Invalid entries in color array')
 
             else:
                 # Might just be a string color name
-                polys.set_facecolor(color)
+                tile_polys.set_facecolor(color)
 
         # Plot tile linecolors
         if linecolor is not None:
             if isinstance(linecolor, dict):
                 # Should be a dict with keys as tile names
                 try:
-                    linecolor_array = np.array(['black'] * len(new_tilenames), dtype=object)
-                    for k in linecolor.keys():
-                        # Thanks to the edge tiles there may be multiple Polygons with the same name
-                        i = [i for i, x in enumerate(new_tilenames) if x == k]
-                        linecolor_array[i] = linecolor[k]
-                    polys2.set_edgecolor(np.array(linecolor_array))
+                    linecolor_array = np.array(['black'] * self.ntiles, dtype=object)
+                    for name in linecolor.keys():
+                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        linecolor_array[index] = linecolor[name]
+                    edge_polys.set_edgecolor(np.array(linecolor_array))
                 except Exception:
                     raise ValueError('Invalid entries in linecolor array')
 
@@ -1050,25 +1087,24 @@ class SkyGrid(object):
 
                 # Should be a list of color string
                 try:
-                    polys2.set_edgecolor(np.array(linecolor[new_indexes]))
+                    edge_polys.set_edgecolor(np.array(linecolor))
                 except Exception:
                     raise ValueError('Invalid entries in linecolor array')
 
             else:
                 # Might just be a string color name
-                polys2.set_edgecolor(linecolor)
+                edge_polys.set_edgecolor(linecolor)
 
         # Plot tile linewidths
         if linewidth is not None:
             if isinstance(linewidth, dict):
                 # Should be a dict with keys as tile names
                 try:
-                    linewidth_array = np.array([0.5] * len(new_tilenames))
-                    for k in linewidth.keys():
-                        # Thanks to the edge tiles there may be multiple Polygons with the same name
-                        i = [i for i, x in enumerate(new_tilenames) if x == k]
-                        linewidth_array[i] = linewidth[k]
-                    polys2.set_linewidth(np.array(linewidth_array))
+                    linewidth_array = np.array([0.5] * self.ntiles)
+                    for name in linewidth.keys():
+                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        linewidth_array[index] = linewidth[name]
+                    edge_polys.set_linewidth(np.array(linewidth_array))
                 except Exception:
                     raise ValueError('Invalid entries in linewidth array')
 
@@ -1079,13 +1115,13 @@ class SkyGrid(object):
 
                 # Should be a list of floats
                 try:
-                    polys2.set_linewidth(np.array(linewidth[new_indexes]))
+                    edge_polys.set_linewidth(np.array(linewidth))
                 except Exception:
                     raise ValueError('Invalid entries in linewidth array')
 
             else:
                 # Might just be a float
-                polys2.set_linewidth(linewidth)
+                edge_polys.set_linewidth(linewidth)
 
         # Highlight paticular tiles
         if highlight is not None:
@@ -1099,19 +1135,20 @@ class SkyGrid(object):
                 try:
                     if highlight_color is None:
                         highlight_color = 'blue'
-                    linecolor_array = np.array(['none'] * len(new_tilenames), dtype=object)
-                    linewidth_array = np.array([0] * len(new_tilenames))
-                    for k in highlight:
-                        i = [i for i, x in enumerate(new_tilenames) if x == k]
-                        linecolor_array[i] = highlight_color
-                        linewidth_array[i] = 1.5
-                    # Create polygons
-                    polys3 = copy(polys2)
-                    polys3.set_edgecolor(np.array(linecolor_array))
-                    polys3.set_linewidth(np.array(linewidth_array))
-                    polys3.set_alpha(0.5)
-                    polys3.set_zorder(9)
-                    axes.add_collection(polys3)
+                    linecolor_array = np.array(['none'] * self.ntiles, dtype=object)
+                    linewidth_array = np.array([0] * self.ntiles)
+                    for name in highlight:
+                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        linecolor_array[index] = highlight_color
+                        linewidth_array[index] = 1.5
+                    # Add polygons over normal lines
+                    self.plot_tiles(axes,
+                                    fc='none',
+                                    ec=np.array(linecolor_array),
+                                    lw=np.array(linewidth_array),
+                                    alpha=0.5,
+                                    zorder=9,
+                                    )
                     # Add to legend
                     if highlight_label is not None:
                         label = highlight_label + ' ({} tiles)'.format(len(highlight))
@@ -1133,20 +1170,21 @@ class SkyGrid(object):
                     else:
                         colors = highlight_color
                     for j, tilelist in enumerate(highlight):
-                        linecolor_array = np.array(['none'] * len(new_tilenames), dtype=object)
-                        linewidth_array = np.array([0] * len(new_tilenames))
-                        for k in tilelist:
-                            i = [i for i, x in enumerate(new_tilenames) if x == k]
+                        linecolor_array = np.array(['none'] * self.ntiles, dtype=object)
+                        linewidth_array = np.array([0] * self.ntiles)
+                        for name in tilelist:
+                            index = np.where(np.array(self.tilenames) == name)[0][0]
                             linecolor = colors[j % len(colors)]
-                            linecolor_array[i] = linecolor
-                            linewidth_array[i] = 1.5
-                        # Create polygons
-                        polys4 = copy(polys2)
-                        polys4.set_edgecolor(np.array(linecolor_array))
-                        polys4.set_linewidth(np.array(linewidth_array))
-                        polys4.set_alpha(0.5)
-                        polys4.set_zorder(9 + len(highlight) - j)
-                        axes.add_collection(polys4)
+                            linecolor_array[index] = linecolor
+                            linewidth_array[index] = 1.5
+                        # Add polygons over normal lines
+                        self.plot_tiles(axes,
+                                        fc='none',
+                                        ec=np.array(linecolor_array),
+                                        lw=np.array(linewidth_array),
+                                        alpha=0.5,
+                                        zorder=9 + len(highlight) - j,
+                                        )
                         # Add to legend
                         if highlight_label is not None:
                             label = highlight_label[j] + ' ({} tiles)'.format(len(tilelist))
