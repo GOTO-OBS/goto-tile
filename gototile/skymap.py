@@ -151,14 +151,17 @@ class SkyMap(object):
         self.coordsys = coordsys
 
         # Save pixel indices, Nside values and areas
-        self.ipix = np.arange(self.npix)
+        self.ipix = np.arange(self.npix, dtype=int)
         if self.is_moc:
             self.pix_nside = np.array([2 ** np.floor(np.log2(u / 4) / 2) for u in uniq], dtype=int)
+            self._nsides = set(self.pix_nside)  # Here to save time in query_polygon
+            # self.pix_order = np.log2(self.pix_nside)
+            self.pix_area = 4 * np.pi / (12 * np.array(self.pix_nside) ** 2)
         else:
-            self.pix_nside = np.array([self.nside] * self.npix, dtype=int)
-        self._nsides = set(self.pix_nside)  # Here to save time in query_polygon
-        self.pix_order = np.array(np.log2(self.pix_nside), dtype=int)
-        self.pix_area = 4 * np.pi / (12 * np.array(self.pix_nside) ** 2)
+            # self.pix_nside = np.array([self.nside] * self.npix, dtype=int)
+            self.pix_nside = np.full(self.npix, self.nside, dtype=int)
+            # self.pix_order = np.log2(self.pix_nside)
+            self.pix_area = np.full(self.npix, 4 * np.pi / (12 * self.nside ** 2))
 
         # Find the coordinates of each pixel
         self.coords = self._pix2coord(self.ipix)

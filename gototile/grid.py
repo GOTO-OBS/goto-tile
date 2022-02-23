@@ -235,7 +235,7 @@ class SkyGrid(object):
         probs = [np.sum(self.skymap.data[ipix]) for ipix in self.pixels]
         return np.array(probs)
 
-    def _get_tile_contours(self, prob_limit=7):
+    def _get_tile_contours(self, prob_limit=5):
         """Calculate the minimum contour level of each pixel.
 
         Unlike for SkyMaps (see `gototile.skymaptools.get_data_contours()`), the calculation for
@@ -306,7 +306,7 @@ class SkyGrid(object):
 
     def select_tiles(self, contour=0.9, max_tiles=None, min_tile_prob=None):
         """Select tiles based off of the given contour."""
-        if self.skymap is None:
+        if self.probs is None or self.contours is None:
             raise ValueError('SkyGrid does not have a SkyMap applied')
 
         # Initially mask to cover the entire given contour level
@@ -646,7 +646,7 @@ class SkyGrid(object):
         """Return a table containing grid statistics."""
         count = self._get_pixel_count(nside)
         counter = Counter(count)
-        in_tiles = [i for i in counter]
+        in_tiles = [int(i) for i in counter]
         npix = [counter[i] for i in counter]
         freq = [counter[i] / len(count) for i in counter]
 
