@@ -76,15 +76,18 @@ PACKAGES = ['gototile',
             ]
 
 REQUIRES = ['numpy',
+            'matplotlib',
             'astropy',
             'astroplan',
             'healpy',
             'mhealpy',
             'pandas',
-            'pyephem',
             'PyYAML',
+            'requests',
             'scipy',
             'ligo.skymap',
+            'shapely',
+            'descartes',
             ]
 
 setup(name='gototile',
