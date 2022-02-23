@@ -6,26 +6,31 @@ from copy import copy, deepcopy
 
 from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
 
-from astropy.coordinates import EarthLocation, SkyCoord
 from astropy import units as u
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.table import QTable
+
+from descartes import PolygonPatch
 
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
 from matplotlib import pyplot as plt
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
-from matplotlib.patches import Patch, Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
+from matplotlib.patches import Patch, Polygon
 
 import mhealpy as mhp
 
 import numpy as np
 
+from shapely.geometry import Polygon as sPolygon
+from shapely.ops import cascaded_union
+
 from .gridtools import create_grid
-from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .gridtools import get_tile_edges_astropy as get_tile_edges
+from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
@@ -652,6 +657,74 @@ class SkyGrid(object):
         table['freq'].format = '.2%'
         table = table.group_by('in_tiles')
         return table
+
+    def _get_tile_polygons(self, meridian_split=False):
+        """Create and cache Matplotlib Polygons to use when creating tile plots."""
+        # Used cached versions to save time when repeatedly plotting
+        if not meridian_split and hasattr(self, '_polygons'):
+            return self._polygons
+        elif meridian_split and hasattr(self, '_polygons_split'):
+            return self._polygons_split
+
+        # We can't just plot the four corners (already saved under self.vertices) because that will
+        # plot straight lines between them. That will look bad, because we're on a sphere.
+        # Instead we get some intermediate points along the edges, so they look better when plotted.
+        # (Admittedly this is only obvious with very large tiles, but it's still good to do).
+        if not hasattr(self, 'edges'):
+            self.edges = get_tile_edges(self.coords, self.fov, edge_points=5)
+
+        # Create the tile polygons
+        polygons = []
+        for ra, dec in zip(self.edges.ra.deg, self.edges.dec.deg):
+            # Check if the tile passes over the RA=0 line:
+            overlaps_meridian = any(ra < 90) and any(ra > 270)
+            if meridian_split and overlaps_meridian:
+                # Annoyingly, tiles that pass over the edges of the plot (at RA=0) won't be
+                # filled when using the 'astro hours mollweide' projection.
+                # The best workaround is to make two shapely Polygons, one on each side,
+                # then take the union and use descartes's PolygonPatch to get it back
+                # into the matplotlib format.
+                ra1 = ra.copy()
+                ra1[ra < 180] = 360
+                p1 = sPolygon(np.array((ra1[::-1], dec[::-1])).T)
+                ra2 = ra.copy()
+                ra2[ra > 180] = 0
+                p2 = sPolygon(np.array((ra2[::-1], dec[::-1])).T)
+                union = cascaded_union([p1, p2])
+                polygons.append(PolygonPatch(union))
+            else:
+                # Need to reverse and transpose to get into the correct format for Polygon
+                polygons.append(Polygon(np.array((ra[::-1], dec[::-1])).T))
+
+        if not meridian_split:
+            self._polygons = polygons
+        else:
+            self._polygons_split = polygons
+
+        return polygons
+
+    def plot_tiles(self, axes, *args, **kwargs):
+        """Plot the grid onto the given axes."""
+        # Add default arguments
+        if 'fc' not in kwargs and 'facecolor' not in kwargs:
+            kwargs['fc'] = 'tab:blue'
+        if 'ec' not in kwargs and 'edgecolor' not in kwargs:
+            kwargs['ec'] = 'black'
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.5
+
+        # Get polygons
+        if 'Mollweide' not in axes.__class__.__name__:
+            polygons = self._get_tile_polygons(meridian_split=False)
+        else:
+            polygons = self._get_tile_polygons(meridian_split=True)
+
+        # Create a Collection from the polygons, applying any arguments
+        transform = axes.get_transform('world')
+        collection = PatchCollection(polygons, transform=transform, *args, **kwargs)
+        axes.add_collection(collection)
+
+        return collection
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,

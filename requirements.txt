@@ -10,3 +10,5 @@ PyYAML
 requests
 scipy
 ligo.skymap
+shapely
+descartes
