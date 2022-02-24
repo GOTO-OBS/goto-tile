@@ -26,7 +26,7 @@ import mhealpy as mhp
 import numpy as np
 
 from shapely.geometry import Polygon as sPolygon
-from shapely.ops import cascaded_union
+from shapely.ops import unary_union
 
 from .gridtools import create_grid
 from .gridtools import get_tile_edges_astropy as get_tile_edges
@@ -690,7 +690,7 @@ class SkyGrid(object):
                 ra2 = ra.copy()
                 ra2[ra > 180] = 0
                 p2 = sPolygon(np.array((ra2[::-1], dec[::-1])).T)
-                union = cascaded_union([p1, p2])
+                union = unary_union([p1, p2])
                 polygons.append(PolygonPatch(union))
             else:
                 # Need to reverse and transpose to get into the correct format for Polygon
