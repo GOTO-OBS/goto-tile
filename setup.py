@@ -86,8 +86,6 @@ REQUIRES = ['numpy',
             'requests',
             'scipy',
             'ligo.skymap',
-            'shapely',
-            'descartes',
             ]
 
 setup(name='gototile',
