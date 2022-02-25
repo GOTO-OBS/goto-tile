@@ -9,5 +9,4 @@ include gototile/webtile/templates/gototile/skymap.html
 include README
 include VERSION
 include MANIFEST.in
-include requirements.txt
 include setup.py
