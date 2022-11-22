@@ -4,14 +4,15 @@ import itertools
 import math
 import multiprocessing
 
-import numpy as np
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+
 import healpy as hp
 
-from astropy.coordinates import SkyCoord
-from astropy import units as u
+import numpy as np
 
-from .math import spherical_to_cartesian, cartesian_to_spherical
-from .math import RAD, intersect, interpolate
+from .math import RAD
+from .math import cartesian_to_spherical, interpolate, intersect, spherical_to_cartesian
 
 
 def create_grid(fov, overlap, kind='minverlap'):
@@ -50,6 +51,7 @@ def create_grid(fov, overlap, kind='minverlap'):
                 Old, legacy algorithm.
                 This method creates lots of overlap between tiles at high decs,
                 which makes it impractical for survey purposes.
+
     """
     fov = fov.copy()
     overlap = overlap.copy()
@@ -312,7 +314,8 @@ def get_tile_vertices(coords, fov):
         ns = Dec
         l = lon = longitude = RA
         b = lat = latitude = Dec
-        """
+
+    """
     # Get latitude/longitude arrays in radians
     # (NB this isn't technically latitude/longitude,
     #  but it's what spherical coordinate formulae use)
@@ -424,6 +427,9 @@ def get_tile_edges(vertices, steps=5):
     ----------
     vertices : `numpy.ndarray`
         An array of shape (4,3) defining 4 vertices in cartesian coordinates.
+    steps : int, default=5
+        The number of steps along each tile edge
+
     """
     all_points = []
     # Loop through all four edges by rolling through the array of vertices and taking each pair
@@ -442,7 +448,7 @@ def get_tile_edges_astropy(centre, fov, edge_points=5):
         The coordinates of the tile centre.
     fov : dict
         The field of view of the tile, with keys of 'ra' and 'dec'
-    edge_points : int, edge_points=5
+    edge_points : int, default=5
         The number of points to find along each tile edge
         If edge_points=0 only the 4 corners will be returned
 
@@ -506,7 +512,7 @@ def get_tile_edges_astropy(centre, fov, edge_points=5):
     return points
 
 
-class PolygonQuery(object):
+class PolygonQuery:
     def __init__(self, nside, nested=True, inclusive=True):
         self.nside = nside
         self.nested = nested
@@ -526,7 +532,7 @@ def get_tile_pixels(vertices, nside=256, order='NESTED', inclusive=True):
 
     Parameters
     ----------
-    tile_vertices : `numpy.ndarray`
+    vertices : `numpy.ndarray`
         A 1D array containing arrays of shape (4,3) defining 4 vertices in cartesian coordinates,
         for each tile.
 
@@ -536,6 +542,7 @@ def get_tile_pixels(vertices, nside=256, order='NESTED', inclusive=True):
         The HEALPix ordering scheme to use
     inclusive : bool, default=True
         See `healpy.query_polygon`
+
     """
     nested = order == 'NESTED'
     polygon_query = PolygonQuery(nside, nested, inclusive)

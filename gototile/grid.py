@@ -40,7 +40,7 @@ NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
                }
 
 
-class SkyGrid(object):
+class SkyGrid:
     """An all-sky grid of defined tiles.
 
     Parameters
@@ -61,6 +61,7 @@ class SkyGrid(object):
     kind : str, optional
         The tiling method to use. See `gototile.gridtools.create_grid` for options.
         Default is 'minverlap'.
+
     """
 
     def __init__(self, fov, overlap=None, kind='minverlap'):
@@ -108,8 +109,8 @@ class SkyGrid(object):
 
         # Give the tiles unique ids
         self.tilenums = np.arange(self.ntiles) + 1
-        filllen = len(str(max(self.tilenums)))
-        self.tilenames = ['T' + str(num).zfill(filllen) for num in self.tilenums]
+        fill_len = len(str(max(self.tilenums)))
+        self.tilenames = ['T' + str(num).zfill(fill_len) for num in self.tilenums]
 
         # Properties waiting for a skymap to be applied
         self.skymap = None
@@ -126,7 +127,7 @@ class SkyGrid(object):
             return False
 
     def __ne__(self, other):
-        return not self == other
+        return self != other
 
     def __repr__(self):
         template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
@@ -153,6 +154,7 @@ class SkyGrid(object):
         -------
         `~gototile.grid.SkyGrid`
             SkyGrid object
+
         """
         if name.startswith('allsky'):
             try:
@@ -186,6 +188,9 @@ class SkyGrid(object):
         ----------
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
+        flatten : bool, default=False
+            If True, and a multi-order skymap is given, then flatten it before applying.
+
         """
         # Store a copy of the skymap on the class
         self.skymap = skymap.copy()
@@ -353,6 +358,7 @@ class SkyGrid(object):
         -------
         tilename : str or list of str
             The name(s) of the tile(s) the coordinates are within
+
         """
         # Handle both scalar and vector coordinates
         scalar = False
@@ -507,7 +513,7 @@ class SkyGrid(object):
         ----------
         tilenames : str or list of str
             The name(s) of the tile(s) to find the edges of.
-        steps : int, optional
+        edge_points : int, optional
             The number of points to find along each tile edge.
             If edge_points=0 only the 4 corners will be returned.
             Default=5.
@@ -621,7 +627,7 @@ class SkyGrid(object):
             return [self.get_area(tile) for tile in tilenames]
 
     def get_table(self):
-        """Return an astropy QTable containing infomation on the defined tiles.
+        """Return an astropy QTable containing information on the defined tiles.
 
         If a sky map has been applied to the grid the table will include a column with
             the contained probability within each tile.
@@ -1176,7 +1182,7 @@ class SkyGrid(object):
                 # Might just be a float
                 edge_patches.set_linewidth(linewidth)
 
-        # Highlight paticular tiles
+        # Highlight particular tiles
         if highlight is not None:
             if isinstance(highlight, str):
                 # Might just be one tile
