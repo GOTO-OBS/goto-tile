@@ -30,14 +30,17 @@ from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
-NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1)],
-               'GOTO-4': [(3.7, 4.9), (0.1, 0.1)],
-               'GOTO8p': [(7.8, 5.1), (0.1, 0.1)],
-               'GOTO-8p': [(7.8, 5.1), (0.1, 0.1)],
+NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
+               'GOTO-4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
+               'GOTO8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
+               'GOTO-8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
+               'GOTO8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
+               'GOTO-8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
+               'GOTO': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
                }
 
 
-class SkyGrid(object):
+class SkyGrid:
     """An all-sky grid of defined tiles.
 
     Parameters
@@ -58,6 +61,7 @@ class SkyGrid(object):
     kind : str, optional
         The tiling method to use. See `gototile.gridtools.create_grid` for options.
         Default is 'minverlap'.
+
     """
 
     def __init__(self, fov, overlap=None, kind='minverlap'):
@@ -105,8 +109,8 @@ class SkyGrid(object):
 
         # Give the tiles unique ids
         self.tilenums = np.arange(self.ntiles) + 1
-        filllen = len(str(max(self.tilenums)))
-        self.tilenames = ['T' + str(num).zfill(filllen) for num in self.tilenums]
+        fill_len = len(str(max(self.tilenums)))
+        self.tilenames = ['T' + str(num).zfill(fill_len) for num in self.tilenums]
 
         # Properties waiting for a skymap to be applied
         self.skymap = None
@@ -123,7 +127,7 @@ class SkyGrid(object):
             return False
 
     def __ne__(self, other):
-        return not self == other
+        return self != other
 
     def __repr__(self):
         template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
@@ -150,6 +154,7 @@ class SkyGrid(object):
         -------
         `~gototile.grid.SkyGrid`
             SkyGrid object
+
         """
         if name.startswith('allsky'):
             try:
@@ -162,12 +167,12 @@ class SkyGrid(object):
                                  'Name format should match ', template)
         else:
             if name in NAMED_GRIDS:
-                fov, overlap = NAMED_GRIDS[name]
+                fov, overlap, kind = NAMED_GRIDS[name]
             else:
                 raise ValueError(f'Grid name "{name}" not recognised, '
                                  'check SkyGrid.get_named_grids() for known grids.')
 
-        return cls(fov, overlap)
+        return cls(fov, overlap, kind)
 
     @staticmethod
     def get_named_grids():
@@ -183,6 +188,9 @@ class SkyGrid(object):
         ----------
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
+        flatten : bool, default=False
+            If True, and a multi-order skymap is given, then flatten it before applying.
+
         """
         # Store a copy of the skymap on the class
         self.skymap = skymap.copy()
@@ -350,6 +358,7 @@ class SkyGrid(object):
         -------
         tilename : str or list of str
             The name(s) of the tile(s) the coordinates are within
+
         """
         # Handle both scalar and vector coordinates
         scalar = False
@@ -504,7 +513,7 @@ class SkyGrid(object):
         ----------
         tilenames : str or list of str
             The name(s) of the tile(s) to find the edges of.
-        steps : int, optional
+        edge_points : int, optional
             The number of points to find along each tile edge.
             If edge_points=0 only the 4 corners will be returned.
             Default=5.
@@ -618,7 +627,7 @@ class SkyGrid(object):
             return [self.get_area(tile) for tile in tilenames]
 
     def get_table(self):
-        """Return an astropy QTable containing infomation on the defined tiles.
+        """Return an astropy QTable containing information on the defined tiles.
 
         If a sky map has been applied to the grid the table will include a column with
             the contained probability within each tile.
@@ -654,85 +663,89 @@ class SkyGrid(object):
         table = table.group_by('in_tiles')
         return table
 
-    def _get_tile_patches(self, meridian_split=False):
-        """Create and cache Matplotlib Patches to use when creating tile plots."""
+    def _get_tile_path(self, edge_coords, meridian_split=False):
+        """Create a Matplotlib Path for the given tile."""
+        ra = edge_coords.ra.deg
+        dec = edge_coords.dec.deg
+
+        # Check if the tile passes over the RA=0 line:
+        overlaps_meridian = any(ra < 90) and any(ra > 270)
+        if meridian_split and overlaps_meridian:
+            if any(np.logical_and(ra > 90, ra < 270)):
+                # This tile goes over the poles
+                # To get it to fill we need to add extra points at the pole itself
+                # First sort by RA
+                ra, dec = zip(*sorted(zip(ra, dec), key=lambda radec: radec[0]))
+
+                # Now add extra points
+                pole = 90 if np.all(np.array(dec) > 0) else -90
+                ra = np.array([0] + list(ra) + [360, 360])
+                dec = np.array([pole] + list(dec) + [dec[0], pole])
+
+                # Create the closed path
+                path = Path(np.array((ra, dec)).T, closed=True)
+
+            else:
+                # Tiles that pass over the edges of the plot (at RA=0) won't fill properly,
+                # they need to be split into two sections on either side.
+                # First create masks, with a little leeway on each side
+                mask_l = np.logical_or(ra <= 181, ra > 359)
+                mask_r = np.logical_or(ra < 1, ra >= 179)
+
+                # Now mask the arrays
+                ra_l = ra[mask_l]
+                dec_l = dec[mask_l]
+                ra_r = ra[mask_r]
+                dec_r = dec[mask_r]
+
+                # Set the points on the meridian to the correct values
+                ra_l[(ra_l < 1) | (ra_l > 359)] = 0
+                ra_r[(ra_r < 1) | (ra_r > 359)] = 360
+
+                # Add the first point on again to close
+                ra_l = list(ra_l) + [ra_l[0]]
+                dec_l = list(dec_l) + [dec_l[0]]
+                ra_r = list(ra_r) + [ra_r[0]]
+                dec_r = list(dec_r) + [dec_r[0]]
+
+                # Create the paths, then combine them
+                path_l = Path(np.array((ra_l, dec_l)).T, closed=True)
+                path_r = Path(np.array((ra_r, dec_r)).T, closed=True)
+                path = Path.make_compound_path(path_l, path_r)
+
+        else:
+            # Just make a normal closed path
+            path = Path(np.array((ra, dec)).T, closed=True)
+
+        return path
+
+    def _get_tile_paths(self, meridian_split=False):
+        """Create and cache Matplotlib Patches to use when plotting tiles."""
         # Used cached versions to save time when repeatedly plotting
-        if not meridian_split and hasattr(self, '_patches'):
-            return self._patches
-        elif meridian_split and hasattr(self, '_patches_split'):
-            return self._patches_split
+        if not meridian_split and hasattr(self, '_paths'):
+            return self._paths
+        elif meridian_split and hasattr(self, '_paths_split'):
+            return self._paths_split
 
         # We can't just plot the four corners (already saved under self.vertices) because that will
         # plot straight lines between them. That will look bad, because we're on a sphere.
         # Instead we get some intermediate points along the edges, so they look better when plotted.
         # (Admittedly this is only obvious with very large tiles, but it's still good to do).
         if not hasattr(self, 'edges'):
-            self.edges = get_tile_edges(self.coords, self.fov, edge_points=1)
+            self.edges = get_tile_edges(self.coords, self.fov, edge_points=4)
 
-        # Create matplotlib patches for the tile areas
-        patches = []
-        for ra, dec in zip(self.edges.ra.deg, self.edges.dec.deg):
-            # Check if the tile passes over the RA=0 line:
-            overlaps_meridian = any(ra < 90) and any(ra > 270)
-            if meridian_split and overlaps_meridian:
-                if any(np.logical_and(ra > 90, ra < 270)):
-                    # This tile goes over the poles
-                    # To get it to fill we need to add extra points at the pole itself
-                    # First sort by RA
-                    ra, dec = zip(*sorted(zip(ra, dec), key=lambda radec: radec[0]))
-
-                    # Now add extra points
-                    pole = 90 if np.all(np.array(dec) > 0) else -90
-                    ra = np.array([0] + list(ra) + [360, 360])
-                    dec = np.array([pole] + list(dec) + [dec[0], pole])
-
-                    # Create the closed path
-                    path = Path(np.array((ra, dec)).T, closed=True)
-
-                else:
-                    # Tiles that pass over the edges of the plot (at RA=0) won't fill properly,
-                    # they need to be split into two sections on either side.
-                    # First create masks, with a little leeway on each side
-                    mask_l = np.logical_or(ra <= 181, ra > 359)
-                    mask_r = np.logical_or(ra < 1, ra >= 179)
-
-                    # Now mask the arrays
-                    ra_l = ra[mask_l]
-                    dec_l = dec[mask_l]
-                    ra_r = ra[mask_r]
-                    dec_r = dec[mask_r]
-
-                    # Set the points on the meridian to the correct values
-                    ra_l[(ra_l < 1) | (ra_l > 359)] = 0
-                    ra_r[(ra_r < 1) | (ra_r > 359)] = 360
-
-                    # Add the first point on again to close
-                    ra_l = list(ra_l) + [ra_l[0]]
-                    dec_l = list(dec_l) + [dec_l[0]]
-                    ra_r = list(ra_r) + [ra_r[0]]
-                    dec_r = list(dec_r) + [dec_r[0]]
-
-                    # Create the paths, then combine them
-                    path_l = Path(np.array((ra_l, dec_l)).T, closed=True)
-                    path_r = Path(np.array((ra_r, dec_r)).T, closed=True)
-                    path = Path.make_compound_path(path_l, path_r)
-
-            else:
-                # Just make a normal closed path
-                path = Path(np.array((ra, dec)).T, closed=True)
-
-            # Create a patch from the path
-            patches.append(PathPatch(path))
+        # Get list of matplotlib paths for the tile areas
+        paths = [self._get_tile_path(edge_coords, meridian_split) for edge_coords in self.edges]
 
         if not meridian_split:
-            self._patches = patches
+            self._paths = paths
         else:
-            self._patches_split = patches
+            self._paths_split = paths
 
-        return patches
+        return paths
 
-    def plot_tiles(self, axes, *args, **kwargs):
-        """Plot the grid onto the given axes."""
+    def plot_tile(self, axes, tilename, *args, **kwargs):
+        """Plot a Patch for the tile onto the given axes."""
         # Add default arguments
         if 'fc' not in kwargs and 'facecolor' not in kwargs:
             kwargs['fc'] = 'tab:blue'
@@ -741,15 +754,42 @@ class SkyGrid(object):
         if 'lw' not in kwargs and 'linewidth' not in kwargs:
             kwargs['lw'] = 0.5
 
-        # Get patches
-        if 'Mollweide' not in axes.__class__.__name__:
-            patches = self._get_tile_patches(meridian_split=False)
-        else:
-            patches = self._get_tile_patches(meridian_split=True)
+        # Get tile paths (will be cached after the first use)
+        meridian_split = 'Mollweide' in axes.__class__.__name__
+        paths = self._get_tile_paths(meridian_split=meridian_split)
 
-        # Create a Collection from the patches, applying any arguments
-        transform = axes.get_transform('world')
-        collection = PatchCollection(patches, transform=transform, *args, **kwargs)
+        # Create a Patch, applying any arguments
+        index = self.tilenames.index(tilename)
+        path = paths[index]
+        patch = PathPatch(path,
+                          transform=axes.get_transform('world'),
+                          *args, **kwargs)
+        axes.add_patch(patch)
+
+        return patch
+
+    def plot_tiles(self, axes, tilenames=None, *args, **kwargs):
+        """Plot a PatchCollection for the grid tiles onto the given axes."""
+        # Add default arguments
+        if 'fc' not in kwargs and 'facecolor' not in kwargs:
+            kwargs['fc'] = 'tab:blue'
+        if 'ec' not in kwargs and 'edgecolor' not in kwargs:
+            kwargs['ec'] = 'black'
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.5
+
+        # Get tile paths (will be cached after the first use)
+        meridian_split = 'Mollweide' in axes.__class__.__name__
+        paths = self._get_tile_paths(meridian_split=meridian_split)
+
+        # Create a Patch Collection, applying any arguments
+        if tilenames is not None:
+            indexes = [self.tilenames.index(tilename) for tilename in tilenames]
+            paths = np.array(paths)[indexes]
+        patches = [PathPatch(path) for path in paths]
+        collection = PatchCollection(patches,
+                                     transform=axes.get_transform('world'),
+                                     *args, **kwargs)
         axes.add_collection(collection)
 
         return collection
@@ -902,26 +942,17 @@ class SkyGrid(object):
                                        zorder=3,
                                        )
 
-        # Plot tile names
-        if tilenames is not None and text is None:
-            # Should be a list of tilenames
-            for name in tilenames:
-                if name not in self.tilenames:
-                    continue
-                index = np.where(np.array(self.tilenames) == name)[0][0]
-                coord = self.coords[index]
-                plt.text(coord.ra.deg, coord.dec.deg, name,
-                         color='k', weight='bold', fontsize=6,
-                         ha='center', va='center', clip_on=True,
-                         transform=transform)
-
         # Plot text
+        if tilenames is not None and text is None:
+            # Use the tilenames as the text
+            text = {tilename: tilename for tilename in tilenames}
         if text:
             # Should be a dict with keys as tile names
             for name in text:
-                if name not in self.tilenames:
+                try:
+                    index = self.tilenames.index(name)
+                except ValueError:
                     continue
-                index = np.where(np.array(self.tilenames) == name)[0][0]
                 coord = self.coords[index]
                 plt.text(coord.ra.deg, coord.dec.deg, str(text[name]),
                          color='k', weight='bold', fontsize=6,
@@ -947,7 +978,7 @@ class SkyGrid(object):
             fig.colorbar(skymap_patches, ax=axes, fraction=0.02, pad=0.05)
 
             # Plot underneath the other patches, and make them transparent for now
-            # (unless overwritten later, e.g. for visability)
+            # (unless overwritten later, e.g. for visibility)
             tile_patches.set_facecolor('none')
 
         if plot_contours is True:
@@ -1020,7 +1051,7 @@ class SkyGrid(object):
                 try:
                     color_array = np.array(['none'] * self.ntiles, dtype=object)
                     for name in color.keys():
-                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        index = self.tilenames.index(name)
                         color_array[index] = color[name]
                     tile_patches.set_facecolor(np.array(color_array))
                 except Exception:
@@ -1028,7 +1059,7 @@ class SkyGrid(object):
                         # Create the color array
                         color_array = np.array([np.nan] * self.ntiles)
                         for name in color.keys():
-                            index = np.where(np.array(self.tilenames) == name)[0][0]
+                            index = self.tilenames.index(name)
                             color_array[index] = color[name]
                         color_array = np.array(color_array)
 
@@ -1102,7 +1133,7 @@ class SkyGrid(object):
                 try:
                     linecolor_array = np.array(['black'] * self.ntiles, dtype=object)
                     for name in linecolor.keys():
-                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        index = self.tilenames.index(name)
                         linecolor_array[index] = linecolor[name]
                     edge_patches.set_edgecolor(np.array(linecolor_array))
                 except Exception:
@@ -1130,7 +1161,7 @@ class SkyGrid(object):
                 try:
                     linewidth_array = np.array([0.5] * self.ntiles)
                     for name in linewidth.keys():
-                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        index = self.tilenames.index(name)
                         linewidth_array[index] = linewidth[name]
                     edge_patches.set_linewidth(np.array(linewidth_array))
                 except Exception:
@@ -1151,7 +1182,7 @@ class SkyGrid(object):
                 # Might just be a float
                 edge_patches.set_linewidth(linewidth)
 
-        # Highlight paticular tiles
+        # Highlight particular tiles
         if highlight is not None:
             if isinstance(highlight, str):
                 # Might just be one tile
@@ -1166,7 +1197,7 @@ class SkyGrid(object):
                     linecolor_array = np.array(['none'] * self.ntiles, dtype=object)
                     linewidth_array = np.array([0] * self.ntiles)
                     for name in highlight:
-                        index = np.where(np.array(self.tilenames) == name)[0][0]
+                        index = self.tilenames.index(name)
                         linecolor_array[index] = highlight_color
                         linewidth_array[index] = 1.5
                     # Add patches over normal lines
@@ -1201,7 +1232,7 @@ class SkyGrid(object):
                         linecolor_array = np.array(['none'] * self.ntiles, dtype=object)
                         linewidth_array = np.array([0] * self.ntiles)
                         for name in tilelist:
-                            index = np.where(np.array(self.tilenames) == name)[0][0]
+                            index = self.tilenames.index(name)
                             linecolor = colors[j % len(colors)]
                             linecolor_array[index] = linecolor
                             linewidth_array[index] = 1.5
