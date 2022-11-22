@@ -670,7 +670,7 @@ class SkyGrid(object):
         # Instead we get some intermediate points along the edges, so they look better when plotted.
         # (Admittedly this is only obvious with very large tiles, but it's still good to do).
         if not hasattr(self, 'edges'):
-            self.edges = get_tile_edges(self.coords, self.fov, edge_points=1)
+            self.edges = get_tile_edges(self.coords, self.fov, edge_points=4)
 
         # Create matplotlib patches for the tile areas
         patches = []
@@ -733,6 +733,31 @@ class SkyGrid(object):
             self._patches_split = patches
 
         return patches
+
+    def plot_tile(self, axes, tilename, *args, **kwargs):
+        """Plot the tile onto the given axes."""
+        # Add default arguments
+        if 'fc' not in kwargs and 'facecolor' not in kwargs:
+            kwargs['fc'] = 'tab:blue'
+        if 'ec' not in kwargs and 'edgecolor' not in kwargs:
+            kwargs['ec'] = 'black'
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.5
+
+        # Get patch
+        index = np.where(np.array(self.tilenames) == tilename)[0][0]
+        if 'Mollweide' not in axes.__class__.__name__:
+            patch = self._get_tile_patches(meridian_split=False)[index]
+        else:
+            patch = self._get_tile_patches(meridian_split=True)[index]
+
+        # Create a Collection from the patch, applying any arguments
+        # TODO: This is a bit of a bodge, could pass args to _get_patches?
+        transform = axes.get_transform('world')
+        collection = PatchCollection([patch], transform=transform, *args, **kwargs)
+        axes.add_collection(collection)
+
+        return collection
 
     def plot_tiles(self, axes, *args, **kwargs):
         """Plot the grid onto the given axes."""
