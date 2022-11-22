@@ -30,10 +30,13 @@ from .gridtools import get_tile_vertices_astropy as get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
-NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1)],
-               'GOTO-4': [(3.7, 4.9), (0.1, 0.1)],
-               'GOTO8p': [(7.8, 5.1), (0.1, 0.1)],
-               'GOTO-8p': [(7.8, 5.1), (0.1, 0.1)],
+NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
+               'GOTO-4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
+               'GOTO8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
+               'GOTO-8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
+               'GOTO8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
+               'GOTO-8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
+               'GOTO': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
                }
 
 
@@ -162,12 +165,12 @@ class SkyGrid(object):
                                  'Name format should match ', template)
         else:
             if name in NAMED_GRIDS:
-                fov, overlap = NAMED_GRIDS[name]
+                fov, overlap, kind = NAMED_GRIDS[name]
             else:
                 raise ValueError(f'Grid name "{name}" not recognised, '
                                  'check SkyGrid.get_named_grids() for known grids.')
 
-        return cls(fov, overlap)
+        return cls(fov, overlap, kind)
 
     @staticmethod
     def get_named_grids():
