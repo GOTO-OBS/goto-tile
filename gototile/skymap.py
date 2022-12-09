@@ -7,8 +7,8 @@ from copy import deepcopy
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.time import Time
 from astropy.table import QTable
+from astropy.time import Time
 
 import healpy as hp
 
@@ -24,11 +24,11 @@ import numpy as np
 
 from . import settings
 from .gaussian import create_gaussian_map
-from .skymaptools import coord2pix, pix2coord, get_data_contours
+from .skymaptools import coord2pix, get_data_contours, pix2coord
 
 
 def read_colormaps(name='cylon'):
-    """Read special color maps, such as 'cylon'"""
+    """Read special color maps, such as 'cylon'."""
     from matplotlib import cm
     from matplotlib.colors import LinearSegmentedColormap
     filename = os.path.join(settings.DATA_DIR, name + '.csv')
@@ -39,7 +39,7 @@ def read_colormaps(name='cylon'):
     cm.register_cmap(cmap=cmap)
 
 
-class SkyMap(object):
+class SkyMap:
     """A probability skymap.
 
     This class is a wrapper around the `~mhealpy.HealpixMap` class, which supports MOC skymaps.
@@ -57,6 +57,7 @@ class SkyMap(object):
             around the given position.
 
     """
+
     def __init__(self, data, order, coordsys='C', uniq=None, density=False):
         # Check types
         if not isinstance(data, np.ndarray):
@@ -93,11 +94,11 @@ class SkyMap(object):
             return False
 
     def __ne__(self, other):
-        return not self == other
+        return self != other
 
     def __mul__(self, other):
         if not isinstance(other, self.__class__):
-            raise ValueError('SkyMaps can only be multipled by other SkyMaps')
+            raise ValueError('SkyMaps can only be multiplied by other SkyMaps')
 
         result = self.copy()
         other_copy = other.copy()
@@ -190,7 +191,7 @@ class SkyMap(object):
 
     @property
     def skymap(self):
-        # backwards-compatable equivalent of SkyMap.data
+        # backwards-compatible equivalent of SkyMap.data
         return self.healpix.data
 
     @property
@@ -215,7 +216,7 @@ class SkyMap(object):
 
     @property
     def isnested(self):
-        # backwards-compatable equivalent of SkyMap.is_nested
+        # backwards-compatible equivalent of SkyMap.is_nested
         return self.healpix.is_nested
 
     @property
@@ -256,7 +257,7 @@ class SkyMap(object):
         data_field : int, default=None
             Field number to read the skymap data from.
             If not given data will be read from field 0 by default, UNLESS the first field
-            is labled 'UNIQ' in which case it's a multi-order map and the data should be in
+            is labeled 'UNIQ' in which case it's a multi-order map and the data should be in
             field 1.
         density : bool or None, default=None
             Is the skymap data given in individual counts per pixel (histogram) or as a density
@@ -268,6 +269,7 @@ class SkyMap(object):
         -------
         `~gototile.skymap.SkyMap``
             SkyMap object.
+
         """
         # If a path has been given then open the file
         file_open = False
@@ -379,6 +381,7 @@ class SkyMap(object):
         -------
         `~gototile.skymap.SkyMap``
             SkyMap object.
+
         """
         if not isinstance(data, np.ndarray):
             data = np.array(data)
@@ -406,6 +409,7 @@ class SkyMap(object):
         -------
         `~gototile.skymap.SkyMap``
             SkyMap object.
+
         """
         # Create an Astropy SkyCoord at the peak
         peak = SkyCoord(ra, dec, unit='deg')
@@ -427,6 +431,7 @@ class SkyMap(object):
         overwrite : bool, optional
             If True, existing file is silently overwritten.
             Otherwise trying to write an existing file raises an OSError.
+
         """
         warnings.filterwarnings('ignore', category=fits.verify.VerifyWarning)
         if self.header is not None:
@@ -447,7 +452,8 @@ class SkyMap(object):
         """Up- or downgrade the sky map HEALPix resolution, or change the pixel ordering.
 
         Note this function can flatten multi-order skymaps (i.e. convert from NUNIQ to NESTED or
-        RING ordering), but not the other way around (i.e. convert flat slymaps to multi-order).
+        RING ordering), but not the other way around (i.e. convert flat skymaps to multi-order).
+
         """
         if nside is None:
             nside = self.nside
@@ -468,11 +474,12 @@ class SkyMap(object):
         """Convert coordinate systems.
 
         Parameters
-        ------------
+        ----------
         coordsys : str
             First character is the coordinate system to convert to.
             As in HEALPIX, allowed coordinate systems are:
             'G' (galactic), 'E' (ecliptic) or 'C' (equatorial)
+
         """
         if self.coordsys == coordsys:
             return
@@ -514,6 +521,7 @@ class SkyMap(object):
             Position coordinates.
         radius : float, optional
             If given, the radius in degrees of a circle to integrate the skymap within.
+
         """
         # Find distance to points
         sep = np.array(coord.separation(self.coords))
@@ -534,6 +542,7 @@ class SkyMap(object):
         ----------
         coord : `astropy.coordinates.SkyCoord`
             Position coordinates.
+
         """
         # Get the pixel that the coordinates are within
         ipix = self._coord2pix(coord)
@@ -549,6 +558,7 @@ class SkyMap(object):
             Position coordinates.
         contour_level : float
             The contour level to query.
+
         """
         contour = self.get_contour(coord)
 
@@ -602,6 +612,7 @@ class SkyMap(object):
         -------
         area : int
             The total area covered by the given pixel(s).
+
         """
         areas = self.get_pixel_areas(ipix)
         if isinstance(areas, int):
@@ -616,6 +627,7 @@ class SkyMap(object):
         ----------
         contour_level : float
             The contour level to query.
+
         """
         # Get pixels within that contour level
         ipix = self.ipix[self.contours < contour_level]
@@ -624,13 +636,15 @@ class SkyMap(object):
         return self.get_pixel_area(ipix)
 
     def query_polygon(self, vertices, inclusive=True, fact=32):
-        """Returns the pixels whose centers lie within the convex polygon defined
-        by the vertices array (if inclusive is False), or which overlap with
-        this polygon (if inclusive is True).
+        """Return pixels within a convex polygon.
+
+        If inclusive is False return pixels with centers within the polygon.
+        If inclusive is True return pixels which overlap with the polygon.
 
         Note `vertices` must be in cartesian coordinates.
 
         See `healpy.query_polygon` or `mhealpy.HealpixMap.query_polygon` for details.
+
         """
         if self.is_moc:
             # Unfortunately `mhealpy.HealpixMap.query_polygon` is *INCREDIBLY* slow for MOC maps.
@@ -653,7 +667,7 @@ class SkyMap(object):
             return ipix
 
     def get_table(self):
-        """Return an astropy QTable containing infomation on the skymap pixels."""
+        """Return an astropy QTable containing information on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'value', 'area']
         col_data = [self.ipix, self.coords.ra, self.coords.dec, self.data,
                     self.pix_area * (180 / np.pi) * u.deg * u.deg]
@@ -665,7 +679,7 @@ class SkyMap(object):
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
-             coordinates=None, plot_contours=True, contour_levels=[0.5, 0.9],
+             coordinates=None, plot_contours=True, contour_levels=None,
              plot_pixels=False, plot_colorbar=False):
         """Plot the skymap.
 
@@ -714,12 +728,13 @@ class SkyMap(object):
 
         plot_colorbar : bool, default = False
             plot a colorbar on the figure
+
         """
         fig = plt.figure(figsize=figsize, dpi=dpi)
 
         # Can only plot in equatorial coordinates
         # If it's not, temporarily rotate into equatorial and then go back afterwards
-        if not self.coordsys == 'C':
+        if self.coordsys != 'C':
             old_coordsys = self.coordsys
             self.rotate('C')
         else:
@@ -747,6 +762,8 @@ class SkyMap(object):
 
         # Plot 50% and 90% contours
         if plot_contours:
+            if contour_levels is None:
+                contour_levels = [0.5, 0.9]
             contour_levels = sorted(contour_levels)
             if not self.is_moc:
                 cs = axes.contour_hpx(self.contours / max(self.contours), nested=self.is_nested,

@@ -5,11 +5,11 @@ import multiprocessing
 import os
 from functools import lru_cache
 
-from astropy.coordinates import SkyCoord, AltAz
-from astropy.time import Time, TimeDelta
-from astropy.table import QTable
 from astropy import units
 from astropy import units as u
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.table import QTable
+from astropy.time import Time, TimeDelta
 from astropy.utils import iers
 
 import ephem
@@ -18,8 +18,8 @@ import healpy as hp
 
 import numpy as np
 
-from . import settings
 from . import math
+from . import settings
 from . import utils
 
 
@@ -118,6 +118,7 @@ def coord2pix(nside, coord, nest=False):
     See Also
     --------
     pix2coord, `healpy.ang2pix`
+
     """
     # Convert sky coordinates to angles
     theta = 0.5 * np.pi - coord.dec.rad
@@ -151,6 +152,7 @@ def pix2coord(nside, ipix, nest=False):
     See Also
     --------
     coord2pix, `healpy.pix2ang`
+
     """
     # Check types
     if isinstance(nside, (list, np.ndarray)):
@@ -164,14 +166,15 @@ def pix2coord(nside, ipix, nest=False):
 
 @lru_cache(maxsize=128)
 def _pix2coord_cached(nside, ipix, nest=False):
-    """The same as pix2coord, but the results of this function are cached.
+    """Convert pixel index or indices to sky coordinates, and cache the results.
 
-    This uses the `functools.lru_cache` decorator.
+    This is the same as pix2coord, but uses the `functools.lru_cache` decorator.
 
     It's useful as this function is often called with the same arguments
     when creating multiple skymaps with the same resolution.
 
     Unfortunately that requires hashable inputs, so need to convert lists and arrays to tuples.
+
     """
     # Get angular coordinates from healpy
     theta, phi = hp.pix2ang(nside, ipix, nest)
