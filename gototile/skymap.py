@@ -150,7 +150,7 @@ class SkyMap(object):
         # Save coordsys (not considered by mhealpy)
         self.coordsys = coordsys
 
-        # Save pixel indices, Nside values and areas
+        # Save pixel indices, Nside values and areas (in steradians)
         self.ipix = np.arange(self.npix, dtype=int)
         if self.is_moc:
             self.pix_nside = np.array([2 ** np.floor(np.log2(u / 4) / 2) for u in uniq], dtype=int)
@@ -167,7 +167,22 @@ class SkyMap(object):
         self.coords = self._pix2coord(self.ipix)
 
         # Calculate the pixel contour levels
-        self.contours = get_data_contours(self.data)
+        # See skymaptools.get_data_contours for explanation
+        if not self.density:
+            self.contours = get_data_contours(self.data)
+            self.density_contours = None
+        else:
+            # For density skymaps things are a bit more complicated, because you could either want
+            # the density contours or the underlying data contours.
+            self.density_contours = get_data_contours(self.data)
+            # But what we normally want are the data (e.g. probability) contours.
+            # For them we want to sort by the density, but then actually use the count values
+            sorted_ipix = np.flipud(np.argsort(self.data))
+            sorted_data = (self.data * self.pix_area)[sorted_ipix]  # note here we convert to counts
+            sorted_contours = np.cumsum(sorted_data)
+            np.roll(sorted_contours, 1)
+            sorted_contours[0] = 0
+            self.contours = sorted_contours[np.argsort(sorted_ipix)]
 
     @property
     def data(self):
