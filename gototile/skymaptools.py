@@ -5,11 +5,11 @@ import multiprocessing
 import os
 from functools import lru_cache
 
-from astropy.coordinates import SkyCoord, AltAz
-from astropy.time import Time, TimeDelta
-from astropy.table import QTable
 from astropy import units
 from astropy import units as u
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.table import QTable
+from astropy.time import Time, TimeDelta
 from astropy.utils import iers
 
 import ephem
@@ -18,16 +18,17 @@ import healpy as hp
 
 import numpy as np
 
-from . import settings
 from . import math
+from . import settings
 from . import utils
 
 
-def get_data_contours(data):
+def get_data_contours(data, min_zero=True):
     """Calculate the minimum contour level of each pixel in a given skymap data array.
 
     This is done using the cumulative sum method, (vaguely) based on code from
-    http://www.virgo-gw.eu/skymap.html
+    http://www.virgo-gw.eu/skymap.html or
+    ligo.skymap.postprocess.util.find_greedy_credible_levels().
 
     For example, consider a very small, normalised skymap with the following table:
 
@@ -54,6 +55,9 @@ def get_data_contours(data):
        3 |   0.2 |  0.7
        1 |   0.1 |  0.9
 
+    This shift is apparently controversial, since the ligo.skymap function is identical just
+    without the shift. The actual effect is very small, but I think it makes more sense to include.
+
     Consider asking for the minimum number of pixels to cover increasing contour levels:
         -  0%-40%: you only need pixel 2
         - 40%-70%: you need pixels 2 & 3
@@ -74,21 +78,23 @@ def get_data_contours(data):
     If you select the pixels for which contour(pixel) < percentage you will always cover
     AT LEAST percentage (you may well cover more of course).
     """
-    # Get the indices sorted by value (reversed, so highest first)
-    # Note 'ipix' are the index numbers of the data array, i.e. the value of pixel X = self.data[X]
-    sorted_ipix = data.argsort()[::-1]
+    # Get the pixel indices sorted by each pixel's value (but reversed, so highest first)
+    # Note 'ipix' are the index numbers of the data array,i.e. the value of pixel X = self.data[X]
+    sorted_ipix = np.flipud(np.argsort(data))
 
     # Sort the data using this mapping
     sorted_data = data[sorted_ipix]
 
     # Create cumulative sum array of each pixel in the array
-    cumulative_data = np.cumsum(sorted_data)
+    sorted_contours = np.cumsum(sorted_data)
 
-    # Shift so we start at 0
-    sorted_contours = np.append([0], cumulative_data[:-1])
+    if min_zero:
+        # Shift so we start at 0
+        np.roll(sorted_contours, 1)
+        sorted_contours[0] = 0
 
     # "Un-sort" the contour array back to the normal pixel order
-    contours = sorted_contours[sorted_ipix.argsort()]
+    contours = sorted_contours[np.argsort(sorted_ipix)]
     return contours
 
 
@@ -112,6 +118,7 @@ def coord2pix(nside, coord, nest=False):
     See Also
     --------
     pix2coord, `healpy.ang2pix`
+
     """
     # Convert sky coordinates to angles
     theta = 0.5 * np.pi - coord.dec.rad
@@ -145,6 +152,7 @@ def pix2coord(nside, ipix, nest=False):
     See Also
     --------
     coord2pix, `healpy.pix2ang`
+
     """
     # Check types
     if isinstance(nside, (list, np.ndarray)):
@@ -158,14 +166,15 @@ def pix2coord(nside, ipix, nest=False):
 
 @lru_cache(maxsize=128)
 def _pix2coord_cached(nside, ipix, nest=False):
-    """The same as pix2coord, but the results of this function are cached.
+    """Convert pixel index or indices to sky coordinates, and cache the results.
 
-    This uses the `functools.lru_cache` decorator.
+    This is the same as pix2coord, but uses the `functools.lru_cache` decorator.
 
     It's useful as this function is often called with the same arguments
     when creating multiple skymaps with the same resolution.
 
     Unfortunately that requires hashable inputs, so need to convert lists and arrays to tuples.
+
     """
     # Get angular coordinates from healpy
     theta, phi = hp.pix2ang(nside, ipix, nest)
