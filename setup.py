@@ -86,6 +86,7 @@ REQUIRES = ['numpy',
             'requests',
             'scipy',
             'ligo.skymap',
+            'ephem',
             ]
 
 setup(name='gototile',
