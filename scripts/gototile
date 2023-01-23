@@ -264,8 +264,8 @@ if __name__ == '__main__':
 
     # Select the grid based on the system
     if args.telescope in SkyGrid.get_named_grids():
-        fov, overlap = SkyGrid.get_named_grids()[args.telescope]
-        print(f'Using defined sky grid "{args.telescope}": fov={fov}, overlap={overlap}')
+        fov, overlap, kind = SkyGrid.get_named_grids()[args.telescope]
+        print(f'Using defined sky grid "{args.telescope}": fov={fov}, overlap={overlap}, kind={kind}')
         grid = SkyGrid(fov, overlap)
     elif args.grid:
         fov = (args.grid[0], args.grid[1])
