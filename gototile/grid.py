@@ -1284,7 +1284,7 @@ class SkyGrid:
                                                                      self.overlap['ra'],
                                                                      self.overlap['dec'])
             if plot_skymap and self.skymap is not None:
-                title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
+                title += '\n' + 'with skymap'
         axes.set_title(title, y=1.05)
 
         # Save or show

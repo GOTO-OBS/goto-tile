@@ -8,7 +8,6 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import QTable
-from astropy.time import Time
 
 import healpy as hp
 
@@ -70,15 +69,8 @@ class SkyMap:
             raise ValueError(f'UNIQ pixel indices (n={len(uniq)} do not match data (n={len(data)})')
 
         # Create empty attributes (filled by from_fits)
-        self.header = None
         self.filename = None
-        self.object = 'unknown'
-        self.objid = 'unknown'
-        self.date_det = None
-
-        # Store creation time
-        self.date = Time.now()
-        self.mjd = self.date.mjd
+        self.header = None
 
         # Parse and store the data
         self._save_data(data, order, coordsys, uniq, density)
@@ -337,19 +329,6 @@ class SkyMap:
             skymap.filename = fits_file
             if fits_file.startswith('http'):
                 skymap.header['url'] = fits_file
-
-        # Get object name, or filename if it isn't in the header
-        if 'object' in skymap.header:
-            skymap.object = skymap.header['object']
-        elif skymap.filename is not None:
-            skymap.object = os.path.basename(skymap.filename).split('.')[0]
-        skymap.objid = skymap.object
-
-        # Store event time, if there is one in the header
-        if 'date-obs' in skymap.header:
-            skymap.date_det = Time(skymap.header['date-obs'])
-        else:
-            skymap.date_det = skymap.date
 
         return skymap
 
@@ -808,7 +787,7 @@ class SkyMap:
 
         # Set title
         if title is None:
-            title = 'Skymap for trigger {}'.format(self.objid)
+            title = 'Skymap'
         axes.set_title(title, y=1.05)
 
         # Save or show
