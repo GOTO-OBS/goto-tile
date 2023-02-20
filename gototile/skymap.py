@@ -93,9 +93,6 @@ class SkyMap:
         except AttributeError:
             return False
 
-    def __ne__(self, other):
-        return self != other
-
     def __mul__(self, other):
         if not isinstance(other, self.__class__):
             raise ValueError('SkyMaps can only be multiplied by other SkyMaps')

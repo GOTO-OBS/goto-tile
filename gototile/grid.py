@@ -126,9 +126,6 @@ class SkyGrid:
         except AttributeError:
             return False
 
-    def __ne__(self, other):
-        return self != other
-
     def __repr__(self):
         template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
         return template.format(self.fov['ra'].value, self.fov['dec'].value,
