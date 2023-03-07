@@ -20,8 +20,6 @@ from matplotlib.colors import BoundaryNorm
 from matplotlib.patches import Patch, PathPatch
 from matplotlib.path import Path
 
-import mhealpy as mhp
-
 import numpy as np
 
 from .gridtools import create_grid
@@ -125,9 +123,6 @@ class SkyGrid:
                     self.kind == other.kind)
         except AttributeError:
             return False
-
-    def __ne__(self, other):
-        return self != other
 
     def __repr__(self):
         template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
@@ -988,26 +983,8 @@ class SkyGrid:
             # Plot the 50% and 90% skymap contours
             # Taken from SkyMap.plot()
             contour_levels = [0.5, 0.9]
-            if not self.skymap.is_moc:
-                axes.contour_hpx(self.skymap.contours / max(self.skymap.contours),
-                                 nested=self.skymap.is_nested,
-                                 levels=contour_levels,
-                                 colors='black', linewidths=0.5, zorder=99,)
-            else:
-                # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
-                # this convoluted method creates a flat skymap based on the actual contour levels,
-                # so it should match the moc contour levels
-                sm = self.skymap.copy()
-                sm.density = True
-                mask = np.zeros(len(sm.contours))
-                for level in contour_levels:
-                    mask += np.array(sm.contours / max(sm.contours) > level,
-                                     dtype=int)
-                healpix = mhp.HealpixMap(mask, sm.uniq, scheme='NUNIQ', density=True)
-                contour_data = healpix.rasterize(128, 'NESTED').data
-                axes.contour_hpx(contour_data, nested=True,
-                                 levels=[i + 0.5 for i in range(len(contour_levels))],
-                                 colors='black', linewidths=0.5, zorder=99,)
+            self.skymap.plot_contours(axes, contour_levels=contour_levels,
+                                      colors='black', linewidths=0.5, zorder=99)
 
         if plot_stats is True:
             # Colour in areas based on the number of tiles they are within
@@ -1287,7 +1264,7 @@ class SkyGrid:
                                                                      self.overlap['ra'],
                                                                      self.overlap['dec'])
             if plot_skymap and self.skymap is not None:
-                title += '\n' + 'with skymap for trigger {}'.format(self.skymap.objid)
+                title += '\n' + 'with skymap'
         axes.set_title(title, y=1.05)
 
         # Save or show

@@ -8,7 +8,6 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import QTable
-from astropy.time import Time
 
 import healpy as hp
 
@@ -70,15 +69,8 @@ class SkyMap:
             raise ValueError(f'UNIQ pixel indices (n={len(uniq)} do not match data (n={len(data)})')
 
         # Create empty attributes (filled by from_fits)
-        self.header = None
         self.filename = None
-        self.object = 'unknown'
-        self.objid = 'unknown'
-        self.date_det = None
-
-        # Store creation time
-        self.date = Time.now()
-        self.mjd = self.date.mjd
+        self.header = None
 
         # Parse and store the data
         self._save_data(data, order, coordsys, uniq, density)
@@ -92,9 +84,6 @@ class SkyMap:
                     self.coordsys == other.coordsys)
         except AttributeError:
             return False
-
-    def __ne__(self, other):
-        return self != other
 
     def __mul__(self, other):
         if not isinstance(other, self.__class__):
@@ -340,19 +329,6 @@ class SkyMap:
             skymap.filename = fits_file
             if fits_file.startswith('http'):
                 skymap.header['url'] = fits_file
-
-        # Get object name, or filename if it isn't in the header
-        if 'object' in skymap.header:
-            skymap.object = skymap.header['object']
-        elif skymap.filename is not None:
-            skymap.object = os.path.basename(skymap.filename).split('.')[0]
-        skymap.objid = skymap.object
-
-        # Store event time, if there is one in the header
-        if 'date-obs' in skymap.header:
-            skymap.date_det = Time(skymap.header['date-obs'])
-        else:
-            skymap.date_det = skymap.date
 
         return skymap
 
@@ -677,6 +653,39 @@ class SkyMap:
 
         return QTable(col_data, names=col_names)
 
+    def plot_data(self, axes, *args, **kwargs):
+        """Plot the skymap data onto the given axes."""
+        return self.healpix.plot(axes, *args, **kwargs)
+
+    def plot_contours(self, axes, levels, *args, **kwargs):
+        """Plot the skymap contours onto the given axes."""
+        if isinstance(levels, (int, float)):
+            levels = [levels]
+        levels = sorted(levels)
+        if not self.is_moc:
+            return axes.contour_hpx(
+                self.contours / max(self.contours),
+                nested=self.is_nested,
+                levels=levels,
+                *args, **kwargs,
+            )
+        else:
+            # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
+            # this convoluted method creates a flat skymap based on the actual contour levels,
+            # so it should approximate the moc contour levels
+            # It's not ideal, but it will do for most plots
+            mask = np.zeros(len(self.contours))
+            for level in levels:
+                mask += np.array(self.contours / max(self.contours) > level, dtype=int)
+            healpix = mhp.HealpixMap(mask, self.uniq, scheme='NUNIQ', density=True)
+            contour_data = healpix.rasterize(128, 'NESTED').data
+            return axes.contour_hpx(
+                contour_data,
+                nested=True,
+                levels=[i + 0.5 for i in range(len(levels))],
+                *args, **kwargs,
+            )
+
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
              coordinates=None, plot_contours=True, contour_levels=None,
@@ -758,30 +767,13 @@ class SkyMap:
         transform = axes.get_transform('world')
 
         # Plot the skymap data
-        self.healpix.plot(axes, rasterize=False, cmap='cylon', cbar=plot_colorbar)
+        self.plot_data(axes, rasterize=False, cmap='cylon', cbar=plot_colorbar)
 
         # Plot 50% and 90% contours
         if plot_contours:
             if contour_levels is None:
                 contour_levels = [0.5, 0.9]
-            contour_levels = sorted(contour_levels)
-            if not self.is_moc:
-                cs = axes.contour_hpx(self.contours / max(self.contours), nested=self.is_nested,
-                                      levels=contour_levels,
-                                      colors='black', linewidths=0.5, zorder=99,)
-            else:
-                # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
-                # this convoluted method creates a flat skymap based on the actual contour levels,
-                # so it should match the moc contour levels
-                mask = np.zeros(len(self.contours))
-                for level in contour_levels:
-                    mask += np.array(self.contours / max(self.contours) > level, dtype=int)
-                healpix = mhp.HealpixMap(mask, self.uniq, scheme='NUNIQ', density=True)
-                contour_data = healpix.rasterize(128, 'NESTED').data
-                cs = axes.contour_hpx(contour_data, nested=True,
-                                      levels=[i + 0.5 for i in range(len(contour_levels))],
-                                      colors='black', linewidths=0.5, zorder=99,)
-
+            cs = self.plot_contours(axes, contour_levels, colors='black', linewidths=0.5, zorder=99)
             label_contours = False
             if label_contours:
                 axes.clabel(cs, inline=False, fontsize=7, fmt='%.0f')
@@ -811,7 +803,7 @@ class SkyMap:
 
         # Set title
         if title is None:
-            title = 'Skymap for trigger {}'.format(self.objid)
+            title = 'Skymap'
         axes.set_title(title, y=1.05)
 
         # Save or show
