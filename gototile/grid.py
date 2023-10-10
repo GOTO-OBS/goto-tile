@@ -1,5 +1,7 @@
 """Module containing the SkyGrid class."""
 
+import itertools
+import math
 import os
 from collections import Counter
 from copy import copy, deepcopy
@@ -22,7 +24,7 @@ from matplotlib.path import Path
 
 import numpy as np
 
-from .gridtools import create_grid, get_tile_edges, get_tile_vertices
+from .geometry import get_tile_edges, get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
@@ -34,6 +36,296 @@ NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
                'GOTO-8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
                'GOTO': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
                }
+
+
+def create_grid(fov, overlap, kind='minverlap'):
+    """Create grid coordinates.
+
+    Calculate strips along RA and stacked in declination to cover the full sky.
+
+    The step size in Right Ascension is adjusted with the declination,
+    by a factor of 1/cos(declination).
+
+    Parameters
+    ----------
+    fov : dict of int or float or `astropy.units.Quantity`
+        The field of view of the tiles in the RA and Dec directions.
+        It should contains the keys 'ra' and 'dec'.
+        If not given units the values are assumed to be in degrees.
+
+    overlap : dict of int or float
+        The overlap amount between the tiles in the RA and Dec directions.
+        It should contains the keys 'ra' and 'dec'.
+
+    kind : str
+        The tiling method to use. Options are:
+        - 'enhanced':
+                An improved algorithm with additional options.
+                This is not yet the default, but will be eventually.
+        - 'minverlap' (default):
+                Uses the overlap as a minimum parameter to fit an integer
+                number of evenly-spaced tiles into each row.
+        - 'cosine':
+                Intermediate algorithm which adjusts RA spacing based on dec.
+        - 'cosine_symmetric':
+                An alternate version of 'cosine' which rotates each dec stripe
+                to be symmetric about the meridian.
+        - 'product':
+                Old, legacy algorithm.
+                This method creates lots of overlap between tiles at high decs,
+                which makes it impractical for survey purposes.
+
+    """
+    fov = fov.copy()
+    overlap = overlap.copy()
+    for key in ('ra', 'dec'):
+        # Get value of foc
+        if isinstance(fov[key], u.Quantity):
+            fov[key] = fov[key].to('deg').value
+
+        # Limit overlap to between 0 and 0.9
+        overlap[key] = min(max(overlap[key], 0), 0.9)
+
+    if kind == 'cosine':
+        return create_grid_cosine(fov, overlap)
+    elif kind == 'cosine_symmetric':
+        return create_grid_cosine_symmetric(fov, overlap)
+    elif kind == 'product':
+        return create_grid_product(fov, overlap)
+    elif kind == 'minverlap':
+        return create_grid_minverlap(fov, overlap)
+    elif kind == 'enhanced':
+        return create_grid_enhanced(fov, overlap)
+    elif kind.startswith('enhanced'):
+        params = [i == '1' for i in kind.strip('enhanced')]
+        return create_grid_enhanced(fov, overlap, *params)
+    else:
+        raise ValueError('Unknown grid tiling method: "{}"'.format(kind))
+
+
+def create_grid_product(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method uses the product of RA and Dec to get the RA spacings.
+    """
+    # Calculate steps
+    step_dec = fov['dec'] * (1 - overlap['dec'])
+    step_ra = fov['ra'] * (1 - overlap['ra'])
+
+    # Create the dec strips
+    pole = 90 // step_dec * step_dec
+    decs = np.arange(-pole, pole + step_dec / 2, step_dec)
+
+    # Arrange the tiles in RA
+    ras = np.arange(0.0, 360., step_ra)
+    allras, alldecs = zip(*[(ra, dec) for ra, dec in itertools.product(ras, decs)])
+    allras, alldecs = np.asarray(allras), np.asarray(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_cosine(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method adjusts the RA spacings based on the cos of the declination.
+    """
+    # Calculate steps
+    step_dec = fov['dec'] * (1 - overlap['dec'])
+    step_ra = fov['ra'] * (1 - overlap['ra'])
+
+    # Create the dec strips
+    pole = 90 // step_dec * step_dec
+    decs = np.arange(-pole, pole + step_dec / 2, step_dec)
+
+    # Arrange the tiles in RA
+    alldecs = []
+    allras = []
+    for dec in decs:
+        ras = np.arange(0.0, 360., step_ra / np.cos(dec * np.pi / 180))
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_cosine_symmetric(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method adjusts the RA spacings based on the cos of the declination.
+
+    Compared to `create_grid_cosine` this method rotates the dec strips so
+    they are symmetric around the meridian.
+    """
+    # Calculate steps
+    step_dec = fov['dec'] * (1 - overlap['dec'])
+    step_ra = fov['ra'] * (1 - overlap['ra'])
+
+    # Create the dec strips
+    pole = 90 // step_dec * step_dec
+    decs = np.arange(-pole, pole + step_dec / 2, step_dec)
+
+    # Arrange the tiles in RA
+    alldecs = []
+    allras = []
+    for dec in decs:
+        ras = np.arange(0.0, 360., step_ra / np.cos(dec * np.pi / 180))
+        ras += (360 - ras[-1]) / 2  # Rotate the strips so they're symmetric
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_minverlap(fov, overlap):
+    """Create a pointing grid to cover the whole sky.
+
+    This method takes the overlaps given as the minimum rather than fixed,
+    and then adjusts the number of tiles in RA and Dec until they overlap
+    at least by the amount given.
+    """
+    # Create the dec strips
+    pole = 90
+    n_tiles = math.ceil(pole / ((1 - overlap['dec']) * fov['dec']))
+    step_dec = pole / n_tiles
+    north_decs = np.arange(pole, 0, step_dec * -1)
+    south_decs = north_decs * -1
+    decs = np.concatenate([south_decs, np.array([0]), north_decs[::-1]])
+
+    # Arrange the tiles in RA
+    alldecs = []
+    allras = []
+    for dec in decs:
+        n_tiles = math.ceil(360 / ((1 - overlap['ra']) * fov['ra'] / np.cos(dec * np.pi / 180)))
+        step_ra = 360 / n_tiles
+        ras = np.arange(0, 360, step_ra)
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
+
+
+def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, polar_edge=False,
+                         corner_align=True):
+    """Create a pointing grid to cover the whole sky.
+
+    Parameters
+    ----------
+    fov : dict, with keys 'ra' and 'dec'
+        The field of view in degrees in each axis.
+
+    overlap : dict, with keys 'ra' and 'dec'
+        The overlap fraction (0-1) in each axis.
+
+    integer_fit : bool, default=True
+        If True, adjust the spacing values to ensure and integer number of tile fit neatly within
+            each range (previously called the "minverlap" algorithm).
+        If False, use the basic spacing to produce a non-symmetric grid.
+
+    force_equator : bool, default=False
+        If True, force a declination band at dec=0 (will always produce a tile at (0,0)).
+        If False, the number of bands can either be even (no equator band) or odd (equator band),
+            depending on what fits best.
+
+    polar_edge : bool, default=False
+        If True, align the highest/lowest tiles with their edge at the pole.
+        If False, place a tile centre on the pole instead.
+
+    corner_align : bool, default=True
+        If True, reduce gaps between tiles by ensuring the right ascension separation is never more
+            than that needed to align the lower tile edges.
+        If False, don't.
+
+    """
+    # Step 1: Create the dec bands
+    fov_dec = fov['dec'] * (1 - overlap['dec'])
+    if polar_edge:
+        # Align the highest band so the midpoint of the upper edge is at 90 dec
+        pole = 90 - fov_dec / 2
+    elif not integer_fit:
+        # This is just how the cosine algorithm calculated the pole, don't ask me why
+        pole = 90 // fov_dec * fov_dec
+    else:
+        # Place the highest band exactly on the pole
+        pole = 90
+    if force_equator:
+        # Fit between 0 and the pole
+        dec_range = pole
+    else:
+        # Fit over the whole dec range (pole to pole)
+        dec_range = pole * 2
+    if integer_fit:
+        # Calculate the number of steps to best fit into the given range.
+        # Note that n_dec is the ideal number of steps *between* bands, creating n_dec + 1 bands.
+        n_dec = math.ceil(dec_range / fov_dec)
+        step_dec = dec_range / n_dec
+    else:
+        # Just use the basic FoV as the step size
+        step_dec = fov_dec
+    # Create the band arrays
+    if force_equator or (integer_fit and n_dec % 2 == 0):
+        # If n_dec is even then there are an old number of bands, so there is one at the equator.
+        # Note we use we always add in the poles and 0 manually, to avoid floating points.
+        north_decs = np.arange(pole, 0, step_dec * -1)
+        south_decs = north_decs * -1
+        decs = np.concatenate([south_decs, np.array([0]), north_decs[::-1]])
+    else:
+        # If n_dec is odd then there are an even number of bands, so nothing at the equator.
+        # We could do np.arange(-pole, pole + step_dec, step_dec) and the last value should be pole,
+        # but sometimes due to fp errors it goes slightly over 90deg and then we get problems...
+        decs = np.arange(-1 * pole, pole, step_dec)
+        decs = np.concatenate([decs, np.array([pole])])
+
+    # Step 2: Arrange the tiles in RA for each band
+    alldecs = []
+    allras = []
+    fov_ra = fov['ra'] * (1 - overlap['ra'])
+    for dec in decs:
+        if abs(dec) == 90:
+            # Note cos(+/-90) = 0, so we could see issues with the 1/cos factor at the poles.
+            # We actually don't, due to floating points, but better to hard code it anyway.
+            ras = np.array([0])
+        else:
+            # Find the effective tile width for this band (including overlap)
+            band_fov_ra = fov_ra / np.cos(dec * np.pi / 180)
+            if corner_align:
+                # Find the effective width of the tile (the difference in RA
+                # between the two lower corners).
+                # By choosing a tile at ra=0 the ra of the south-east corner is half
+                # the effective width, which is the same for all tiles in the band.
+                # Note that since the grid is symmetric we take abs(dec).
+                centre = SkyCoord(0 * u.deg, abs(dec) * u.deg)
+                corners = get_tile_vertices(centre,
+                                            {'ra': fov['ra'] * u.deg,
+                                             'dec': fov['dec'] * u.deg})
+                corner_se = corners[2]
+                max_fov_ra = corner_se.ra.value * 2
+                # This is the maximum spacing, so only override the default if it is larger than
+                # the maximum (usually closest to the poles).
+                if band_fov_ra > max_fov_ra:
+                    band_fov_ra = max_fov_ra
+            if integer_fit:
+                # Calculate the number of steps to best fit into the given range
+                n_ra = math.ceil(360 / band_fov_ra)
+                step_ra = 360 / n_ra
+            else:
+                # Just use the basic FoV as the step size
+                step_ra = band_fov_ra
+            # Create the point coordinates
+            ras = np.arange(0, 360, step_ra)
+        # Add coordinates to lists
+        allras.append(ras)
+        alldecs.append(dec * np.ones(ras.shape))
+    # Concatenate the lists
+    allras = np.concatenate(allras)
+    alldecs = np.concatenate(alldecs)
+
+    return allras, alldecs
 
 
 class SkyGrid:
@@ -55,7 +347,7 @@ class SkyGrid:
         default is 0.5 in both axes, minimum is 0 and maximum is 0.9
 
     kind : str, optional
-        The tiling method to use. See `gototile.gridtools.create_grid` for options.
+        The tiling method to use. See `gototile.grid.create_grid` for options.
         Default is 'minverlap'.
 
     """
