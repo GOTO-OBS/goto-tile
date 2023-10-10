@@ -18,7 +18,6 @@ import healpy as hp
 
 import numpy as np
 
-from . import math
 from . import settings
 from . import utils
 
@@ -410,6 +409,21 @@ def get_visiblemap_bit_faster(skymap, sidtimes, location, min_elevation,
     return maskedmap
 
 
+def cartesian_to_celestial(x, y, z):
+    """Convert cartesian coordinates (x,y,z) to celestial (ra,dec)."""
+    # First convert cartesian to spherical
+    lat = np.arctan2(z, np.sqrt(y ** 2 + x ** 2))
+    lon = np.arctan2(y, x)
+
+    # Then spherical to celestial
+    ra, dec = np.rad2deg(lon), np.rad2deg(lat)
+
+    # Make sure they're within the valid range
+    ra[ra < 0] = ra[ra < 0] + 360
+
+    return np.array([ra, dec])
+
+
 def calculate_tiling(skymap, telescopes, date=None,
                      coverage=None, maxtiles=100, within=None,
                      nightsky=False, catalog=None,
@@ -557,7 +571,7 @@ def calculate_tiling(skymap, telescopes, date=None,
             index = indices[sortindices][0]
             indices = indices[sortindices][1:]
             telescope = telescopes[index]
-            tile = math.cartesian_to_celestial(*telescope.toptile.T)
+            tile = cartesian_to_celestial(*telescope.toptile.T)
             prob = telescope.topprob
             sources = telescope.topsources
             GWobs += prob

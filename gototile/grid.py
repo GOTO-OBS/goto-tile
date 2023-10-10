@@ -22,9 +22,7 @@ from matplotlib.path import Path
 
 import numpy as np
 
-from .gridtools import create_grid
-from .gridtools import get_tile_edges_astropy as get_tile_edges
-from .gridtools import get_tile_vertices_astropy as get_tile_vertices
+from .gridtools import create_grid, get_tile_edges, get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 

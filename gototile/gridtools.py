@@ -2,17 +2,11 @@
 
 import itertools
 import math
-import multiprocessing
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 
-import healpy as hp
-
 import numpy as np
-
-from .math import RAD
-from .math import cartesian_to_spherical, interpolate, intersect, spherical_to_cartesian
 
 
 def create_grid(fov, overlap, kind='minverlap'):
@@ -118,7 +112,7 @@ def create_grid_cosine(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., step_ra / np.cos(dec * RAD))
+        ras = np.arange(0.0, 360., step_ra / np.cos(dec * np.pi / 180))
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
     allras = np.concatenate(allras)
@@ -147,7 +141,7 @@ def create_grid_cosine_symmetric(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., step_ra / np.cos(dec * RAD))
+        ras = np.arange(0.0, 360., step_ra / np.cos(dec * np.pi / 180))
         ras += (360 - ras[-1]) / 2  # Rotate the strips so they're symmetric
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
@@ -176,7 +170,7 @@ def create_grid_minverlap(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        n_tiles = math.ceil(360 / ((1 - overlap['ra']) * fov['ra'] / np.cos(dec * RAD)))
+        n_tiles = math.ceil(360 / ((1 - overlap['ra']) * fov['ra'] / np.cos(dec * np.pi / 180)))
         step_ra = 360 / n_tiles
         ras = np.arange(0, 360, step_ra)
         allras.append(ras)
@@ -269,7 +263,7 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
             ras = np.array([0])
         else:
             # Find the effective tile width for this band (including overlap)
-            band_fov_ra = fov_ra / np.cos(dec * RAD)
+            band_fov_ra = fov_ra / np.cos(dec * np.pi / 180)
             if corner_align:
                 # Find the effective width of the tile (the difference in RA
                 # between the two lower corners).
@@ -277,9 +271,9 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
                 # the effective width, which is the same for all tiles in the band.
                 # Note that since the grid is symmetric we take abs(dec).
                 centre = SkyCoord(0 * u.deg, abs(dec) * u.deg)
-                corners = get_tile_vertices_astropy(centre,
-                                                    {'ra': fov['ra'] * u.deg,
-                                                     'dec': fov['dec'] * u.deg})
+                corners = get_tile_vertices(centre,
+                                            {'ra': fov['ra'] * u.deg,
+                                             'dec': fov['dec'] * u.deg})
                 corner_se = corners[2]
                 max_fov_ra = corner_se.ra.value * 2
                 # This is the maximum spacing, so only override the default if it is larger than
@@ -305,82 +299,7 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
     return allras, alldecs
 
 
-def get_tile_vertices(coords, fov):
-    """Get points defining the tile vertices from a list of coordinates and field of view.
-
-    Returns a numpy array of shape (4,3) - 4 vertices (corners) each with x,y,z coordinates
-
-    NB: ew = RA
-        ns = Dec
-        l = lon = longitude = RA
-        b = lat = latitude = Dec
-
-    """
-    # Get latitude/longitude arrays in radians
-    # (NB this isn't technically latitude/longitude,
-    #  but it's what spherical coordinate formulae use)
-    lon = coords.ra.to('radian').value
-    lat = coords.dec.to('radian').value
-
-    # Poles???
-    poles = {}
-    poles['w'] = lon - (np.pi / 2), 0 * lat
-    poles['e'] = lon + (np.pi / 2), 0 * lat
-    mask = lat < 0
-    poles['s'] = lon + 0, lat - (np.pi / 2)
-    poles['s'][0][mask], poles['s'][1][mask] = lon[mask] + np.pi, -lat[mask] - (np.pi / 2)
-
-    poles['n'] = lon + np.pi, (np.pi / 2) - lat
-    poles['n'][0][mask], poles['n'][1][mask] = lon[mask], lat[mask] + (np.pi / 2)
-
-    poles['w'] = spherical_to_cartesian(*poles['w'])
-    poles['e'] = spherical_to_cartesian(*poles['e'])
-    poles['n'] = spherical_to_cartesian(*poles['n'])
-    poles['s'] = spherical_to_cartesian(*poles['s'])
-
-    # Get phi angles in radians
-    # (NB divided by 2, since angle from centre to edge is half the FoV)
-    phi_ra = fov['ra'].to('radian').value / 2
-    phi_dec = fov['dec'].to('radian').value / 2
-
-    # Convert lat/lon to cartesian
-    xyz = spherical_to_cartesian(lon, lat)
-
-    # Edges
-    edges = {}
-    fcos, fsin = np.cos(phi_ra), np.sin(phi_ra)
-
-    edges['e'] = xyz * fcos + poles['e'] * fsin
-    le, be = cartesian_to_spherical(*edges['e'])
-
-    edges['w'] = xyz * fcos + poles['w'] * fsin
-    lw, bw = cartesian_to_spherical(*edges['w'])
-
-    ls, bs = lon, lat - phi_dec
-    edges['s'] = spherical_to_cartesian(ls, bs)
-
-    ln, bn = lon, lat + phi_dec
-    edges['n'] = spherical_to_cartesian(ln, bn)
-
-    # Something
-    for key in edges.keys():
-        edges[key] = edges[key].T
-    for key in poles.keys():
-        poles[key] = poles[key].T
-
-    # Corners
-    corners = []
-    corners.append(intersect(edges['n'], poles['w'], edges['w'], poles['n']))
-    corners.append(intersect(edges['n'], poles['e'], edges['e'], poles['n']))
-    corners.append(intersect(edges['s'], poles['e'], edges['e'], poles['s']))
-    corners.append(intersect(edges['s'], poles['w'], edges['w'], poles['s']))
-
-    corners = np.asarray(corners)
-    corners = np.rollaxis(corners, 0, 2)
-    return corners
-
-
-def get_tile_vertices_astropy(centre, fov):
+def get_tile_vertices(centre, fov):
     """Calculate the coordinates of the tile vertices.
 
     Parameters
@@ -420,26 +339,7 @@ def get_tile_vertices_astropy(centre, fov):
     return corners
 
 
-def get_tile_edges(vertices, steps=5):
-    """Interpolate a tile with corners to a full shape to be drawn.
-
-    Parameters
-    ----------
-    vertices : `numpy.ndarray`
-        An array of shape (4,3) defining 4 vertices in cartesian coordinates.
-    steps : int, default=5
-        The number of steps along each tile edge
-
-    """
-    all_points = []
-    # Loop through all four edges by rolling through the array of vertices and taking each pair
-    for corner1, corner2 in zip(vertices, np.roll(vertices, 1, axis=0)):
-        points = interpolate(corner2, corner1, steps)  # Note the order is flipped
-        all_points.extend(points[:-1])  # We remove the final point, since it's duplicated
-    return np.array(all_points)
-
-
-def get_tile_edges_astropy(centre, fov, edge_points=5):
+def get_tile_edges(centre, fov, edge_points=5):
     """Get points along the edges of the tile.
 
     Parameters
@@ -465,7 +365,7 @@ def get_tile_edges_astropy(centre, fov, edge_points=5):
         scalar = True
 
     # First get the positions of the corners for each tile
-    corners = get_tile_vertices_astropy(centre, fov)
+    corners = get_tile_vertices(centre, fov)
 
     # If edge_points=0 then just return the corners
     if edge_points == 0:
@@ -510,98 +410,3 @@ def get_tile_edges_astropy(centre, fov, edge_points=5):
         points = points[0]
 
     return points
-
-
-class PolygonQuery:
-    def __init__(self, nside, nested=True, inclusive=True):
-        self.nside = nside
-        self.nested = nested
-        self.inclusive = inclusive
-
-    def __call__(self, vertices):
-        # Note nest is always True
-        # See https://github.com/GOTO-OBS/goto-tile/issues/65
-        ipix = hp.query_polygon(self.nside, vertices, nest=True, inclusive=self.inclusive, fact=32)
-        if not self.nested:
-            ipix = np.array(sorted(hp.nest2ring(self.nside, ipix)))
-        return ipix
-
-
-def get_tile_pixels(vertices, nside=256, order='NESTED', inclusive=True):
-    """Find the HEALPix pixels within the given vertices.
-
-    Parameters
-    ----------
-    vertices : `numpy.ndarray`
-        A 1D array containing arrays of shape (4,3) defining 4 vertices in cartesian coordinates,
-        for each tile.
-
-    nside : float, default=256
-        The HEALPix Nside resolution parameter
-    order : string, default='NESTED'
-        The HEALPix ordering scheme to use
-    inclusive : bool, default=True
-        See `healpy.query_polygon`
-
-    """
-    nested = order == 'NESTED'
-    polygon_query = PolygonQuery(nside, nested, inclusive)
-
-    pool = multiprocessing.Pool()
-    pixels = pool.map(polygon_query, vertices)
-    pool.close()
-    pool.join()
-
-    return pixels
-
-
-def get_tile_pixels_astropy(vertices, nside=256, order='NESTED', inclusive=True):
-    """Find the HEALPix pixels within the given vertices.
-
-    Parameters
-    ----------
-    vertices : `astropy.coordinates.SkyCoord`
-        Coordinates describing the 4 vertices of each tile.
-        Can either have shape=(4) (for a single tile) or shape=(X,4) (for X tiles).
-        Note using more than those 4 points (e.g. finding more edge points using `get_tile_edges`)
-            will result in a "degenerate corner" error from HEALPix once it finds three points that
-            lie in the same plane. Therefore always use the output from `get_tile_vertices` in this
-            function, not `get_tile_edges`.
-
-    nside : float, default=256
-        The HEALPix Nside resolution parameter
-    order : string, default='NESTED'
-        The HEALPix ordering scheme to use
-    inclusive : bool, default=True
-        See `healpy.query_polygon`
-
-    Returns
-    -------
-    ipix : `numpy.array` or list of `numpy.array`
-        The indices of the pixels contained within each tile.
-        If `vertices` has shape=(4) this will be a single array of pixel indices, for shape=(X,4)
-            it will be a list of len=X.
-        Note that tiles can contain different numbers of pixels, which is why this is not
-            necessarily a 2D array.
-
-    """
-    scalar = False
-    if vertices.ndim == 1:
-        if vertices.shape[0] != 4:
-            raise ValueError('Too many edge points defined, only the 4 vertices are required')
-        scalar = True
-        xyz_points = np.array([vertices.cartesian.get_xyz(xyz_axis=1).value])
-    else:
-        if vertices.shape[1] != 4:
-            raise ValueError('Too many edge points defined, only the 4 vertices are required')
-        xyz_points = vertices.cartesian.get_xyz(xyz_axis=2).value
-
-    # Run polygon query
-    # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
-    ipix = [hp.query_polygon(nside, p, nest=True, inclusive=inclusive, fact=32) for p in xyz_points]
-    if order == 'RING':
-        ipix = [np.array(sorted(hp.nest2ring(nside, ip))) for ip in ipix]
-
-    if scalar:
-        ipix = ipix[0]
-    return ipix
