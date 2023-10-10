@@ -138,6 +138,8 @@ class SkyMap:
                                       )
 
         # Save coordsys (not considered by mhealpy)
+        # TODO ACTUALLY IT IS NOW:
+        # https://gitlab.com/burstcube/mhealpy/-/commit/8f4d59d3c0f7dbf56c7d6e088202c5b2e53dbe3f
         self.coordsys = coordsys
 
         # Save pixel indices, Nside values and areas (in steradians)
