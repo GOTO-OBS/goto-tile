@@ -982,8 +982,7 @@ class SkyGrid:
 
             # Plot the 50% and 90% skymap contours
             # Taken from SkyMap.plot()
-            contour_levels = [0.5, 0.9]
-            self.skymap.plot_contours(axes, contour_levels=contour_levels,
+            self.skymap.plot_contours(axes, levels=[0.5, 0.9],
                                       colors='black', linewidths=0.5, zorder=99)
 
         if plot_stats is True:
