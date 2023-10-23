@@ -28,13 +28,14 @@ from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
 NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
-               'GOTO-4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
                'GOTO8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
-               'GOTO-8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
-               'GOTO8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
-               'GOTO-8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
-               'GOTO': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],
+               'GOTO8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],  # NB absolute overlap
                }
+# Aliases
+NAMED_GRIDS['GOTO-4'] = NAMED_GRIDS['GOTO4']
+NAMED_GRIDS['GOTO-8p'] = NAMED_GRIDS['GOTO8p']
+NAMED_GRIDS['GOTO-8'] = NAMED_GRIDS['GOTO8']
+NAMED_GRIDS['GOTO'] = NAMED_GRIDS['GOTO8']
 
 
 def create_grid(fov, overlap, kind='minverlap'):
