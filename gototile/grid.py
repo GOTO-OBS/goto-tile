@@ -973,28 +973,8 @@ class SkyGrid:
         return paths
 
     def plot_tile(self, axes, tilename, *args, **kwargs):
-        """Plot a Patch for the tile onto the given axes."""
-        # Add default arguments
-        if 'fc' not in kwargs and 'facecolor' not in kwargs:
-            kwargs['fc'] = 'tab:blue'
-        if 'ec' not in kwargs and 'edgecolor' not in kwargs:
-            kwargs['ec'] = 'black'
-        if 'lw' not in kwargs and 'linewidth' not in kwargs:
-            kwargs['lw'] = 0.5
-
-        # Get tile paths (will be cached after the first use)
-        meridian_split = 'Mollweide' in axes.__class__.__name__
-        paths = self._get_tile_paths(meridian_split=meridian_split)
-
-        # Create a Patch, applying any arguments
-        index = self.tilenames.index(tilename)
-        path = paths[index]
-        patch = PathPatch(path,
-                          transform=axes.get_transform('world'),
-                          *args, **kwargs)
-        axes.add_patch(patch)
-
-        return patch
+        """Plot a Patch for a single tile onto the given axes."""
+        return self.plot_tiles(axes, [tilename], *args, **kwargs)
 
     def plot_tiles(self, axes, tilenames=None, *args, **kwargs):
         """Plot a PatchCollection for the grid tiles onto the given axes."""
@@ -1009,18 +989,29 @@ class SkyGrid:
         # Get tile paths (will be cached after the first use)
         meridian_split = 'Mollweide' in axes.__class__.__name__
         paths = self._get_tile_paths(meridian_split=meridian_split)
-
-        # Create a Patch Collection, applying any arguments
         if tilenames is not None:
             indexes = [self.tilenames.index(tilename) for tilename in tilenames]
             paths = np.array(paths)[indexes]
-        patches = [PathPatch(path) for path in paths]
-        collection = PatchCollection(patches,
-                                     transform=axes.get_transform('world'),
-                                     *args, **kwargs)
-        axes.add_collection(collection)
 
-        return collection
+        if len(paths) == 1:
+            # Add a single patch
+            patch = PathPatch(
+                paths[0],
+                transform=axes.get_transform('world'),
+                *args, **kwargs
+            )
+            axes.add_patch(patch)
+            return patch
+        else:
+            # Add all the patches together as a collection
+            patches = [PathPatch(path) for path in paths]
+            collection = PatchCollection(
+                patches,
+                transform=axes.get_transform('world'),
+                *args, **kwargs
+            )
+            axes.add_collection(collection)
+            return collection
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
