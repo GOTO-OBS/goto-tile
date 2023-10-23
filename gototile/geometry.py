@@ -72,12 +72,14 @@ def onsky_offset(coords, offsets):
     # They're the same, unless either offset is 0 in which case it breaks.
     # Hence the careful masking below.
     phi = np.zeros_like(theta)
-    # If tan_ra is 0 then use the formula with tan_dec
-    phi[tan_ra == 0] = np.arctan(tan_dec[tan_ra == 0] / np.cos(theta[tan_ra == 0]))
-    # If tan_dec is 0 then use the formula with tan_ra
-    phi[tan_dec == 0] = np.arctan(tan_ra[tan_dec == 0] / np.sin(theta[tan_dec == 0]))
     # If they're both zero then the distance is obviously zero...
     phi[(tan_ra == 0) & (tan_dec == 0)] = 0 * u.rad
+    # If tan_ra is 0 then use the formula with tan_dec
+    mask = (tan_ra == 0) & (tan_dec != 0)
+    phi[mask] = np.arctan(tan_dec[mask] / np.cos(theta[mask]))
+    # If tan_dec is 0 then use the formula with tan_ra
+    mask = (tan_ra != 0) & (tan_dec == 0)
+    phi[mask] = np.arctan(tan_ra[mask] / np.sin(theta[mask]))
     # Any other points can use either formula, here we just use the one with tan_ra
     mask = (tan_ra != 0) & (tan_dec != 0)
     phi[mask] = np.arctan(tan_ra[mask] / np.sin(theta[mask]))
