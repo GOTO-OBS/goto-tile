@@ -20,11 +20,10 @@ if 'DISPLAY' not in os.environ:
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
 from matplotlib.patches import Patch, PathPatch
-from matplotlib.path import Path
 
 import numpy as np
 
-from .geometry import get_tile_edges, get_tile_vertices
+from .geometry import get_tile_path, get_tile_edges, get_tile_vertices
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
@@ -948,62 +947,6 @@ class SkyGrid:
         table = table.group_by('in_tiles')
         return table
 
-    def _get_tile_path(self, edge_coords, meridian_split=False):
-        """Create a Matplotlib Path for the given tile."""
-        ra = edge_coords.ra.deg
-        dec = edge_coords.dec.deg
-
-        # Check if the tile passes over the RA=0 line:
-        overlaps_meridian = any(ra < 90) and any(ra > 270)
-        if meridian_split and overlaps_meridian:
-            if any(np.logical_and(ra > 90, ra < 270)):
-                # This tile goes over the poles
-                # To get it to fill we need to add extra points at the pole itself
-                # First sort by RA
-                ra, dec = zip(*sorted(zip(ra, dec), key=lambda radec: radec[0]))
-
-                # Now add extra points
-                pole = 90 if np.all(np.array(dec) > 0) else -90
-                ra = np.array([0] + list(ra) + [360, 360])
-                dec = np.array([pole] + list(dec) + [dec[0], pole])
-
-                # Create the closed path
-                path = Path(np.array((ra, dec)).T, closed=True)
-
-            else:
-                # Tiles that pass over the edges of the plot (at RA=0) won't fill properly,
-                # they need to be split into two sections on either side.
-                # First create masks, with a little leeway on each side
-                mask_l = np.logical_or(ra <= 181, ra > 359)
-                mask_r = np.logical_or(ra < 1, ra >= 179)
-
-                # Now mask the arrays
-                ra_l = ra[mask_l]
-                dec_l = dec[mask_l]
-                ra_r = ra[mask_r]
-                dec_r = dec[mask_r]
-
-                # Set the points on the meridian to the correct values
-                ra_l[(ra_l < 1) | (ra_l > 359)] = 0
-                ra_r[(ra_r < 1) | (ra_r > 359)] = 360
-
-                # Add the first point on again to close
-                ra_l = list(ra_l) + [ra_l[0]]
-                dec_l = list(dec_l) + [dec_l[0]]
-                ra_r = list(ra_r) + [ra_r[0]]
-                dec_r = list(dec_r) + [dec_r[0]]
-
-                # Create the paths, then combine them
-                path_l = Path(np.array((ra_l, dec_l)).T, closed=True)
-                path_r = Path(np.array((ra_r, dec_r)).T, closed=True)
-                path = Path.make_compound_path(path_l, path_r)
-
-        else:
-            # Just make a normal closed path
-            path = Path(np.array((ra, dec)).T, closed=True)
-
-        return path
-
     def _get_tile_paths(self, meridian_split=False):
         """Create and cache Matplotlib Patches to use when plotting tiles."""
         # Used cached versions to save time when repeatedly plotting
@@ -1020,7 +963,7 @@ class SkyGrid:
             self.edges = get_tile_edges(self.coords, self.fov, edge_points=4)
 
         # Get list of matplotlib paths for the tile areas
-        paths = [self._get_tile_path(edge_coords, meridian_split) for edge_coords in self.edges]
+        paths = [get_tile_path(edge_coords, meridian_split) for edge_coords in self.edges]
 
         if not meridian_split:
             self._paths = paths
