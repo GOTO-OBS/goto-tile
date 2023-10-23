@@ -122,10 +122,10 @@ def get_tile_vertices(centre, fov):
     # Get the offsets from the centre to the corners
     # Going in order NW>NE>SE>SW (remember RA increases going east)
     offsets = [
-        (+ fov['dec'] / 2, - fov['ra'] / 2),
-        (+ fov['dec'] / 2, + fov['ra'] / 2),
-        (- fov['dec'] / 2, + fov['ra'] / 2),
-        (- fov['dec'] / 2, - fov['ra'] / 2),
+        (- fov['ra'] / 2, + fov['dec'] / 2),
+        (+ fov['ra'] / 2, + fov['dec'] / 2),
+        (+ fov['ra'] / 2, - fov['dec'] / 2),
+        (- fov['ra'] / 2, - fov['dec'] / 2),
     ]
     return onsky_offset(centre, offsets)
 
