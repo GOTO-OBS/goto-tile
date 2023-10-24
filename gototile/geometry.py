@@ -103,33 +103,6 @@ def onsky_offset(coords, offsets):
     return offset_coords
 
 
-def get_tile_vertices(centre, fov):
-    """Calculate the coordinates of the tile vertices.
-
-    Parameters
-    ----------
-    centre : `astropy.coordinates.SkyCoord`
-        The coordinates of the tile centre.
-    fov : dict
-        The field of view of the tile, with keys of 'ra' and 'dec'
-
-    Returns
-    -------
-    vertices : `astropy.coordinates.SkyCoord`
-        An array with length `n` the same as centre and shape `(n, 4)`
-
-    """
-    # Get the offsets from the centre to the corners
-    # Going in order NW>NE>SE>SW (remember RA increases going east)
-    offsets = [
-        (- fov['ra'] / 2, + fov['dec'] / 2),
-        (+ fov['ra'] / 2, + fov['dec'] / 2),
-        (+ fov['ra'] / 2, - fov['dec'] / 2),
-        (- fov['ra'] / 2, - fov['dec'] / 2),
-    ]
-    return onsky_offset(centre, offsets)
-
-
 def get_tile_edges(centre, fov, edge_points=5):
     """Get points along the edges of the tile.
 
@@ -156,7 +129,13 @@ def get_tile_edges(centre, fov, edge_points=5):
         scalar = True
 
     # First get the positions of the corners for each tile
-    corners = get_tile_vertices(centre, fov)
+    corner_offsets = [
+        (- fov['ra'] / 2, + fov['dec'] / 2) * u.deg,
+        (+ fov['ra'] / 2, + fov['dec'] / 2) * u.deg,
+        (+ fov['ra'] / 2, - fov['dec'] / 2) * u.deg,
+        (- fov['ra'] / 2, - fov['dec'] / 2) * u.deg,
+    ]
+    corners = onsky_offset(centre, corner_offsets)
 
     # If edge_points=0 then just return the corners
     if edge_points == 0:

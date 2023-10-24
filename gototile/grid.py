@@ -23,7 +23,7 @@ from matplotlib.patches import Patch, PathPatch
 
 import numpy as np
 
-from .geometry import get_tile_path, get_tile_edges, get_tile_vertices
+from .geometry import get_tile_path, get_tile_edges, onsky_offset
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
@@ -296,14 +296,11 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
             if corner_align:
                 # Find the effective width of the tile (the difference in RA
                 # between the two lower corners).
-                # By choosing a tile at ra=0 the ra of the south-east corner is half
+                # By carefully choosing a tile at ra=0 the ra of the south-east corner is half
                 # the effective width, which is the same for all tiles in the band.
                 # Note that since the grid is symmetric we take abs(dec).
                 centre = SkyCoord(0 * u.deg, abs(dec) * u.deg)
-                corners = get_tile_vertices(centre,
-                                            {'ra': fov['ra'] * u.deg,
-                                             'dec': fov['dec'] * u.deg})
-                corner_se = corners[2]
+                corner_se = onsky_offset(centre, (fov['ra'] / 2, - fov['dec'] / 2) * u.deg)
                 max_fov_ra = corner_se.ra.value * 2
                 # This is the maximum spacing, so only override the default if it is larger than
                 # the maximum (usually closest to the poles).
@@ -393,7 +390,15 @@ class SkyGrid:
         self.ntiles = len(self.coords)
 
         # Get the tile vertices - 4 points on the corner of each tile
-        self.vertices = get_tile_vertices(self.coords, self.fov)
+        # We get these by offsetting on-sky from the tile centres by half the fov in each direction.
+        # Order of corners is NW>NE>SE>SW (remember RA increases going east).
+        corner_offsets = [
+            (- self.fov['ra'] / 2, + self.fov['dec'] / 2) * u.deg,
+            (+ self.fov['ra'] / 2, + self.fov['dec'] / 2) * u.deg,
+            (+ self.fov['ra'] / 2, - self.fov['dec'] / 2) * u.deg,
+            (- self.fov['ra'] / 2, - self.fov['dec'] / 2) * u.deg,
+        ]
+        self.vertices = onsky_offset(self.coords, corner_offsets)
 
         # Give the tiles unique ids
         self.tilenums = np.arange(self.ntiles) + 1
