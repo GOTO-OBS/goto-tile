@@ -761,13 +761,14 @@ class SkyGrid:
         else:
             return [self.tilenames.index(tile) for tile in tilenames]
 
-    def get_coordinates(self, tilenames):
+    def get_coordinates(self, tilenames=None):
         """Return the central coordinates of the given tile(s).
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the coordinates of.
+            If not given, return the central coordinates of all tiles in the grid.
 
         Returns
         -------
@@ -775,34 +776,42 @@ class SkyGrid:
             The central coordinates of the given tile(s).
 
         """
+        if tilenames is None:
+            return self.coords
+
         indices = self._get_tilename_indices(tilenames)
         return self.coords[indices]
 
-    def get_vertices(self, tilenames):
+    def get_vertices(self, tilenames=None):
         """Return coordinates of the four corners of the given tile(s).
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the vertices of.
+            If not given, return the vertices of all tiles in the grid.
 
         Returns
         -------
         coords : `astropy.coordinates.SkyCoord`
             The coordinates of the vertices of the given tile(s).
-            Will be an array of shape shape (n, 4), where n = len(tilenames).
+            Will be an array of shape shape (ntiles, 4), where.
 
         """
+        if tilenames is None:
+            return self.vertices
+
         indices = self._get_tilename_indices(tilenames)
         return self.vertices[indices]
 
-    def get_edges(self, tilenames, edge_points=5):
+    def get_edges(self, tilenames=None, edge_points=5):
         """Return coordinates along the edges of the given tile(s).
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the edges of.
+            If not given, return the edges of all tiles in the grid.
         edge_points : int, optional
             The number of points to find along each tile edge.
             If edge_points=0 only the 4 corners will be returned.
@@ -812,20 +821,27 @@ class SkyGrid:
         -------
         coords : `astropy.coordinates.SkyCoord`
             The coordinates of the edge points of the given tile(s).
-            Will be an array with shape (n, 4*(edge_points+1)), where n = len(tilenames).
+            Will be an array with shape (ntiles, 4*(edge_points+1)).
 
         """
-        indices = self._get_tilename_indices(tilenames)
+        if edge_points == 0:
+            return self.get_vertices(tilenames)
+
         coords = get_tile_edges(self.coords, self.fov, edge_points)
+        if tilenames is None:
+            return coords
+
+        indices = self._get_tilename_indices(tilenames)
         return coords[indices]
 
-    def get_pixels(self, tilenames):
+    def get_pixels(self, tilenames=None):
         """Get the skymap pixels contained within the given tile(s).
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the pixels of.
+            If not given, return the pixels of all tiles in the grid.
 
         Returns
         -------
@@ -835,23 +851,26 @@ class SkyGrid:
         """
         if self.pixels is None:
             raise ValueError('SkyGrid does not have a SkyMap applied')
+        if tilenames is None:
+            return sorted(set([ipix for tile_pix in self.pixels for ipix in tile_pix]))
 
         indices = self._get_tilename_indices(tilenames)
         if isinstance(indices, int):
-            pix = self.pixels[indices]
+            pixels = self.pixels[indices]
         else:
-            pix = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
-        return sorted(set(pix))
+            pixels = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
+        return sorted(set(pixels))
 
-    def get_probability(self, tilenames):
+    def get_probability(self, tilenames=None):
         """Return the contained probability within the given tile(s).
 
         If multiple tiles are given, the probability only be included once in any overlaps.
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the probability within.
+            If not given, return the total probability covered by all tiles in the grid.
 
         Returns
         -------
@@ -859,21 +878,19 @@ class SkyGrid:
             The total skymap value within the area covered by the given tile(s).
 
         """
-        if self.probs is None:
-            raise ValueError('SkyGrid does not have a SkyMap applied')
-
         pixels = self.get_pixels(tilenames)
         return self.skymap.data[pixels].sum()
 
-    def get_area(self, tilenames):
+    def get_area(self, tilenames=None):
         """Return the sky area contained within the given tile(s) in square degrees.
 
         If multiple tiles are given, the area only be included once in any overlaps.
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the area of.
+            If not given, return the total area covered by all tiles in the grid.
 
         Returns
         -------
@@ -882,16 +899,19 @@ class SkyGrid:
 
         """
         self._get_test_map()
+        if tilenames is None:
+            pixels = sorted(set([ipix for tile_pix in self._base_pixels for ipix in tile_pix]))
+            return self._base_skymap.get_pixel_area(pixels)
 
         indices = self._get_tilename_indices(tilenames)
         if isinstance(indices, int):
-            pix = sorted(set(self._base_pixels[indices]))
+            pixels = sorted(set(self._base_pixels[indices]))
         else:
-            pix = [ipix for tile_pix in self._base_pixels[indices] for ipix in tile_pix]
-        pix = sorted(set(pix))
-        return self._base_skymap.get_pixel_area(pix)
+            pixels = [ipix for tile_pix in self._base_pixels[indices] for ipix in tile_pix]
+        pixels = sorted(set(pixels))
+        return self._base_skymap.get_pixel_area(pixels)
 
-    def get_areas(self, tilenames):
+    def get_areas(self, tilenames=None):
         """Return the areas contained within each of the given tile(s) in square degrees.
 
         Note although every tile should have the same area (equal to fov_ra * fov_dec) there will
@@ -902,8 +922,9 @@ class SkyGrid:
 
         Parameters
         ----------
-        tilenames : str or list of str
+        tilenames : str or list of str, optional
             The name(s) of the tile(s) to find the area of.
+            If not given, return the areas covered by all tiles in the grid.
 
         Returns
         -------
@@ -911,6 +932,9 @@ class SkyGrid:
             The areas covered by the given tile(s), in square degrees.
 
         """
+        if tilenames is None:
+            return [self.get_area(tile) for tile in self.tilenames]
+
         if isinstance(tilenames, str):
             return self.get_area(tilenames)
         else:
