@@ -23,9 +23,10 @@ from matplotlib.patches import Patch, PathPatch
 
 import numpy as np
 
-from .geometry import get_tile_path, interpolate_points, onsky_offset
+from .geometry import coords_to_path, interpolate_points, onsky_offset
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
+
 
 NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
                'GOTO8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
@@ -988,7 +989,7 @@ class SkyGrid:
         edges = self.get_edges(edge_points=4)
 
         # Get list of matplotlib paths for the tile areas
-        paths = [get_tile_path(edge_coords, meridian_split) for edge_coords in edges]
+        paths = [coords_to_path(edge_coords, meridian_split) for edge_coords in edges]
 
         if not meridian_split:
             self._paths = paths

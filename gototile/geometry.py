@@ -178,7 +178,7 @@ def interpolate_points(coords, n_points=5):
     return points
 
 
-def get_tile_path(edge_coords, meridian_split=False):
+def coords_to_path(coords, meridian_split=False):
     """Create a Matplotlib Path for a region defined by the given edge coordinates.
 
     The main benefit of this function is that it can handle shapes that pass over the RA=0 meridian,
@@ -187,7 +187,7 @@ def get_tile_path(edge_coords, meridian_split=False):
 
     Parameters
     ----------
-    edge_coords : `astropy.coordinates.SkyCoord`
+    coords : `astropy.coordinates.SkyCoord`
         The coordinates of the points that define the edge of the shape.
         Should be a closed loop, i.e. the first and last points should be the same.
     meridian_split : bool, default=False
@@ -202,10 +202,10 @@ def get_tile_path(edge_coords, meridian_split=False):
         a single Path object will be returned (using Path.make_compound_path).
 
     """
-    ra = edge_coords.ra.deg
-    dec = edge_coords.dec.deg
+    ra = coords.ra.deg
+    dec = coords.dec.deg
 
-    # Check if the tile passes over the RA=0 line
+    # Check if the region passes over the RA=0 line
     overlaps_meridian = any(ra < 90) and any(ra > 270)
     if not overlaps_meridian or not meridian_split:
         # If not then just make a normal closed path
@@ -213,7 +213,7 @@ def get_tile_path(edge_coords, meridian_split=False):
 
     # If it does then we need to do some extra work
     if any(np.logical_and(ra > 90, ra < 270)):
-        # This tile goes over the poles
+        # This region includes one of the poles
         # To get it to fill we need to add extra points at the pole itself
         # First sort by RA
         ra, dec = zip(*sorted(zip(ra, dec), key=lambda radec: radec[0]))
