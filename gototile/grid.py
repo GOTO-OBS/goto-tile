@@ -23,7 +23,7 @@ from matplotlib.patches import Patch, PathPatch
 
 import numpy as np
 
-from .geometry import get_tile_path, get_tile_edges, onsky_offset
+from .geometry import get_tile_path, interpolate_points, onsky_offset
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
@@ -795,7 +795,7 @@ class SkyGrid:
         -------
         coords : `astropy.coordinates.SkyCoord`
             The coordinates of the vertices of the given tile(s).
-            Will be an array of shape shape (ntiles, 4), where.
+            Will be an array with shape (ntiles, 4).
 
         """
         if tilenames is None:
@@ -813,7 +813,7 @@ class SkyGrid:
             The name(s) of the tile(s) to find the edges of.
             If not given, return the edges of all tiles in the grid.
         edge_points : int, optional
-            The number of points to find along each tile edge.
+            The number of points to find along each tile edge (not including the corners).
             If edge_points=0 only the 4 corners will be returned.
             Default=4.
 
@@ -824,21 +824,11 @@ class SkyGrid:
             Will be an array with shape (ntiles, 4*(edge_points+1)).
 
         """
-        if edge_points == 0:
-            return self.get_vertices(tilenames)
-
-        # Since there are different numbers of edge points we can't pre-calculate
-        # the edges on initialisation, but we might as well cache after we've done it once.
-        if not hasattr(self, '_edges'):
-            self._edges = {}
-        if edge_points not in self._edges:
-            self._edges[edge_points] = get_tile_edges(self.coords, self.fov, edge_points)
-
         if tilenames is None:
-            return self._edges[edge_points]
+            return interpolate_points(self.vertices, edge_points)
 
         indices = self._get_tilename_indices(tilenames)
-        return self._edges[edge_points][indices]
+        return interpolate_points(self.vertices[indices], edge_points)
 
     def get_pixels(self, tilenames=None):
         """Get the skymap pixels contained within the given tile(s).

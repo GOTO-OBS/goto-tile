@@ -103,82 +103,78 @@ def onsky_offset(coords, offsets):
     return offset_coords
 
 
-def get_tile_edges(centre, fov, edge_points=5):
-    """Get points along the edges of the tile.
+def interpolate_points(coords, n_points=5):
+    """Interpolate a number of on-sky positions between the given coordinates.
 
     Parameters
     ----------
-    centre : `astropy.coordinates.SkyCoord`
-        The coordinates of the tile centre.
-    fov : dict
-        The field of view of the tile, with keys of 'ra' and 'dec'
-    edge_points : int, default=5
-        The number of points to find along each tile edge
-        If edge_points=0 only the 4 corners will be returned
+    coords : `astropy.coordinates.SkyCoord`
+        An array of coordinates to interpolate between.
+        At least two coordinates must be given.
+        If more than two are given then `points` points will be returned between each pair.
+        E.g. if `coords` has length 3 and points=2 then 7 coordinates will be returned:
+        the first coordinate "A", 2 points on the line between "A" and "B", the second coordinate
+        "B", 2 points on the line between "B" and "C", and the final coordinate "C".
+        The given SkyCoord can be 1D or 2D, to take advantage of making multiple offsets at once.
+        Note in the 2D case it's only efficient if the distance between the points are the same
+        in every case, which is true for a regular grid of tiles.
+        For multiple irregular polygons this function may be slow.
+    n_points : int, default=5
+        The number of points to interpolate between each pair of coordinates.
 
     Returns
     -------
-    coords : `astropy.coordinates.SkyCoord`
-        An array with length `n` the same as centre and shape `(n, 4*(edge_points+1))`
+    interpolated_coords : `astropy.coordinates.SkyCoord`
+        An array with length len(coords)*(points + 1)
 
     """
-    # We need a vector input, we can convert back at the end
-    scalar = False
-    if centre.isscalar:
-        centre = SkyCoord([centre])
-        scalar = True
+    # For no interpolation just return the given coordinates
+    if n_points == 0:
+        return coords
 
-    # First get the positions of the corners for each tile
-    corner_offsets = [
-        (- fov['ra'] / 2, + fov['dec'] / 2) * u.deg,
-        (+ fov['ra'] / 2, + fov['dec'] / 2) * u.deg,
-        (+ fov['ra'] / 2, - fov['dec'] / 2) * u.deg,
-        (- fov['ra'] / 2, - fov['dec'] / 2) * u.deg,
-    ]
-    corners = onsky_offset(centre, corner_offsets)
+    # We assume a 2D array, so if we only have 1D then reshape to add a dimension
+    one_d = False
+    if coords.ndim == 1:
+        one_d = True
+        coords = coords.reshape((1, len(coords)))
+    if coords.ndim != 2:
+        raise ValueError('coords must be a 1D or 2D SkyCoord array')
+    if coords.shape[1] < 2:
+        raise ValueError('coords must have at least 2 coordinates to interpolate between')
 
-    # If edge_points=0 then just return the corners
-    if edge_points == 0:
-        if scalar:
-            return corners[0]
-        return corners
+    # We need to loop through pairs of coordinates, including the last to first pair
+    offset_points = []
+    for i in range(coords.shape[1]):
+        coords_a = coords[:, i]
+        coords_b = coords[:, (i + 1) % coords.shape[1]]
+        # Find the angle between the coordinates
+        ang = coords_a.position_angle(coords_b)
+        # Find the separation between the coordinates
+        sep = coords_a.separation(coords_b)
+        # If we're dealing with a 2D array where all the shapes are identical
+        # (i.e. for a set grid of tiles) then the separations will be the same,
+        # so we can save a lot of time by using the same steps for every offset
+        if np.all(np.isclose(sep, sep[0], 10e-10)):
+            # Calculate the position of the points along the joining line
+            # These steps will all be the same, so we only need to calculate them once
+            steps = np.arange(0, sep[0].deg, sep[0].deg / (n_points + 1)) * u.deg
+            # Now offset to find the points
+            new_points = coords_a.directional_offset_by(ang, steps[:, np.newaxis])
+        else:
+            # In this case we need to calculate the position of the points along each line
+            steps = np.array([np.arange(0, s.deg, s.deg / (n_points + 1)) * u.deg for s in sep])
+            # Then we have to offset each individually
+            # TODO: There might be a faster way to do this?
+            new_points = SkyCoord([coords_a.directional_offset_by(ang, s[:, np.newaxis])
+                                   for s in steps])
+        offset_points.append(new_points)
 
-    # Split out arrays for each corner
-    corner_nw, corner_ne, corner_se, corner_sw = corners.T
+    # Combine into a single array, and transpose to match input
+    points = SkyCoord(offset_points).T
 
-    # Find the angles between the corners
-    ang_n = corner_nw.position_angle(corner_ne)
-    ang_e = corner_ne.position_angle(corner_se)
-    ang_s = corner_se.position_angle(corner_sw)
-    ang_w = corner_sw.position_angle(corner_nw)
-
-    # Find the separations between the corners
-    # Because the tiles all have the same FoV they have the same separation N/S and E/W
-    # (this is not true for the angles!), so we only need to do it for the first tile
-    sep_ns = corner_nw[0].separation(corner_ne[0])  # = corner_se[0].separation(corner_sw[0])
-    sep_ew = corner_ne[0].separation(corner_se[0])  # = corner_sw[0].separation(corner_nw[0])
-
-    # Calculate the position of the points along the edges
-    steps = edge_points + 1
-    steps_ns = np.arange(0, sep_ns.deg, sep_ns.deg / steps) * u.deg
-    steps_ew = np.arange(0, sep_ew.deg, sep_ew.deg / steps) * u.deg
-
-    # Find the points by moving from corners
-    # (see https://github.com/astropy/astropy/issues/10083)
-    # Maybe this could all be done as one action, but that might get confusing
-    points_n = SkyCoord(corner_nw.directional_offset_by(ang_n, steps_ns[:, np.newaxis]))
-    points_e = SkyCoord(corner_ne.directional_offset_by(ang_e, steps_ew[:, np.newaxis]))
-    points_s = SkyCoord(corner_se.directional_offset_by(ang_s, steps_ns[:, np.newaxis]))
-    points_w = SkyCoord(corner_sw.directional_offset_by(ang_w, steps_ew[:, np.newaxis]))
-
-    # Combine, reshape and transpose
-    points = SkyCoord([points_n, points_e, points_s, points_w])
-    points = points.reshape(4 * steps, len(centre)).T
-
-    # If input was a single coordinate return a 1D array
-    if scalar:
+    # If input was a 1D array then return a 1D array
+    if one_d:
         points = points[0]
-
     return points
 
 
