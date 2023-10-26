@@ -804,7 +804,7 @@ class SkyGrid:
         indices = self._get_tilename_indices(tilenames)
         return self.vertices[indices]
 
-    def get_edges(self, tilenames=None, edge_points=5):
+    def get_edges(self, tilenames=None, edge_points=4):
         """Return coordinates along the edges of the given tile(s).
 
         Parameters
@@ -815,7 +815,7 @@ class SkyGrid:
         edge_points : int, optional
             The number of points to find along each tile edge.
             If edge_points=0 only the 4 corners will be returned.
-            Default=5.
+            Default=4.
 
         Returns
         -------
@@ -827,12 +827,18 @@ class SkyGrid:
         if edge_points == 0:
             return self.get_vertices(tilenames)
 
-        coords = get_tile_edges(self.coords, self.fov, edge_points)
+        # Since there are different numbers of edge points we can't pre-calculate
+        # the edges on initialisation, but we might as well cache after we've done it once.
+        if not hasattr(self, '_edges'):
+            self._edges = {}
+        if edge_points not in self._edges:
+            self._edges[edge_points] = get_tile_edges(self.coords, self.fov, edge_points)
+
         if tilenames is None:
-            return coords
+            return self._edges[edge_points]
 
         indices = self._get_tilename_indices(tilenames)
-        return coords[indices]
+        return self._edges[edge_points][indices]
 
     def get_pixels(self, tilenames=None):
         """Get the skymap pixels contained within the given tile(s).
@@ -989,11 +995,10 @@ class SkyGrid:
         # plot straight lines between them. That will look bad, because we're on a sphere.
         # Instead we get some intermediate points along the edges, so they look better when plotted.
         # (Admittedly this is only obvious with very large tiles, but it's still good to do).
-        if not hasattr(self, 'edges'):
-            self.edges = get_tile_edges(self.coords, self.fov, edge_points=4)
+        edges = self.get_edges(edge_points=4)
 
         # Get list of matplotlib paths for the tile areas
-        paths = [get_tile_path(edge_coords, meridian_split) for edge_coords in self.edges]
+        paths = [get_tile_path(edge_coords, meridian_split) for edge_coords in edges]
 
         if not meridian_split:
             self._paths = paths
