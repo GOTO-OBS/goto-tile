@@ -104,6 +104,17 @@ class SkyMap:
 
         return result
 
+    def __pow__(self, exponent):
+        if not isinstance(exponent, (int, float)):
+            raise TypeError('Exponent must be an integer or a float')
+
+        result = self.copy()
+
+        new_data = result.data ** exponent
+        result._save_data(new_data, order=self.order, coordsys=self.coordsys, density=self.density)
+
+        return result
+
     def __repr__(self):
         template = ('SkyMap(nside={}, order={}, coordsys={}, density={})')
         return template.format(self.nside, self.order, self.coordsys, self.density)
