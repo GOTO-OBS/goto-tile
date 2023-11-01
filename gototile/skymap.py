@@ -220,7 +220,7 @@ class SkyMap:
 
     @density.setter
     def density(self, to_density):
-        """Convert between histogram (counts) and density (per steradian) maps."""
+        """Convert the skymap between a count histogram or density of counts per steradian."""
         if not self.density and to_density:
             # Convert the histogram map to density per base pixel
             data = self.data / self.pix_area
