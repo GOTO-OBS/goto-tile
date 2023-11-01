@@ -657,13 +657,26 @@ class SkyMap:
 
     def plot_data(self, axes, *args, **kwargs):
         """Plot the skymap data onto the given axes."""
+        # Add default arguments
+        if 'cmap' not in kwargs:
+            kwargs['cmap'] = 'cylon'
+        if 'cbar' not in kwargs:
+            kwargs['cbar'] = False
+
         return self.healpix.plot(axes, *args, **kwargs)
 
-    def plot_contours(self, axes, levels, *args, **kwargs):
+    def plot_contours(self, axes, levels=(0.5, 0.9), *args, **kwargs):
         """Plot the skymap contours onto the given axes."""
         if isinstance(levels, (int, float)):
             levels = [levels]
         levels = sorted(levels)
+
+        # Add default arguments
+        if 'colors' not in kwargs:
+            kwargs['colors'] = 'black'
+        if 'linewidths' not in kwargs:
+            kwargs['linewidths'] = 0.5
+
         if not self.is_moc:
             return axes.contour_hpx(
                 self.contours / max(self.contours),
@@ -687,6 +700,14 @@ class SkyMap:
                 levels=[i + 0.5 for i in range(len(levels))],
                 *args, **kwargs,
             )
+
+    def plot_pixels(self, axes, *args, **kwargs):
+        """Plot the skymap data onto the given axes."""
+        # Add default arguments
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.1
+
+        return self.healpix.plot_grid(axes, *args, **kwargs)
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
@@ -782,7 +803,7 @@ class SkyMap:
 
         # Plot the skymap pixel boundaries
         if plot_pixels:
-            self.healpix.plot_grid(axes, linewidth=0.1, color='black')
+            self.plot_pixels(axes, linewidth=0.1, color='black')
 
         # Plot coordinates if given
         if coordinates:
