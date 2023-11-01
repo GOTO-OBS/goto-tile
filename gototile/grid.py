@@ -28,10 +28,26 @@ from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
 
 
-NAMED_GRIDS = {'GOTO4': [(3.7, 4.9), (0.1, 0.1), 'minverlap'],
-               'GOTO8p': [(7.8, 5.1), (0.1, 0.1), 'minverlap'],
-               'GOTO8': [(8.0, 5.5), (0.2 / 8.0, 0.2 / 5.5), 'enhanced1011'],  # NB absolute overlap
-               }
+NAMED_GRIDS = {
+    'GOTO4':
+        {'fov': (3.7, 4.9),
+         'overlap': (0.1, 0.1),
+         'kind': 'minverlap',
+         'array': {'fov': (2.1, 2.8), 'shape': (2, 2), 'overlap': 0.3}
+         },
+    'GOTO8p':
+        {'fov': (7.8, 5.1),
+         'overlap': (0.1, 0.1),
+         'kind': 'minverlap',
+         'array': {'fov': (2.1, 2.8), 'shape': (4, 2), 'overlap': 0.3}
+         },
+    'GOTO8':
+        {'fov': (8.0, 5.5),
+         'overlap': (0.2 / 8.0, 0.2 / 5.5),  # Note absolute 0.2 deg overlap, not relative fraction
+         'kind': 'enhanced1011',  # integer_fit, polar_edge & corner_align but don't force_equator
+         'array': {'fov': (2.21, 2.95), 'shape': (4, 2), 'overlap': 0.2}
+         },
+}
 # Aliases
 NAMED_GRIDS['GOTO-4'] = NAMED_GRIDS['GOTO4']
 NAMED_GRIDS['GOTO-8p'] = NAMED_GRIDS['GOTO8p']
@@ -326,6 +342,71 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
     return allras, alldecs
 
 
+def create_array(fov=(2.21, 2.95), shape=(4, 2), overlap=0.2):
+    """Define the relative on-sky offsets for an array of rectangular FoVs.
+
+    The default is the GOTO array of 8 UTs, arranged in 2 rows of 4, with 0.2 deg overlap.
+
+    The fields are numbered starting in the top left, going left to right, top to bottom.
+    e.g. for GOTO the (4,2) arrangement is
+        +---+---+---+---+
+        | 1 | 2 | 3 | 4 |
+        +---+---+---+---+
+        | 5 | 6 | 7 | 8 |
+        +---+---+---+---+
+    assuming North (increasing Dec) is up and East (increasing RA) is left.
+
+    The returned positions are given in degrees relative to the centre, defined as (0, 0).
+    For actual on-sky coordinates for a given target use the `onsky_offset` function.
+
+    Parameters
+    ----------
+    fov : 2-tuple of floats, optional
+        The field of view of each field in RA and Dec, in degrees.
+        Default=(2.21, 2.95) (the GOTO UT FoV)
+    shape : 2-tuple of ints, optional
+        The number of fields spaced in RA and Dec (N_ra columns x N_dec rows).
+        Default=(4, 2) (the GOTO 8-UT array arrangement)
+    overlap : float or 2-tuple of floats, optional
+        The amount of overlap between fields, in degrees.
+        If two values are given they are the overlap in RA and Dec, a single value is used for both.
+        Can be negative, in which case there will be gaps between the fields.
+        Default=0.2 (the GOTO UT overlap, the same in both RA and Dec)
+
+    Returns
+    -------
+    centres : `numpy.ndarray`, shape=(N_ra x N_dec, 2)
+        The on-sky positions of the centres of each field, relative to the centre of the array.
+    corners : `numpy.ndarray`, shape=(N_ra x N_dec, 4, 2)
+        The on-sky positions of the four corners of each field, relative to the centre of the array.
+
+    """
+    if isinstance(overlap, (int, float)):
+        overlap = (overlap, overlap)
+
+    # We define UTs going in "reading" order, left to right, top to bottom.
+    # This is why we reverse the ranges for each offset, and loop in Dec then RA.
+    centres = []
+    for j in range(shape[1])[::-1]:
+        for i in range(shape[0])[::-1]:
+            centres.append((
+                (i - (shape[0] - 1) / 2) * (fov[0] - overlap[0]),
+                (j - (shape[1] - 1) / 2) * (fov[1] - overlap[1]),
+            ))
+
+    # Now simply offset half the fov in each direction from the centres to find the four corners.
+    # We go in order NW>NE>SE>SW, same as the grid tiles.
+    corners = [
+        [(c[0] - fov[0] / 2, c[1] + fov[1] / 2),
+         (c[0] + fov[0] / 2, c[1] + fov[1] / 2),
+         (c[0] + fov[0] / 2, c[1] - fov[1] / 2),
+         (c[0] - fov[0] / 2, c[1] - fov[1] / 2),
+         ]
+        for c in centres]
+
+    return np.array(centres), np.array(corners)
+
+
 class SkyGrid:
     """An all-sky grid of defined tiles.
 
@@ -348,9 +429,15 @@ class SkyGrid:
         The tiling method to use. See `gototile.grid.create_grid` for options.
         Default is 'minverlap'.
 
+    array_params : dict or 3-tuple, optional
+        If given, define a sub-array for each position on the grid.
+        The dict should contain the keys 'fov', 'shape', and 'overlap', or the parameters can be
+        given as a 3-tuple of (fov, shape, overlap).
+        See `gototile.grid.create_array()` for details on how the array is defined.
+
     """
 
-    def __init__(self, fov, overlap=None, kind='minverlap'):
+    def __init__(self, fov, overlap=None, kind='minverlap', array_params=None):
         # Parse fov
         if isinstance(fov, (list, tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
@@ -406,6 +493,28 @@ class SkyGrid:
         fill_len = len(str(max(self.tilenums)))
         self.tilenames = ['T' + str(num).zfill(fill_len) for num in self.tilenums]
 
+        # Define the sub-array, if given
+        if array_params is not None:
+            if isinstance(array_params, dict):
+                fov = array_params['fov']
+                shape = array_params['shape']
+                overlap = array_params['overlap']
+            else:
+                fov, shape, overlap = array_params
+            self.array_params = (fov, shape, overlap)
+
+            # For each grid point get the centres and corners of each field in the array
+            array_centres, array_corners = create_array(fov, shape, overlap)
+            self.array_coords = onsky_offset(self.coords, array_centres * u.deg)
+            all_corners = SkyCoord([onsky_offset(self.coords, c * u.deg) for c in array_corners])
+            all_corners = all_corners.reshape(len(array_corners), self.ntiles, 4)
+            all_corners = all_corners.transpose(1, 0, 2)
+            self.array_vertices = all_corners
+        else:
+            self.array_params = None
+            self.array_coords = None
+            self.array_vertices = None
+
         # Properties waiting for a skymap to be applied
         self.skymap = None
         self.pixels = None
@@ -452,18 +561,19 @@ class SkyGrid:
                 fov = (float(name.split('-')[1].split('x')[0]),
                        float(name.split('-')[1].split('x')[1]))
                 overlap = (float(name.split('-')[2]), float(name.split('-')[3]))
+                return cls(fov, overlap)
             except Exception:
                 template = 'allsky-{fov_ra}x{fov_dec}-{overlap_ra}-{overlap_dec}`'
                 raise ValueError(f'Grid name "{name}" not recognised, '
                                  'Name format should match ', template)
-        else:
-            if name in NAMED_GRIDS:
-                fov, overlap, kind = NAMED_GRIDS[name]
-            else:
-                raise ValueError(f'Grid name "{name}" not recognised, '
-                                 'check SkyGrid.get_named_grids() for known grids.')
+        elif name in NAMED_GRIDS:
+            fov = NAMED_GRIDS[name]['fov']
+            overlap = NAMED_GRIDS[name]['overlap']
+            kind = NAMED_GRIDS[name]['kind']
+            array_params = NAMED_GRIDS[name].get('array')
+            return cls(fov, overlap, kind, array_params)
 
-        return cls(fov, overlap, kind)
+        raise ValueError(f'Name "{name}" not recognised, check `SkyGrid.get_named_grids()`.')
 
     @staticmethod
     def get_named_grids():
@@ -651,6 +761,9 @@ class SkyGrid:
             The name(s) of the tile(s) the coordinates are within
 
         """
+        # TODO: spherical_geometry has better functions for things like overlaps, areas and
+        #       finding if a point is within an area
+
         # Handle both scalar and vector coordinates
         scalar = False
         if coord.isscalar:
@@ -687,6 +800,16 @@ class SkyGrid:
             return tilenames[0]
         else:
             return tilenames
+
+    def get_field(self):
+        """Find which field(s) the given coordinates fall within."""
+        # TODO: With the array system we should be able to find the exact tile and field within
+        #       that tile's array the coordinates are in.
+        #       However the way we do it with the base HEALPix map would involve finding which
+        #       pixels are in every field.
+        #       Instead I think spherical_geometry is the way to go, but that would require
+        #       a bigger requite of some of the internal functions.
+        raise NotImplementedError
 
     def get_visible_tiles(self, locations, time_range=None, alt_limit=30, sun_limit=-15,
                           any_all='any'):
@@ -974,35 +1097,72 @@ class SkyGrid:
         table = table.group_by('in_tiles')
         return table
 
-    def _get_tile_paths(self, meridian_split=False):
+    def _get_tile_paths(self, meridian_split=False, edge_points=4):
         """Create and cache Matplotlib Patches to use when plotting tiles."""
         # Used cached versions to save time when repeatedly plotting
-        if not meridian_split and hasattr(self, '_paths'):
+        if (not meridian_split and hasattr(self, '_paths') and
+                self._paths_points == edge_points):
             return self._paths
-        elif meridian_split and hasattr(self, '_paths_split'):
+        elif (meridian_split and hasattr(self, '_paths_split') and
+                self._paths_split_points == edge_points):
             return self._paths_split
 
         # We can't just plot the four corners (already saved under self.vertices) because that will
         # plot straight lines between them. That will look bad, because we're on a sphere.
         # Instead we get some intermediate points along the edges, so they look better when plotted.
         # (Admittedly this is only obvious with very large tiles, but it's still good to do).
-        edges = self.get_edges(edge_points=4)
+        edges = interpolate_points(self.vertices, edge_points)
 
         # Get list of matplotlib paths for the tile areas
         paths = [coords_to_path(edge_coords, meridian_split) for edge_coords in edges]
 
         if not meridian_split:
             self._paths = paths
+            self._paths_points = edge_points
         else:
             self._paths_split = paths
+            self._paths_split_points = edge_points
 
         return paths
+
+    def _get_array_paths(self, meridian_split=False, edge_points=1):
+        """Create and cache Matplotlib Patches to use when plotting sub-array fields."""
+        # Used cached versions to save time when repeatedly plotting
+        if (not meridian_split and hasattr(self, '_array_paths') and
+                self._array_paths_points == edge_points):
+            return self._array_paths
+        elif (meridian_split and hasattr(self, '_array_paths_split') and
+                self._array_paths_split_points == edge_points):
+            return self._array_paths_split
+
+        if self.array_params is None:
+            raise ValueError('SkyGrid does not have an array defined')
+
+        # It's quicker go through each field at once rather than loop though each tile
+        # (actually if you don't interpolate it takes about the same time, but if you do have
+        #  edge_points>0 then doing that e.g. 8 times is much quicker than 1048!)
+        all_corners = self.array_vertices.transpose(1, 0, 2)
+        all_paths = []
+        for corners in all_corners:
+            edges = interpolate_points(corners, edge_points)
+            paths = [coords_to_path(edge_coords, meridian_split) for edge_coords in edges]
+            all_paths.append(paths)
+        all_paths = np.array(all_paths).T
+
+        if not meridian_split:
+            self._array_paths = all_paths
+            self._array_paths_points = edge_points
+        else:
+            self._array_paths_split = all_paths
+            self._array_paths_split_points = edge_points
+
+        return all_paths
 
     def plot_tile(self, axes, tilename, *args, **kwargs):
         """Plot a Patch for a single tile onto the given axes."""
         return self.plot_tiles(axes, [tilename], *args, **kwargs)
 
-    def plot_tiles(self, axes, tilenames=None, *args, **kwargs):
+    def plot_tiles(self, axes, tilenames=None, edge_points=4, *args, **kwargs):
         """Plot a PatchCollection for the grid tiles onto the given axes."""
         # Add default arguments
         if 'fc' not in kwargs and 'facecolor' not in kwargs:
@@ -1014,7 +1174,7 @@ class SkyGrid:
 
         # Get tile paths (will be cached after the first use)
         meridian_split = 'Mollweide' in axes.__class__.__name__
-        paths = self._get_tile_paths(meridian_split=meridian_split)
+        paths = self._get_tile_paths(meridian_split, edge_points)
         if tilenames is not None:
             indexes = [self.tilenames.index(tilename) for tilename in tilenames]
             paths = np.array(paths)[indexes]
@@ -1038,6 +1198,38 @@ class SkyGrid:
             )
             axes.add_collection(collection)
             return collection
+
+    def plot_array(self, axes, tilenames=None, edge_points=1, *args, **kwargs):
+        """Plot a sub-array of fields aligned to the grid onto the given axes."""
+        if self.array_params is None:
+            raise ValueError('SkyGrid does not have an array defined')
+
+        # Add default arguments
+        if 'fc' not in kwargs and 'facecolor' not in kwargs:
+            kwargs['fc'] = 'tab:blue'
+        if 'ec' not in kwargs and 'edgecolor' not in kwargs:
+            kwargs['ec'] = 'black'
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.5
+
+        # Get the patches for each field (will be cached after the first use)
+        meridian_split = 'Mollweide' in axes.__class__.__name__
+        paths = self._get_array_paths(meridian_split, edge_points)
+        if tilenames is not None:
+            indices = self._get_tilename_indices(tilenames)
+            paths = np.array(paths)[indices]
+
+        # Make a single collection from all the paths
+        # PatchCollections are 1D, so we have to flatten the array first
+        paths = paths.flatten()
+        patches = [PathPatch(path) for path in paths]
+        collection = PatchCollection(
+            patches,
+            transform=axes.get_transform('world'),
+            *args, **kwargs
+        )
+        axes.add_collection(collection)
+        return collection
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
