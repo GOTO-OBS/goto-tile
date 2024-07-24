@@ -424,7 +424,19 @@ class SkyMap:
         """
         warnings.filterwarnings('ignore', category=fits.verify.VerifyWarning)
         if self.header is not None:
-            header = [(k.upper(), self.header[k]) for k in self.header]
+            # We need to be careful with extended header cards, like HISTORY.
+            # write_map only accepts a dict of (card, value) pairs, but the extended cards
+            # will have been converted to a HeaderCommentaryCards object.
+            # So we have to add multiple entries for each extended card.
+            header = [
+                (k.upper(), self.header[k])
+                for k in self.header
+                if not isinstance(self.header[k], fits.header._HeaderCommentaryCards)
+            ]
+            for k in self.header:
+                if isinstance(self.header[k], fits.header._HeaderCommentaryCards):
+                    for v in self.header[k]:
+                        header.append((k.upper(), v))
         else:
             header = None
         self.healpix.write_map(filename,
