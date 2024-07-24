@@ -104,6 +104,17 @@ class SkyMap:
 
         return result
 
+    def __pow__(self, exponent):
+        if not isinstance(exponent, (int, float)):
+            raise TypeError('Exponent must be an integer or a float')
+
+        result = self.copy()
+
+        new_data = result.data ** exponent
+        result._save_data(new_data, order=self.order, coordsys=self.coordsys, density=self.density)
+
+        return result
+
     def __repr__(self):
         template = ('SkyMap(nside={}, order={}, coordsys={}, density={})')
         return template.format(self.nside, self.order, self.coordsys, self.density)
@@ -138,6 +149,8 @@ class SkyMap:
                                       )
 
         # Save coordsys (not considered by mhealpy)
+        # TODO ACTUALLY IT IS NOW:
+        # https://gitlab.com/burstcube/mhealpy/-/commit/8f4d59d3c0f7dbf56c7d6e088202c5b2e53dbe3f
         self.coordsys = coordsys
 
         # Save pixel indices, Nside values and areas (in steradians)
@@ -218,7 +231,7 @@ class SkyMap:
 
     @density.setter
     def density(self, to_density):
-        """Convert between histogram (counts) and density (per steradian) maps."""
+        """Convert the skymap between a count histogram or density of counts per steradian."""
         if not self.density and to_density:
             # Convert the histogram map to density per base pixel
             data = self.data / self.pix_area
@@ -655,13 +668,26 @@ class SkyMap:
 
     def plot_data(self, axes, *args, **kwargs):
         """Plot the skymap data onto the given axes."""
+        # Add default arguments
+        if 'cmap' not in kwargs:
+            kwargs['cmap'] = 'cylon'
+        if 'cbar' not in kwargs:
+            kwargs['cbar'] = False
+
         return self.healpix.plot(axes, *args, **kwargs)
 
-    def plot_contours(self, axes, levels, *args, **kwargs):
+    def plot_contours(self, axes, levels=(0.5, 0.9), *args, **kwargs):
         """Plot the skymap contours onto the given axes."""
         if isinstance(levels, (int, float)):
             levels = [levels]
         levels = sorted(levels)
+
+        # Add default arguments
+        if 'colors' not in kwargs:
+            kwargs['colors'] = 'black'
+        if 'linewidths' not in kwargs:
+            kwargs['linewidths'] = 0.5
+
         if not self.is_moc:
             return axes.contour_hpx(
                 self.contours / max(self.contours),
@@ -685,6 +711,14 @@ class SkyMap:
                 levels=[i + 0.5 for i in range(len(levels))],
                 *args, **kwargs,
             )
+
+    def plot_pixels(self, axes, *args, **kwargs):
+        """Plot the skymap data onto the given axes."""
+        # Add default arguments
+        if 'lw' not in kwargs and 'linewidth' not in kwargs:
+            kwargs['lw'] = 0.1
+
+        return self.healpix.plot_grid(axes, *args, **kwargs)
 
     def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
              plot_type='mollweide', center=(0, 45), radius=10,
@@ -780,7 +814,7 @@ class SkyMap:
 
         # Plot the skymap pixel boundaries
         if plot_pixels:
-            self.healpix.plot_grid(axes, linewidth=0.1, color='black')
+            self.plot_pixels(axes, linewidth=0.1, color='black')
 
         # Plot coordinates if given
         if coordinates:

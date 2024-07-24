@@ -10,6 +10,8 @@ from astropy.time import Time, TimeDelta
 from gototile.grid import SkyGrid
 from gototile.skymap import SkyMap
 
+from matplotlib import pyplot as plt
+
 import numpy as np
 
 
@@ -53,7 +55,30 @@ def run(grid, skymap=None,
 
         if plot is not None:
             print('Saving tile plot to', plot)
-            grid.plot(filename=plot, title='', dpi=150, plot_skymap=True)
+
+            fig = plt.figure(figsize=(12, 6), dpi=150)
+            axes = plt.axes(projection='astro hours mollweide')
+            axes.grid()
+
+            # Add the tiles coloured by probability
+            tiles = grid.plot_tiles(axes, array=grid.probs, ec='none', alpha=0.6, zorder=1)
+            grid.plot_tiles(axes, fc='none', ec='0.7', lw=0.3, zorder=1.2)
+
+            # Add the skymap contours
+            skymap.plot_contours(axes, levels=[0.5, 0.9],
+                                 colors='black', linewidths=0.5, zorder=1.3)
+
+            # Add a colorbar
+            tiles.set_cmap('cylon')
+            fig.colorbar(
+                tiles, ax=axes, fraction=0.02, pad=0.05,
+                label='Tile contained probability',
+                format=lambda x, _: f'{x:.0%}'
+                )
+
+            # Save the figure
+            plt.savefig(plot)
+            plt.close(fig)
 
         # That's all
         return
@@ -153,6 +178,7 @@ def run(grid, skymap=None,
         table.to_pandas().to_csv(outfile)
 
     if plot is not None:
+        # TODO: REPLACE WITH PROPER PLOT
         print('Saving observation plot to', plot)
         visible_tiles = grid.get_visible_tiles(site, time_range=(start_date, end_date),
                                                alt_limit=min_alt, sun_limit=twilight)
@@ -264,14 +290,16 @@ if __name__ == '__main__':
 
     # Select the grid based on the system
     if args.telescope in SkyGrid.get_named_grids():
-        fov, overlap = SkyGrid.get_named_grids()[args.telescope]
-        print(f'Using defined sky grid "{args.telescope}": fov={fov}, overlap={overlap}')
-        grid = SkyGrid(fov, overlap)
+        fov, overlap, kind = SkyGrid.get_named_grids()[args.telescope]
+        print(f'Using defined sky grid "{args.telescope}":', end=' ')
+        print(f'fov={fov}, overlap={overlap}, kind={kind}')
+        grid = SkyGrid(fov, overlap, kind)
     elif args.grid:
         fov = (args.grid[0], args.grid[1])
         overlap = (args.grid[2], args.grid[3])
+        kind = 'enhanced1011'  # TODO: add grid method arg?
         print(f'Using new sky grid: fov={fov}, overlap={overlap}')
-        grid = SkyGrid(fov, overlap)
+        grid = SkyGrid(fov, overlap, kind)
     else:
         raise ValueError('Missing telescope or grid parameters')
     print(f'Generated grid containing {grid.ntiles} tiles')
