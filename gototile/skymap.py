@@ -1,5 +1,7 @@
 """Module containing the SkyMap class."""
 
+from gzip import GzipFile
+from io import BytesIO
 import os
 import warnings
 from copy import deepcopy
@@ -273,12 +275,21 @@ class SkyMap:
             SkyMap object.
 
         """
-        # If a path has been given then open the file
         file_open = False
         if isinstance(fits_file, str):
+            # If a string has been given then open the file (could be a path or URL)
             hdu_list = fits.open(fits_file)
             hdu = hdu_list[hdu]
             file_open = True
+        elif isinstance(fits_file, bytes):
+            # We also allow encoded FITS files (e.g. from notices)
+            try:
+                hdu_list = fits.open(BytesIO(fits_file))
+            except OSError:
+                # It might be compressed
+                gzip = GzipFile(fileobj=BytesIO(fits_file), mode='rb')
+                hdu_list = fits.open(gzip)
+            hdu = hdu_list[hdu]
         elif isinstance(fits_file, fits.hdu.HDUList):
             hdu = fits_file[hdu]
         else:
@@ -424,7 +435,19 @@ class SkyMap:
         """
         warnings.filterwarnings('ignore', category=fits.verify.VerifyWarning)
         if self.header is not None:
-            header = [(k.upper(), self.header[k]) for k in self.header]
+            # We need to be careful with extended header cards, like HISTORY.
+            # write_map only accepts a dict of (card, value) pairs, but the extended cards
+            # will have been converted to a HeaderCommentaryCards object.
+            # So we have to add multiple entries for each extended card.
+            header = [
+                (k.upper(), self.header[k])
+                for k in self.header
+                if not isinstance(self.header[k], fits.header._HeaderCommentaryCards)
+            ]
+            for k in self.header:
+                if isinstance(self.header[k], fits.header._HeaderCommentaryCards):
+                    for v in self.header[k]:
+                        header.append((k.upper(), v))
         else:
             header = None
         self.healpix.write_map(filename,
