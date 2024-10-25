@@ -674,46 +674,32 @@ class SkyGrid:
 
         This method iterates through the tiles by selecting the one with highest probability,
         adding it to the list, then blanking out that portion of the sky and recalculating the
-        remaining tile probabilities.
+        probabilities of any overlapping tiles.
 
-        As this can take quite a while the probability limit (`prob_limit`) is a way to ignore
+        To save time the probability limit (`prob_limit`) is a way to ignore any
         tiles with a probability of less than 10^-1**prob_limit (i.e. if the prob_limit is 3 then
-        it will only consider tiles with a probability of more than 0.001). The default is 7, which
-        will make no difference unless you are considering the 99.9999999% skymap contour level...
+        it will only consider tiles with a probability of more than 0.001). The default is 5, which
+        will make no difference unless you are considering the 99.99999% skymap contour level...
 
         The result is a minimum contour level for every tile, starting at 0 for the highest
         probability tile and increasing from there. To select all tiles within a given contour X you
         can mask for those with a contour level < X.
-
-        You could argue that a faster method would be to only recalculate the probability of the
-        tiles that overlap with the high tile. That's true, but the issue is finding which tiles
-        overlap. You'll have to loop through every tile and compare its pixels to those of
-        the high tile, and do that every time. It's just not worth it. Even if you pre-calculate
-        which tiles overlap before you start you don't save any time, because that takes ages
-        for any reasonable nside resolution.
         """
-        pixel_probs = self.skymap.data.copy()
-        if prob_limit:
-            # Exclude tiles containing a probability of less than 10^-prob_limit
-            tile_mask = self.probs > 10**(-1 * prob_limit)
-        else:
-            tile_mask = np.full(self.ntiles, True)
-        tile_pixels = self.pixels[tile_mask]
+        pixel_probs = self.skymap.data.copy()  # Copy since we will be blanking out pixels
+        tile_pixels = self.pixels
         tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
+        pixel_tiles = self._get_pixel_tiles(self.skymap)
 
         sorted_contours = [0]
         sorted_index = []
         for i in range(len(tile_pixels)):
             # Find the tile with the highest probability
             high_tile_prob = max(tile_probs)
-            if high_tile_prob == 0:
-                # We've already blacked out all the pixels, there's no probability left!
-                # This can happen with really low-resolution skymaps, where the grid tiles are
-                # of the order or larger than the pixels.
-                # Just add all the remaining pixels with a contour value of 1.
-                unassigned_pixels = [i for i in range(len(tile_pixels)) if i not in sorted_index]
-                sorted_index += unassigned_pixels
-                sorted_contours += [1] * len(unassigned_pixels)
+            if ((prob_limit is not None and high_tile_prob < 10**(-1 * prob_limit)) or
+                    high_tile_prob == 0):
+                # We've reached the probability limit, or we've already blacked out all the pixels
+                # and there's no probability left!
+                # Any remaining tiles will have their contour level set to 1.
                 break
             # Find the high tile index
             high_tile_index = np.where(tile_probs == high_tile_prob)[0][0]
@@ -725,12 +711,19 @@ class SkyGrid:
             # Black out the already-counted pixels
             high_tile_pixels = tile_pixels[high_tile_index]
             pixel_probs[high_tile_pixels] = 0
-            # Recalculate the probability within all tiles
-            tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
+            # Recalculate the probability within any changed tiles
+            changed_tiles = np.unique(np.concatenate(pixel_tiles[high_tile_pixels]))
+            tile_probs[changed_tiles] = np.array(
+                [np.sum(pixel_probs[pixels]) for pixels in tile_pixels[changed_tiles]]
+            )
 
-        # Start from a contour level of 1, only replace those within the mask
+        # Start from a contour level of 1, only replace those with the calculated values
+        # Note we don't include the last value in the contours list, since we want the
+        # contour level to start at 0.
+        # This ensures the highest probability tile has a contour of 0, so it is always selected
+        # when masking for tiles below a given contour level.
         contours = np.ones(self.ntiles)
-        contours[tile_mask] = np.array(sorted_contours)[np.array(sorted_index).argsort()]
+        contours[np.array(sorted_index)] = np.array(sorted_contours)[:-1]
 
         return contours
 
