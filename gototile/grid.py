@@ -632,8 +632,33 @@ class SkyGrid:
         # inside the region (`fact` tells how deep to look, at nside=self.nside*fact)
         ipix = [skymap.query_polygon(v, inclusive=True, fact=32) for v in vertices]
 
-        # Note the number of pixels per tile will vary, so the returned array is an array of lists
+        # Note the number of pixels per tile will vary, so we need dtype=object
+        # (skymap.query_polygon already returns numpy arrays)
         return np.array(ipix, dtype=object)
+
+    def _get_pixel_tiles(self, skymap=None):
+        """Calculate which tiles each skymap pixel is within."""
+        if skymap is None:
+            tile_pixels = self.pixels
+        else:
+            tile_pixels = self._get_tile_pixels(skymap)
+
+        # We do this by "inverting" the pixels array, so we have a list of pixels for each tile
+        # rather than a list of tiles for each pixel.
+        pixel_tile_dict = {}
+        for tile, pixels in enumerate(tile_pixels):
+            for pixel in pixels:
+                if pixel not in pixel_tile_dict:
+                    pixel_tile_dict[pixel] = []
+                pixel_tile_dict[pixel].append(tile)
+
+        # Convert the dictionary to a numpy array of arrays
+        # Again the number of tiles each pixel is in will vary, so we need
+        # to convert each sub-list to and array and use dtype=object
+        pixel_tiles = [[] for _ in range(max(pixel_tile_dict.keys()) + 1)]
+        for key, indices in pixel_tile_dict.items():
+            pixel_tiles[key] = indices
+        return np.array([np.array(tiles) for tiles in pixel_tiles], dtype=object)
 
     def _get_tile_probs(self):
         """Calculate the contained probabilities within each tile."""
