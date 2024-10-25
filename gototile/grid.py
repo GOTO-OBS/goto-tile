@@ -611,34 +611,32 @@ class SkyGrid:
 
         # Calculate which skymap pixels are contained within each tile,
         # then find the tile probabilities and contour levels
-        self.pixels = self._get_tile_pixels()
-        self.probs = self._get_tile_probs()
-        self.contours = self._get_tile_contours()
+        self.pixels = self._get_tile_pixels(self.skymap)
+        self.probs = self._get_tile_probs(self.skymap)
+        self.contours = self._get_tile_contours(self.skymap)
 
         return self.probs
 
-    def _get_tile_pixels(self, skymap=None):
+    def _get_tile_pixels(self, skymap):
         """Calculate the skymap pixel indices within each tile."""
-        if skymap is None:
-            skymap = self.skymap
-
         # Need to provide tile vertices in cartesian coordinates
-        vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
+        tile_vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
 
         # Use the mhealpy `query_polygon` method on the skymap.
         # Unlike healpy's `query_polygon` this can also deal with multi-order skymaps.
         # HOWEVER it's really, really slow. Which is why we have to flatten skymaps when applying.
         # `inclusive=True` will include pixels that overlap in area even if the centres aren't
         # inside the region (`fact` tells how deep to look, at nside=self.nside*fact)
-        ipix = [skymap.query_polygon(v, inclusive=True, fact=32) for v in vertices]
+        tile_pixels = [skymap.query_polygon(v, inclusive=True, fact=32) for v in tile_vertices]
 
         # Note the number of pixels per tile will vary, so we need dtype=object
         # (skymap.query_polygon already returns numpy arrays)
-        return np.array(ipix, dtype=object)
+        return np.array(tile_pixels, dtype=object)
 
-    def _get_pixel_tiles(self, skymap=None):
+    def _get_pixel_tiles(self, skymap):
         """Calculate which tiles each skymap pixel is within."""
-        if skymap is None:
+        if skymap == self.skymap and self.pixels is not None:
+            # Use cached pixels if available
             tile_pixels = self.pixels
         else:
             tile_pixels = self._get_tile_pixels(skymap)
@@ -660,12 +658,18 @@ class SkyGrid:
             pixel_tiles[key] = indices
         return np.array([np.array(tiles) for tiles in pixel_tiles], dtype=object)
 
-    def _get_tile_probs(self):
+    def _get_tile_probs(self, skymap):
         """Calculate the contained probabilities within each tile."""
-        probs = [np.sum(self.skymap.data[ipix]) for ipix in self.pixels]
-        return np.array(probs)
+        if skymap == self.skymap and self.pixels is not None:
+            # Use cached pixels if available
+            tile_pixels = self.pixels
+        else:
+            tile_pixels = self._get_tile_pixels(skymap)
+        pixel_probs = skymap.data
 
-    def _get_tile_contours(self, prob_limit=5):
+        return np.array([np.sum(pixel_probs[pixels]) for pixels in tile_pixels])
+
+    def _get_tile_contours(self, skymap, prob_limit=5):
         """Calculate the minimum contour level of each pixel.
 
         Unlike for SkyMaps (see `gototile.skymaptools.get_data_contours()`), the calculation for
@@ -685,10 +689,17 @@ class SkyGrid:
         probability tile and increasing from there. To select all tiles within a given contour X you
         can mask for those with a contour level < X.
         """
-        pixel_probs = self.skymap.data.copy()  # Copy since we will be blanking out pixels
-        tile_pixels = self.pixels
-        tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
-        pixel_tiles = self._get_pixel_tiles(self.skymap)
+        if skymap == self.skymap and self.pixels is not None:
+            # Use cached pixels if available
+            tile_pixels = self.pixels
+            # Copy both, probs since we will be blanking out pixels
+            tile_probs = self.probs.copy()
+            pixel_probs = self.skymap.data.copy()
+        else:
+            tile_pixels = self._get_tile_pixels(skymap)
+            tile_probs = self._get_tile_probs(skymap)
+            pixel_probs = skymap.data.copy()
+        pixel_tiles = self._get_pixel_tiles(skymap)
 
         sorted_contours = [0]
         sorted_index = []
