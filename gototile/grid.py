@@ -580,7 +580,7 @@ class SkyGrid:
         """Get a dictionary of pre-defined grid parameters for use with `SkyGrid.from_name()`."""
         return NAMED_GRIDS
 
-    def apply_skymap(self, skymap, flatten=False):
+    def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid, calculating the contained probability within each tile.
 
         The tile probabilities are stored in self.probs, and the contour levels in self.contours.
@@ -589,17 +589,11 @@ class SkyGrid:
         ----------
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
-        flatten : bool, default=False
-            If True, and a multi-order skymap is given, then flatten it before applying.
 
         """
         # Store a copy of the skymap on the class
         self.skymap = skymap.copy()
         self.nside = self.skymap.nside
-
-        # Flatten multi-order skymaps if requested
-        if self.skymap.is_moc and flatten:
-            self.skymap.regrade(self.skymap.nside, order='NESTED')
 
         # Ensure the skymap is in equatorial coordinates
         if self.skymap.coordsys != 'C':
@@ -622,9 +616,7 @@ class SkyGrid:
         # Need to provide tile vertices in cartesian coordinates
         tile_vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
 
-        # Use the mhealpy `query_polygon` method on the skymap.
-        # Unlike healpy's `query_polygon` this can also deal with multi-order skymaps.
-        # HOWEVER it's really, really slow. Which is why we have to flatten skymaps when applying.
+        # Get the pixels within each polygon on the map.
         # `inclusive=True` will include pixels that overlap in area even if the centres aren't
         # inside the region (`fact` tells how deep to look, at nside=self.nside*fact)
         tile_pixels = [skymap.query_polygon(v, inclusive=True, fact=32) for v in tile_vertices]
