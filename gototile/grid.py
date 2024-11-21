@@ -580,7 +580,7 @@ class SkyGrid:
         """Get a dictionary of pre-defined grid parameters for use with `SkyGrid.from_name()`."""
         return NAMED_GRIDS
 
-    def apply_skymap(self, skymap, flatten=False):
+    def apply_skymap(self, skymap):
         """Apply a SkyMap to the grid, calculating the contained probability within each tile.
 
         The tile probabilities are stored in self.probs, and the contour levels in self.contours.
@@ -589,17 +589,11 @@ class SkyGrid:
         ----------
         skymap : `gototile.skymap.SkyMap`
             The sky map to map onto this grid.
-        flatten : bool, default=False
-            If True, and a multi-order skymap is given, then flatten it before applying.
 
         """
         # Store a copy of the skymap on the class
         self.skymap = skymap.copy()
         self.nside = self.skymap.nside
-
-        # Flatten multi-order skymaps if requested
-        if self.skymap.is_moc and flatten:
-            self.skymap.regrade(self.skymap.nside, order='NESTED')
 
         # Ensure the skymap is in equatorial coordinates
         if self.skymap.coordsys != 'C':
@@ -611,36 +605,63 @@ class SkyGrid:
 
         # Calculate which skymap pixels are contained within each tile,
         # then find the tile probabilities and contour levels
-        self.pixels = self._get_tile_pixels()
-        self.probs = self._get_tile_probs()
-        self.contours = self._get_tile_contours()
+        self.pixels = self._get_tile_pixels(self.skymap)
+        self.probs = self._get_tile_probs(self.skymap)
+        self.contours = self._get_tile_contours(self.skymap)
 
         return self.probs
 
-    def _get_tile_pixels(self, skymap=None):
+    def _get_tile_pixels(self, skymap):
         """Calculate the skymap pixel indices within each tile."""
-        if skymap is None:
-            skymap = self.skymap
-
         # Need to provide tile vertices in cartesian coordinates
-        vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
+        tile_vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
 
-        # Use the mhealpy `query_polygon` method on the skymap.
-        # Unlike healpy's `query_polygon` this can also deal with multi-order skymaps.
-        # HOWEVER it's really, really slow. Which is why we have to flatten skymaps when applying.
+        # Get the pixels within each polygon on the map.
         # `inclusive=True` will include pixels that overlap in area even if the centres aren't
         # inside the region (`fact` tells how deep to look, at nside=self.nside*fact)
-        ipix = [skymap.query_polygon(v, inclusive=True, fact=32) for v in vertices]
+        tile_pixels = [skymap.query_polygon(v, inclusive=True, fact=32) for v in tile_vertices]
 
-        # Note the number of pixels per tile will vary, so the returned array is an array of lists
-        return np.array(ipix, dtype=object)
+        # Note the number of pixels per tile will vary, so we need dtype=object
+        # (skymap.query_polygon already returns numpy arrays)
+        return np.array(tile_pixels, dtype=object)
 
-    def _get_tile_probs(self):
+    def _get_pixel_tiles(self, skymap):
+        """Calculate which tiles each skymap pixel is within."""
+        if skymap == self.skymap and self.pixels is not None:
+            # Use cached pixels if available
+            tile_pixels = self.pixels
+        else:
+            tile_pixels = self._get_tile_pixels(skymap)
+
+        # We do this by "inverting" the pixels array, so we have a list of pixels for each tile
+        # rather than a list of tiles for each pixel.
+        pixel_tile_dict = {}
+        for tile, pixels in enumerate(tile_pixels):
+            for pixel in pixels:
+                if pixel not in pixel_tile_dict:
+                    pixel_tile_dict[pixel] = []
+                pixel_tile_dict[pixel].append(tile)
+
+        # Convert the dictionary to a numpy array of arrays
+        # Again the number of tiles each pixel is in will vary, so we need
+        # to convert each sub-list to and array and use dtype=object
+        pixel_tiles = [[] for _ in range(max(pixel_tile_dict.keys()) + 1)]
+        for key, indices in pixel_tile_dict.items():
+            pixel_tiles[key] = indices
+        return np.array([np.array(tiles) for tiles in pixel_tiles], dtype=object)
+
+    def _get_tile_probs(self, skymap):
         """Calculate the contained probabilities within each tile."""
-        probs = [np.sum(self.skymap.data[ipix]) for ipix in self.pixels]
-        return np.array(probs)
+        if skymap == self.skymap and self.pixels is not None:
+            # Use cached pixels if available
+            tile_pixels = self.pixels
+        else:
+            tile_pixels = self._get_tile_pixels(skymap)
+        pixel_probs = skymap.data
 
-    def _get_tile_contours(self, prob_limit=5):
+        return np.array([np.sum(pixel_probs[pixels]) for pixels in tile_pixels])
+
+    def _get_tile_contours(self, skymap, prob_limit=5):
         """Calculate the minimum contour level of each pixel.
 
         Unlike for SkyMaps (see `gototile.skymaptools.get_data_contours()`), the calculation for
@@ -649,46 +670,39 @@ class SkyGrid:
 
         This method iterates through the tiles by selecting the one with highest probability,
         adding it to the list, then blanking out that portion of the sky and recalculating the
-        remaining tile probabilities.
+        probabilities of any overlapping tiles.
 
-        As this can take quite a while the probability limit (`prob_limit`) is a way to ignore
+        To save time the probability limit (`prob_limit`) is a way to ignore any
         tiles with a probability of less than 10^-1**prob_limit (i.e. if the prob_limit is 3 then
-        it will only consider tiles with a probability of more than 0.001). The default is 7, which
-        will make no difference unless you are considering the 99.9999999% skymap contour level...
+        it will only consider tiles with a probability of more than 0.001). The default is 5, which
+        will make no difference unless you are considering the 99.99999% skymap contour level...
 
         The result is a minimum contour level for every tile, starting at 0 for the highest
         probability tile and increasing from there. To select all tiles within a given contour X you
         can mask for those with a contour level < X.
-
-        You could argue that a faster method would be to only recalculate the probability of the
-        tiles that overlap with the high tile. That's true, but the issue is finding which tiles
-        overlap. You'll have to loop through every tile and compare its pixels to those of
-        the high tile, and do that every time. It's just not worth it. Even if you pre-calculate
-        which tiles overlap before you start you don't save any time, because that takes ages
-        for any reasonable nside resolution.
         """
-        pixel_probs = self.skymap.data.copy()
-        if prob_limit:
-            # Exclude tiles containing a probability of less than 10^-prob_limit
-            tile_mask = self.probs > 10**(-1 * prob_limit)
+        if skymap == self.skymap and self.pixels is not None:
+            # Use cached pixels if available
+            tile_pixels = self.pixels
+            # Copy both, probs since we will be blanking out pixels
+            tile_probs = self.probs.copy()
+            pixel_probs = self.skymap.data.copy()
         else:
-            tile_mask = np.full(self.ntiles, True)
-        tile_pixels = self.pixels[tile_mask]
-        tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
+            tile_pixels = self._get_tile_pixels(skymap)
+            tile_probs = self._get_tile_probs(skymap)
+            pixel_probs = skymap.data.copy()
+        pixel_tiles = self._get_pixel_tiles(skymap)
 
         sorted_contours = [0]
         sorted_index = []
         for i in range(len(tile_pixels)):
             # Find the tile with the highest probability
             high_tile_prob = max(tile_probs)
-            if high_tile_prob == 0:
-                # We've already blacked out all the pixels, there's no probability left!
-                # This can happen with really low-resolution skymaps, where the grid tiles are
-                # of the order or larger than the pixels.
-                # Just add all the remaining pixels with a contour value of 1.
-                unassigned_pixels = [i for i in range(len(tile_pixels)) if i not in sorted_index]
-                sorted_index += unassigned_pixels
-                sorted_contours += [1] * len(unassigned_pixels)
+            if ((prob_limit is not None and high_tile_prob < 10**(-1 * prob_limit)) or
+                    high_tile_prob == 0):
+                # We've reached the probability limit, or we've already blacked out all the pixels
+                # and there's no probability left!
+                # Any remaining tiles will have their contour level set to 1.
                 break
             # Find the high tile index
             high_tile_index = np.where(tile_probs == high_tile_prob)[0][0]
@@ -700,12 +714,19 @@ class SkyGrid:
             # Black out the already-counted pixels
             high_tile_pixels = tile_pixels[high_tile_index]
             pixel_probs[high_tile_pixels] = 0
-            # Recalculate the probability within all tiles
-            tile_probs = np.array([np.sum(pixel_probs[ipix]) for ipix in tile_pixels])
+            # Recalculate the probability within any changed tiles
+            changed_tiles = np.unique(np.concatenate(pixel_tiles[high_tile_pixels]))
+            tile_probs[changed_tiles] = np.array(
+                [np.sum(pixel_probs[pixels]) for pixels in tile_pixels[changed_tiles]]
+            )
 
-        # Start from a contour level of 1, only replace those within the mask
+        # Start from a contour level of 1, only replace those with the calculated values
+        # Note we don't include the last value in the contours list, since we want the
+        # contour level to start at 0.
+        # This ensures the highest probability tile has a contour of 0, so it is always selected
+        # when masking for tiles below a given contour level.
         contours = np.ones(self.ntiles)
-        contours[tile_mask] = np.array(sorted_contours)[np.array(sorted_index).argsort()]
+        contours[np.array(sorted_index)] = np.array(sorted_contours)[:-1]
 
         return contours
 

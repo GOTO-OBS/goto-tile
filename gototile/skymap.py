@@ -137,12 +137,23 @@ class SkyMap:
             nested_ipix = coord2pix(self.nside, coord, nest=True)
             return self.healpix.nest2pix(nested_ipix)
 
-    def _save_data(self, data, order=None, coordsys=None, uniq=None, density=None):
+    def _save_data(self, data, order=None, coordsys=None, uniq=None, density=False):
         """Save the skymap data and add attributes."""
         if order != 'NUNIQ':
             uniq = None
         elif uniq is None:
             raise ValueError('Uniq pixels not given for NUNIQ skymap')
+
+        # For quick polygon searches we expect the uniq pixels to be sorted.
+        # Unfortunately I don't think that's actually part of the HEALPIX standard,
+        # although it seems to be true in most cases I have found some GW maps that aren't,
+        # e.g. https://gracedb.ligo.org/api/superevents/S230605o/files/Bilby.multiorder.fits,0
+        # So here if the pixels aren't sorted we sort them, and then reorder the data values.
+        # There's no np.issorted function, the method below seems to be a popular way to check.
+        if uniq is not None and not np.all(np.diff(uniq) > 0):
+            sort_order = np.argsort(uniq)
+            uniq = uniq.copy()[sort_order]
+            data = data.copy()[sort_order]
 
         # Create mhealpy HEALPix class (we access most properties from here)
         self.healpix = mhp.HealpixMap(data, uniq,
@@ -159,13 +170,13 @@ class SkyMap:
         self.ipix = np.arange(self.npix, dtype=int)
         if self.is_moc:
             self.pix_nside = np.array([2 ** np.floor(np.log2(u / 4) / 2) for u in uniq], dtype=int)
-            self._nsides = set(self.pix_nside)  # Here to save time in query_polygon
-            # self.pix_order = np.log2(self.pix_nside)
             self.pix_area = 4 * np.pi / (12 * np.array(self.pix_nside) ** 2)
+            # Here we generate some private attributes to save time in query_polygon.
+            # Doing them once here is a lot faster than doing them every query.
+            self._nsides = set(self.pix_nside)
+            self._uniq_set = set(self.uniq)
         else:
-            # self.pix_nside = np.array([self.nside] * self.npix, dtype=int)
             self.pix_nside = np.full(self.npix, self.nside, dtype=int)
-            # self.pix_order = np.log2(self.pix_nside)
             self.pix_area = np.full(self.npix, 4 * np.pi / (12 * self.nside ** 2))
 
         # Find the coordinates of each pixel
@@ -658,18 +669,47 @@ class SkyMap:
         See `healpy.query_polygon` or `mhealpy.HealpixMap.query_polygon` for details.
 
         """
+        # Unfortunately `mhealpy.HealpixMap.query_polygon` is very slow for MOC maps.
+        # Otherwise we'd just do "return self.healpix.query_polygon(vertices, inclusive, fact)"
+        # The problem is that the `HealpixMap.pix_order_list` function is called every time,
+        # which is very slow. You could do it once on initialisation, but I don't think you need it
+        # at all.
+        # Instead, I just convert directly from NESTED to NUNIQ pixel indices for each order,
+        # and then do one big union with the skymap NUNIQ pixels. It means you don't need to
+        # know which NSIDE pixels are in the map, and one query outside the loop is bigger than
+        # doing it once for each nside. Plus using sets saves a lot of time.
         if self.is_moc:
-            # Unfortunately `mhealpy.HealpixMap.query_polygon` is *INCREDIBLY* slow for MOC maps.
-            # The problem is that the `HealpixMap.pix_order_list` function is called every time,
-            # even though we only need it once (and actually not at all).
-            # So here we just have the same function but optimised as much as I can.
-            all_uniq_pix = np.zeros(0, dtype=int)
+            # First we have to go through each nside level of the MOC map,
+            # and find the NUNIQ pixel indices of the pixels within the polygon.
+            # To do this we use the basic flat healpy.query_polygon() function, using NESTED
+            # ordering, and then convert the pixel indices to the NUNIQ numbering.
+            # The function says it's more efficient with RING ordering, but I don't find that,
+            # even before having to call hp.ring2nest each time (since we need NESTED indices to
+            # convert to NUNIQ).
+            # Since the indices for the NUNIQ ordering are, by definition, unique, we can just
+            # add them to a master set without worrying about duplicates.
+            all_uniq_pix = set()
             for nside in self._nsides:
-                ipix_nested = hp.query_polygon(nside, vertices, inclusive, fact, nest=True)
-                uniq_pix = ipix_nested + 4 * nside ** 2
-                all_uniq_pix = np.append(all_uniq_pix, uniq_pix)
-            uniq_mask = np.isin(self.uniq, all_uniq_pix)
-            query_pix = self.ipix[uniq_mask]
+                ipix = hp.query_polygon(nside, vertices, inclusive, fact, nest=True)
+                uniq_pix = ipix + 4 * nside ** 2
+                all_uniq_pix.update(uniq_pix)
+
+            # Now we have all the possible NUNIQ pixels within the polygon, we have to find which
+            # of those are included in our MOC skymap.
+            # I used to use np.isin(self.uniq, all_uniq_pix), but using sets is *much* faster.
+            # Assuming we've already created the set of all NUNIQ pixels in the map, which we do
+            # in SkyMap._save_data().
+            uniq_pix = self._uniq_set & all_uniq_pix
+
+            # Finally we find the ipix indices of each of those pixels.
+            # You could do query_pix = np.array([np.where(self.uniq == u)[0][0] for u in uniq_pix]),
+            # but this way is faster.
+            # np.searchsorted finds the position of each element in the uniq pixel array, which
+            # is really useful since that corresponds directly to the ipix indices.
+            # The caveat is that it does require the uniq list to be sorted, which we do in
+            # _save_data(). But even with that this is still much faster than the np.where method.
+            uniq_pix_array = np.array(list(uniq_pix))
+            query_pix = np.searchsorted(self.uniq, uniq_pix_array)
             return np.sort(query_pix)
         else:
             # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
