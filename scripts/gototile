@@ -17,7 +17,7 @@ import numpy as np
 
 def run(grid, skymap=None,
         simulate=True, date=None, duration=1, site=None, mounts=1, source=None,
-        maxtiles=200, minprob=0, contour=0.95, min_alt=30, twilight=-12, exptime=300,
+        max_tiles=200, min_prob=0, contour=0.95, min_alt=30, twilight=-12, exptime=300,
         airmass_weight=0.1,
         verbose=False, outfile=None, plot=None,
         ):
@@ -44,8 +44,7 @@ def run(grid, skymap=None,
 
     if not simulate:
         table = grid.get_table()
-        table.sort('prob')
-        table.reverse()
+        table.sort('prob', reverse=True)
         table = table.to_pandas()
         print(table)
 
@@ -85,15 +84,16 @@ def run(grid, skymap=None,
 
     # We want to simulate observing the tiles with the telescope
     # First select tiles based on the given limits
-    masked_table = grid.select_tiles(contour=contour,
-                                     max_tiles=maxtiles,
-                                     min_tile_prob=minprob,
-                                     )
-    print(f'Selected {len(masked_table)} tiles based on given limits.')
-    masked_table.sort('prob')
-    masked_table.reverse()
-    print(masked_table.to_pandas())
-    all_tiles = list(masked_table['tilename'])
+    grid_tiles = grid.get_table()
+    mask = grid_tiles['contour'] < contour & grid_tiles['prob'] > min_prob
+    selected_tiles = grid_tiles[mask]
+    selected_tiles.sort('prob', reverse=True)
+    if max_tiles > 0 and len(selected_tiles) > max_tiles:
+        # Select only the N highest probability tiles
+        selected_tiles = selected_tiles[:max_tiles]
+    print(f'Selected {len(selected_tiles)} tiles based on given limits.')
+    print(selected_tiles.to_pandas())
+    all_tiles = list(selected_tiles['tilename'])
     print(f'Total probability covered: {grid.get_probability(all_tiles):.2%}')
 
     # Then we want to run through observing with the given telescope(s) at the given site
@@ -104,7 +104,7 @@ def run(grid, skymap=None,
     if site is None:
         site = EarthLocation.of_site('lapalma')
     print(f'Simulating {duration} days starting from {date}...')
-    tile_times_observed = np.zeros(len(masked_table), dtype=int)
+    tile_times_observed = np.zeros(len(selected_tiles), dtype=int)
     start_date = date
     end_date = start_date + TimeDelta(duration * u.day)
     while date < end_date:
@@ -120,7 +120,7 @@ def run(grid, skymap=None,
 
         else:
             # Find which of the selected tiles are above the horizon
-            tile_coords = SkyCoord(masked_table['ra'], masked_table['dec'])
+            tile_coords = SkyCoord(selected_tiles['ra'], selected_tiles['dec'])
             tile_altaz = tile_coords.transform_to(altaz_frame)
             horizon_mask = tile_altaz.alt > min_alt * u.deg
             if sum(horizon_mask) == 0:
@@ -259,9 +259,9 @@ if __name__ == '__main__':
     group.add_argument('-C', '--source-coords', type=float, nargs=2, metavar=('RA', 'DEC'),
                        help=('Coordinates of the skymap source, in degrees'),
                        )
-    group.add_argument('--maxtiles', type=int, default=200,
+    group.add_argument('--max-tiles', type=int, default=200,
                        help='Maximum number of tiles to select for observing (default=0)')
-    group.add_argument('--minprob', type=float, default=0,
+    group.add_argument('--min-prob', type=float, default=0,
                        help='Minimum probability to select tiles (default=0)')
     group.add_argument('-c', '--contour', type=float, default=0.95,
                        help='Probability contour level to select tiles (default=0.95)')
@@ -328,8 +328,8 @@ if __name__ == '__main__':
         site=args.site,
         mounts=args.mounts,
         source=source,
-        maxtiles=args.maxtiles,
-        minprob=args.minprob,
+        max_tiles=args.max_tiles,
+        min_prob=args.min_prob,
         contour=args.contour,
         min_alt=args.min_alt,
         twilight=args.twilight,
