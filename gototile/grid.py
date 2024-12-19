@@ -730,27 +730,6 @@ class SkyGrid:
 
         return contours
 
-    def select_tiles(self, contour=0.9, max_tiles=None, min_tile_prob=None):
-        """Select tiles based off of the given contour."""
-        if self.probs is None or self.contours is None:
-            raise ValueError('SkyGrid does not have a SkyMap applied')
-
-        # Initially mask to cover the entire given contour level
-        mask = self.contours < contour
-
-        # Limit to given max tiles, if limit is given
-        if max_tiles is not None and sum(mask) > max_tiles:
-            # Limit by probability above `max_tiles`th tile
-            mask &= self.probs > sorted(self.probs, reverse=True)[max_tiles]
-
-        # Limit to tiles above min prob, if limit is given
-        if min_tile_prob is not None:
-            mask &= self.probs > min_tile_prob
-
-        # Returned the masked tile table
-        table = self.get_table()
-        return table[mask]
-
     def _get_test_map(self, nside=None):
         """Create a basic empty skymap, useful for statistical calculations.
 
@@ -1082,14 +1061,16 @@ class SkyGrid:
             return [self.get_area(tile) for tile in tilenames]
 
     def get_table(self):
-        """Return an astropy QTable containing information on the defined tiles.
+        """Return an astropy QTable containing the name and coordinates of each tile in the grid.
 
-        If a sky map has been applied to the grid the table will include a column with
-            the contained probability within each tile.
+        If a sky map has been applied to the grid the table will include columns with
+            the contained probability within each tile and the contour level it is within.
         """
-        col_names = ['tilename', 'ra', 'dec', 'prob']
+        col_names = ['tilename', 'ra', 'dec', 'prob', 'contour']
         col_data = [self.tilenames, self.coords.ra, self.coords.dec,
-                    self.probs if self.probs is not None else np.zeros(self.ntiles)]
+                    self.probs if self.probs is not None else np.zeros(self.ntiles),
+                    self.contours if self.contours is not None else np.zeros(self.ntiles),
+                    ]
         return QTable(col_data, names=col_names)
 
     def _get_pixel_count(self, nside=128):
