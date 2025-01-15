@@ -715,7 +715,7 @@ class SkyMap:
             # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
             ipix = hp.query_polygon(self.nside, vertices, inclusive, fact, nest=True)
             if self.order == 'RING':
-                ipix = [np.array(sorted(hp.nest2ring(self.nside, pix))) for pix in ipix]
+                ipix = np.array(sorted(hp.nest2ring(self.nside, ipix)))
             return ipix
 
     def get_table(self):
