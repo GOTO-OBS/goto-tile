@@ -26,6 +26,9 @@ dependencies = [
     "scipy",
 ]
 
+[project.scripts]
+gototile = "gototile.cli:main"
+
 [project.urls]
 Homepage = "http://github.com/GOTO-OBS/goto-tile"
 
