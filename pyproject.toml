@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gototile"
+dynamic = ["version"]
+description = "Create sky grids and tiles to cover extended sky maps"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.7"
+authors = [
+    { name = "Martin Dyer", email = "martin.dyer@sheffield.ac.uk" },
+]
+dependencies = [
+    "astroplan",
+    "astropy",
+    "healpy",
+    "ligo.skymap",
+    "matplotlib",
+    "mhealpy",
+    "numpy",
+    "pandas",
+    "PyYAML",
+    "requests",
+    "scipy",
+]
+
+[project.urls]
+Homepage = "http://github.com/GOTO-OBS/goto-tile"
+
+[tool.hatch.version]
+path = "src/gototile/version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/gototile",
+]
