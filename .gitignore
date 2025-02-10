@@ -10,4 +10,4 @@ __pycache__/
 *.vscode*
 
 # Don't upload large catalogs
-gototile/data/GLADE.csv
+src/gototile/data/GLADE.csv
