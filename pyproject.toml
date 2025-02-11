@@ -30,9 +30,6 @@ dependencies = [
     "mhealpy",
     "numpy",
     "pandas",
-    "PyYAML",
-    "requests",
-    "scipy",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
