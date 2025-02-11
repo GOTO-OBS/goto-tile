@@ -22,14 +22,14 @@ maintainers = [
   { name = "Martin Dyer", email = "martin.dyer@sheffield.ac.uk" },
 ]
 dependencies = [
-    "astroplan",
-    "astropy",
-    "healpy",
-    "ligo.skymap",
-    "matplotlib",
-    "mhealpy",
-    "numpy",
-    "pandas",
+    "astropy>=5",
+    "astroplan>=0.8",
+    "healpy>=1.16",
+    "mhealpy>=0.2",
+    "ligo.skymap>=1.0.4",
+    "matplotlib>=3.6",
+    "numpy>=1.24",
+    "pandas>=1.5",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
