@@ -14,11 +14,11 @@ It should not require any other GOTO-specific modules to be installed.
 
 Once you've downloaded or cloned the repository, in the base directory run:
 
-    pip3 install . --user
+    pip3 install .
 
 You should then be able to import the module using `import gototile` within Python.
 
-Several scripts from the `scripts` folder should also be added to your path.
+The `gototile` scripts should also be added to your path (see below).
 
 ## Usage instructions
 
