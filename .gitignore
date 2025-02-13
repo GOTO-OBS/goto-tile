@@ -4,10 +4,14 @@ __pycache__/
 *.egg-info/
 *.ipynb_checkpoints
 *build/
+*dist/
 
 # Visual Studio Code files
 *.browse*
 *.vscode*
 
+# Hatch VCS version file
+src/gototile/_version.py
+
 # Don't upload large catalogs
-gototile/data/GLADE.csv
+src/gototile/data/GLADE.csv

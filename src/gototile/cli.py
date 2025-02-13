@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-"""Core functionality"""
+"""Core command-line script for the gototile package."""
 
 import argparse
 
@@ -191,7 +191,7 @@ def run(grid, skymap=None,
                   )
 
 
-if __name__ == '__main__':
+def main():
     def date_validator(date):
         try:
             if date == 'now':

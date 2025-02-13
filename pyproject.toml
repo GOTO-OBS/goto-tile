@@ -1,0 +1,69 @@
+# Build Configuration
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling", "hatch-vcs"]
+
+# Project Configuration
+
+[project]
+name = "gototile"
+dynamic = ["version"]
+description = "Create sky grids and tiles to cover extended sky maps"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+requires-python = ">=3.7"
+authors = [
+    { name = "Martin Dyer", email = "martin.dyer@sheffield.ac.uk" },
+    { name = "Darren White", email = "djwhiteastro@gmail.com" },
+    { name = "Evert Rol", email = "evert.rol@gmail.com" },
+]
+maintainers = [
+  { name = "Martin Dyer", email = "martin.dyer@sheffield.ac.uk" },
+]
+dependencies = [
+    "astropy>=5",
+    "astroplan>=0.8",
+    "healpy>=1.16",
+    "mhealpy>=0.2",
+    "ligo.skymap>=1.0.4",
+    "matplotlib>=3.6",
+    "numpy>=1.24",
+    "pandas>=1.5",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Unix",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+keywords = [
+    "astronomy",
+]
+
+[project.scripts]
+gototile = "gototile.cli:main"
+
+[project.urls]
+homepage = "http://github.com/GOTO-OBS/goto-tile"
+documentation = "http://github.com/GOTO-OBS/goto-tile"
+repository = "http://github.com/GOTO-OBS/goto-tile"
+
+# Tool Configuration
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/gototile/_version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/gototile",
+]
