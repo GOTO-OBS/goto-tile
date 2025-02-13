@@ -28,6 +28,12 @@ def gaussian_prob(grid, peak, radius):
     sigma = radius / np.sqrt(2.3)
     prob = np.exp(-dist ** 2 / (2 * sigma ** 2))
 
+    if np.sum(prob) == 0:
+        # The radius is probably too small, so even in the peak pixel the gaussian prob is tiny.
+        # In this case we just have an empty map and set the prob to 1 at the peak.
+        prob = np.zeros_like(prob)
+        prob[dist == np.min(dist)] = 1
+
     # normalise the probability
     prob = prob / np.sum(prob)
 
