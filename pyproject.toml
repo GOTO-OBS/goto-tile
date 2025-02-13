@@ -2,7 +2,7 @@
 
 [build-system]
 build-backend = "hatchling.build"
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 
 # Project Configuration
 
@@ -58,7 +58,10 @@ repository = "http://github.com/GOTO-OBS/goto-tile"
 # Tool Configuration
 
 [tool.hatch.version]
-path = "src/gototile/version.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/gototile/_version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [

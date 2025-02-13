@@ -10,5 +10,8 @@ __pycache__/
 *.browse*
 *.vscode*
 
+# Hatch VCS version file
+src/gototile/_version.py
+
 # Don't upload large catalogs
 src/gototile/data/GLADE.csv
