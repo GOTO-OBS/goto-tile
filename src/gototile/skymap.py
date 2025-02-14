@@ -16,6 +16,7 @@ import healpy as hp
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
 from matplotlib import pyplot as plt
+
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
 
@@ -68,9 +69,11 @@ class SkyMap:
         try:
             if len(self.data) != len(other.data):
                 return False
-            return (np.all(self.data == other.data) and
-                    self.order == other.order and
-                    self.coordsys == other.coordsys)
+            return (
+                np.all(self.data == other.data)
+                and self.order == other.order
+                and self.coordsys == other.coordsys
+            )
         except AttributeError:
             return False
 
@@ -99,13 +102,13 @@ class SkyMap:
 
         result = self.copy()
 
-        new_data = result.data ** exponent
+        new_data = result.data**exponent
         result._save_data(new_data, order=self.order, coordsys=self.coordsys, density=self.density)
 
         return result
 
     def __repr__(self):
-        template = ('SkyMap(nside={}, order={}, coordsys={}, density={})')
+        template = 'SkyMap(nside={}, order={}, coordsys={}, density={})'
         return template.format(self.nside, self.order, self.coordsys, self.density)
 
     def _pix2coord(self, ipix):
@@ -143,10 +146,12 @@ class SkyMap:
             data = data.copy()[sort_order]
 
         # Create mhealpy HEALPix class (we access most properties from here)
-        self.healpix = mhp.HealpixMap(data, uniq,
-                                      scheme=order,
-                                      density=density,
-                                      )
+        self.healpix = mhp.HealpixMap(
+            data,
+            uniq,
+            scheme=order,
+            density=density,
+        )
 
         # Save coordsys (not considered by mhealpy)
         # TODO ACTUALLY IT IS NOW:
@@ -164,7 +169,7 @@ class SkyMap:
             self._uniq_set = set(self.uniq)
         else:
             self.pix_nside = np.full(self.npix, self.nside, dtype=int)
-            self.pix_area = np.full(self.npix, 4 * np.pi / (12 * self.nside ** 2))
+            self.pix_area = np.full(self.npix, 4 * np.pi / (12 * self.nside**2))
 
         # Find the coordinates of each pixel
         self.coords = self._pix2coord(self.ipix)
@@ -295,8 +300,11 @@ class SkyMap:
         header = dict(hdu.header)
 
         # Check that the file is valid HEALPix
-        if ('PIXTYPE' not in header or header['PIXTYPE'].upper() != 'HEALPIX' or
-                'ORDERING' not in header):
+        if (
+            'PIXTYPE' not in header
+            or header['PIXTYPE'].upper() != 'HEALPIX'
+            or 'ORDERING' not in header
+        ):
             raise ValueError('FITS file is not in a valid HEALPix format')
         order = header['ORDERING'].upper()
 
@@ -328,9 +336,10 @@ class SkyMap:
         if density is None:
             if 'DENSITY' in hdu.data.columns[data_field].name:
                 density = True
-            elif (hdu.data.columns[data_field].unit is not None and
-                  ('/sr' in hdu.data.columns[data_field].unit or
-                   'sr-1' in hdu.data.columns[data_field].unit)):
+            elif hdu.data.columns[data_field].unit is not None and (
+                '/sr' in hdu.data.columns[data_field].unit
+                or 'sr-1' in hdu.data.columns[data_field].unit
+            ):
                 density = True
             else:
                 density = False
@@ -448,11 +457,12 @@ class SkyMap:
                         header.append((k.upper(), v))
         else:
             header = None
-        self.healpix.write_map(filename,
-                               coordsys=self.coordsys,
-                               extra_header=header,
-                               overwrite=overwrite,
-                               )
+        self.healpix.write_map(
+            filename,
+            coordsys=self.coordsys,
+            extra_header=header,
+            overwrite=overwrite,
+        )
 
     def copy(self):
         """Return a new instance containing a copy of the sky map data."""
@@ -499,8 +509,9 @@ class SkyMap:
         # NOTE: rotator expects order=RING in and returns order=RING out
         # If this skymap is NESTED we need to regrade before and after
         if self.order == 'NESTED':
-            in_data = hp.ud_grade(self.data, nside_out=self.nside,
-                                  order_in='NESTED', order_out='RING')
+            in_data = hp.ud_grade(
+                self.data, nside_out=self.nside, order_in='NESTED', order_out='RING'
+            )
         else:
             in_data = self.data.copy()
 
@@ -509,8 +520,9 @@ class SkyMap:
 
         # Convert back to NESTED if needed
         if self.order == 'NESTED':
-            out_data = hp.ud_grade(out_data, nside_out=self.nside,
-                                   order_in='RING', order_out='NESTED')
+            out_data = hp.ud_grade(
+                out_data, nside_out=self.nside, order_in='RING', order_out='NESTED'
+            )
 
         # Save the new data
         self._save_data(out_data, order=self.order, coordsys=coordsys, density=self.density)
@@ -678,7 +690,7 @@ class SkyMap:
             all_uniq_pix = set()
             for nside in self._nsides:
                 ipix = hp.query_polygon(nside, vertices, inclusive, fact, nest=True)
-                uniq_pix = ipix + 4 * nside ** 2
+                uniq_pix = ipix + 4 * nside**2
                 all_uniq_pix.update(uniq_pix)
 
             # Now we have all the possible NUNIQ pixels within the polygon, we have to find which
@@ -708,8 +720,13 @@ class SkyMap:
     def get_table(self):
         """Return an astropy QTable containing information on the skymap pixels."""
         col_names = ['pixel', 'ra', 'dec', 'value', 'area']
-        col_data = [self.ipix, self.coords.ra, self.coords.dec, self.data,
-                    self.pix_area * (180 / np.pi) * u.deg * u.deg]
+        col_data = [
+            self.ipix,
+            self.coords.ra,
+            self.coords.dec,
+            self.data,
+            self.pix_area * (180 / np.pi) * u.deg * u.deg,
+        ]
         if self.is_moc:
             col_names += ['uniq', 'nside']
             col_data += [self.uniq, self.pix_nside]
@@ -743,7 +760,8 @@ class SkyMap:
                 self.contours / max(self.contours),
                 nested=self.is_nested,
                 levels=levels,
-                *args, **kwargs,
+                *args,
+                **kwargs,
             )
         else:
             # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
@@ -759,7 +777,8 @@ class SkyMap:
                 contour_data,
                 nested=True,
                 levels=[i + 0.5 for i in range(len(levels))],
-                *args, **kwargs,
+                *args,
+                **kwargs,
             )
 
     def plot_pixels(self, axes, *args, **kwargs):
@@ -770,10 +789,21 @@ class SkyMap:
 
         return self.healpix.plot_grid(axes, *args, **kwargs)
 
-    def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
-             plot_type='mollweide', center=(0, 45), radius=10,
-             coordinates=None, plot_contours=True, contour_levels=None,
-             plot_pixels=False, plot_colorbar=False):
+    def plot(
+        self,
+        title=None,
+        filename=None,
+        dpi=90,
+        figsize=(8, 6),
+        plot_type='mollweide',
+        center=(0, 45),
+        radius=10,
+        coordinates=None,
+        plot_contours=True,
+        contour_levels=None,
+        plot_pixels=False,
+        plot_colorbar=False,
+    ):
         """Plot the skymap.
 
         Parameters
@@ -868,18 +898,28 @@ class SkyMap:
 
         # Plot coordinates if given
         if coordinates:
-            axes.scatter(coordinates.ra.value, coordinates.dec.value,
-                         transform=transform,
-                         s=99, c='blue', marker='*', zorder=9)
+            axes.scatter(
+                coordinates.ra.value,
+                coordinates.dec.value,
+                transform=transform,
+                s=99,
+                c='blue',
+                marker='*',
+                zorder=9,
+            )
             if coordinates.isscalar:
                 coordinates = SkyCoord([coordinates])
             for coord in coordinates:
-                axes.text(coord.ra.value, coord.dec.value,
-                          coord.to_string('hmsdms').replace(' ', '\n') + '\n',
-                          transform=transform,
-                          ha='center', va='bottom',
-                          size='x-small', zorder=12,
-                          )
+                axes.text(
+                    coord.ra.value,
+                    coord.dec.value,
+                    coord.to_string('hmsdms').replace(' ', '\n') + '\n',
+                    transform=transform,
+                    ha='center',
+                    va='bottom',
+                    size='x-small',
+                    zorder=12,
+                )
 
         # Remember to rotate back!
         if old_coordsys:

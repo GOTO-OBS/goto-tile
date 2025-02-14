@@ -16,8 +16,7 @@ from . import skymaptools
 from .skymap import SkyMap
 
 
-class download():
-
+class download:
     @staticmethod
     def reporthook(count, block_size, total_size):
         global start_time
@@ -28,40 +27,70 @@ class download():
         progress_size = int(count * block_size)
         speed = int(progress_size / (1024 * duration))
         percent = int(count * block_size * 100 / total_size)
-        sys.stdout.write("\r...%d%%, %d MB, %d KB/s, %d seconds passed" %
-                        (percent, progress_size / (1024 * 1024), speed, duration))
+        sys.stdout.write(
+            '\r...%d%%, %d MB, %d KB/s, %d seconds passed'
+            % (percent, progress_size / (1024 * 1024), speed, duration)
+        )
         sys.stdout.flush()
 
     @staticmethod
-    def glade(url="http://glade.elte.hu/GLADE_2.3.txt", local_path=None, cutoff_dist=10000):
-        print("Downloading GLADE galaxy catalog ...")
-        if local_path==None:
+    def glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cutoff_dist=10000):
+        print('Downloading GLADE galaxy catalog ...')
+        if local_path == None:
             local_path = pkg_resources.resource_filename('gototile', 'data')
             if not os.path.exists(local_path):
                 os.makedirs(local_path)
 
-        out_txt = os.path.join(local_path,'GLADE.txt')
+        out_txt = os.path.join(local_path, 'GLADE.txt')
         urlretrieve(url, out_txt, download.reporthook)
 
-        print("\nCoverting .txt to .csv ...")
-        col = ['PGC','GWGC name','HyperLEDA name',
-                '2MASS name','SDSS-DR12 name','flag1',
-                'ra','dec','Dist','Dist_err','z','B',
-                'B_err','B_Abs','J','J_err','H','H_err',
-                'K','K_err','flag2','flag3']
+        print('\nCoverting .txt to .csv ...')
+        col = [
+            'PGC',
+            'GWGC name',
+            'HyperLEDA name',
+            '2MASS name',
+            'SDSS-DR12 name',
+            'flag1',
+            'ra',
+            'dec',
+            'Dist',
+            'Dist_err',
+            'z',
+            'B',
+            'B_err',
+            'B_Abs',
+            'J',
+            'J_err',
+            'H',
+            'H_err',
+            'K',
+            'K_err',
+            'flag2',
+            'flag3',
+        ]
 
-        df = pd.read_csv(out_txt, sep=" ", header=None)
+        df = pd.read_csv(out_txt, sep=' ', header=None)
         df.columns = col
-        df = df[(df.Dist < cutoff_dist) & (df.flag1=='G')]
+        df = df[(df.Dist < cutoff_dist) & (df.flag1 == 'G')]
 
-        outfile = os.path.join(local_path,'GLADE.csv')
+        outfile = os.path.join(local_path, 'GLADE.csv')
         df.to_csv(outfile, index=False)
 
         os.remove(out_txt)
 
 
-def create_catalog_skymap(name, dist_mean=None, dist_err=None, key='weight',
-                          nside=64, nest=True, smooth=True, sigma=15, min_weight=0):
+def create_catalog_skymap(
+    name,
+    dist_mean=None,
+    dist_err=None,
+    key='weight',
+    nside=64,
+    nest=True,
+    smooth=True,
+    sigma=15,
+    min_weight=0,
+):
     """Create a skymap of weighted galaxy positions from a given catalog.
 
     Parameters
@@ -130,7 +159,7 @@ def create_catalog_skymap(name, dist_mean=None, dist_err=None, key='weight',
 
     # Calculate the weight for each galaxy based on its reported distance
     if dist_mean and dist_err:
-        table['weighted_distance'] = np.exp(-(table['Dist'] - dist_mean)**2/(2*dist_err**2))
+        table['weighted_distance'] = np.exp(-((table['Dist'] - dist_mean) ** 2) / (2 * dist_err**2))
         key = 'weighted_distance'
 
     # Get ra,dec coords of the entries in the table

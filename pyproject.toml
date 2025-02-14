@@ -67,3 +67,11 @@ version-file = "src/gototile/_version.py"
 include = [
     "/gototile",
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+docstring-code-format = true

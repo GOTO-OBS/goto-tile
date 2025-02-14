@@ -22,9 +22,9 @@ def _get_hatch_version():
         # a development environment.
         return None
 
-    pyproject_toml = locate_file(__file__, "pyproject.toml")
+    pyproject_toml = locate_file(__file__, 'pyproject.toml')
     if pyproject_toml is None:
-        raise RuntimeError("pyproject.toml not found although hatchling is installed")
+        raise RuntimeError('pyproject.toml not found although hatchling is installed')
     root = os.path.dirname(pyproject_toml)
     metadata = ProjectMetadata(root=root, plugin_manager=PluginManager())
     # Version can be either statically set in pyproject.toml or computed dynamically:

@@ -15,6 +15,7 @@ from astropy.table import QTable
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 
 from matplotlib import pyplot as plt
+
 if 'DISPLAY' not in os.environ:
     plt.switch_backend('agg')
 from matplotlib.collections import PatchCollection
@@ -29,24 +30,24 @@ from .skymaptools import coord2pix, pix2coord
 
 
 NAMED_GRIDS = {
-    'GOTO4':
-        {'fov': (3.7, 4.9),
-         'overlap': (0.1, 0.1),
-         'kind': 'minverlap',
-         'array': {'fov': (2.1, 2.8), 'shape': (2, 2), 'overlap': 0.3}
-         },
-    'GOTO8p':
-        {'fov': (7.8, 5.1),
-         'overlap': (0.1, 0.1),
-         'kind': 'minverlap',
-         'array': {'fov': (2.1, 2.8), 'shape': (4, 2), 'overlap': 0.3}
-         },
-    'GOTO8':
-        {'fov': (8.0, 5.5),
-         'overlap': (0.2 / 8.0, 0.2 / 5.5),  # Note absolute 0.2 deg overlap, not relative fraction
-         'kind': 'enhanced1011',  # integer_fit, polar_edge & corner_align but don't force_equator
-         'array': {'fov': (2.21, 2.95), 'shape': (4, 2), 'overlap': 0.2}
-         },
+    'GOTO4': {
+        'fov': (3.7, 4.9),
+        'overlap': (0.1, 0.1),
+        'kind': 'minverlap',
+        'array': {'fov': (2.1, 2.8), 'shape': (2, 2), 'overlap': 0.3},
+    },
+    'GOTO8p': {
+        'fov': (7.8, 5.1),
+        'overlap': (0.1, 0.1),
+        'kind': 'minverlap',
+        'array': {'fov': (2.1, 2.8), 'shape': (4, 2), 'overlap': 0.3},
+    },
+    'GOTO8': {
+        'fov': (8.0, 5.5),
+        'overlap': (0.2 / 8.0, 0.2 / 5.5),  # Note absolute 0.2 deg overlap, not relative fraction
+        'kind': 'enhanced1011',  # integer_fit, polar_edge & corner_align but don't force_equator
+        'array': {'fov': (2.21, 2.95), 'shape': (4, 2), 'overlap': 0.2},
+    },
 }
 # Aliases
 NAMED_GRIDS['GOTO-4'] = NAMED_GRIDS['GOTO4']
@@ -134,7 +135,7 @@ def create_grid_product(fov, overlap):
     decs = np.arange(-pole, pole + step_dec / 2, step_dec)
 
     # Arrange the tiles in RA
-    ras = np.arange(0.0, 360., step_ra)
+    ras = np.arange(0.0, 360.0, step_ra)
     allras, alldecs = zip(*[(ra, dec) for ra, dec in itertools.product(ras, decs)])
     allras, alldecs = np.asarray(allras), np.asarray(alldecs)
 
@@ -158,7 +159,7 @@ def create_grid_cosine(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., step_ra / np.cos(dec * np.pi / 180))
+        ras = np.arange(0.0, 360.0, step_ra / np.cos(dec * np.pi / 180))
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
     allras = np.concatenate(allras)
@@ -187,7 +188,7 @@ def create_grid_cosine_symmetric(fov, overlap):
     alldecs = []
     allras = []
     for dec in decs:
-        ras = np.arange(0.0, 360., step_ra / np.cos(dec * np.pi / 180))
+        ras = np.arange(0.0, 360.0, step_ra / np.cos(dec * np.pi / 180))
         ras += (360 - ras[-1]) / 2  # Rotate the strips so they're symmetric
         allras.append(ras)
         alldecs.append(dec * np.ones(ras.shape))
@@ -227,8 +228,9 @@ def create_grid_minverlap(fov, overlap):
     return allras, alldecs
 
 
-def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, polar_edge=False,
-                         corner_align=True):
+def create_grid_enhanced(
+    fov, overlap, integer_fit=True, force_equator=False, polar_edge=False, corner_align=True
+):
     """Create a pointing grid to cover the whole sky.
 
     Parameters
@@ -317,7 +319,7 @@ def create_grid_enhanced(fov, overlap, integer_fit=True, force_equator=False, po
                 # the effective width, which is the same for all tiles in the band.
                 # Note that since the grid is symmetric we take abs(dec).
                 centre = SkyCoord(0 * u.deg, abs(dec) * u.deg)
-                corner_se = onsky_offset(centre, (fov['ra'] / 2, - fov['dec'] / 2) * u.deg)
+                corner_se = onsky_offset(centre, (fov['ra'] / 2, -fov['dec'] / 2) * u.deg)
                 max_fov_ra = corner_se.ra.value * 2
                 # This is the maximum spacing, so only override the default if it is larger than
                 # the maximum (usually closest to the poles).
@@ -389,20 +391,24 @@ def create_array(fov=(2.21, 2.95), shape=(4, 2), overlap=0.2):
     centres = []
     for j in range(shape[1])[::-1]:
         for i in range(shape[0])[::-1]:
-            centres.append((
-                (i - (shape[0] - 1) / 2) * (fov[0] - overlap[0]),
-                (j - (shape[1] - 1) / 2) * (fov[1] - overlap[1]),
-            ))
+            centres.append(
+                (
+                    (i - (shape[0] - 1) / 2) * (fov[0] - overlap[0]),
+                    (j - (shape[1] - 1) / 2) * (fov[1] - overlap[1]),
+                )
+            )
 
     # Now simply offset half the fov in each direction from the centres to find the four corners.
     # We go in order NW>NE>SE>SW, same as the grid tiles.
     corners = [
-        [(c[0] - fov[0] / 2, c[1] + fov[1] / 2),
-         (c[0] + fov[0] / 2, c[1] + fov[1] / 2),
-         (c[0] + fov[0] / 2, c[1] - fov[1] / 2),
-         (c[0] - fov[0] / 2, c[1] - fov[1] / 2),
-         ]
-        for c in centres]
+        [
+            (c[0] - fov[0] / 2, c[1] + fov[1] / 2),
+            (c[0] + fov[0] / 2, c[1] + fov[1] / 2),
+            (c[0] + fov[0] / 2, c[1] - fov[1] / 2),
+            (c[0] - fov[0] / 2, c[1] - fov[1] / 2),
+        ]
+        for c in centres
+    ]
 
     return np.array(centres), np.array(corners)
 
@@ -467,10 +473,9 @@ class SkyGrid:
         self.algorithm = kind
 
         # Give the grid a unique name
-        self.name = 'allsky-{}x{}-{}-{}'.format(self.fov['ra'].value,
-                                                self.fov['dec'].value,
-                                                self.overlap['ra'],
-                                                self.overlap['dec'])
+        self.name = 'allsky-{}x{}-{}-{}'.format(
+            self.fov['ra'].value, self.fov['dec'].value, self.overlap['ra'], self.overlap['dec']
+        )
 
         # Create the grid
         ras, decs = create_grid(self.fov, self.overlap, kind)
@@ -481,10 +486,10 @@ class SkyGrid:
         # We get these by offsetting on-sky from the tile centres by half the fov in each direction.
         # Order of corners is NW>NE>SE>SW (remember RA increases going east).
         corner_offsets = [
-            (- self.fov['ra'] / 2, + self.fov['dec'] / 2) * u.deg,
-            (+ self.fov['ra'] / 2, + self.fov['dec'] / 2) * u.deg,
-            (+ self.fov['ra'] / 2, - self.fov['dec'] / 2) * u.deg,
-            (- self.fov['ra'] / 2, - self.fov['dec'] / 2) * u.deg,
+            (-self.fov['ra'] / 2, +self.fov['dec'] / 2) * u.deg,
+            (+self.fov['ra'] / 2, +self.fov['dec'] / 2) * u.deg,
+            (+self.fov['ra'] / 2, -self.fov['dec'] / 2) * u.deg,
+            (-self.fov['ra'] / 2, -self.fov['dec'] / 2) * u.deg,
         ]
         self.vertices = onsky_offset(self.coords, corner_offsets)
 
@@ -523,17 +528,21 @@ class SkyGrid:
 
     def __eq__(self, other):
         try:
-            return (self.fov == other.fov and
-                    self.overlap == other.overlap and
-                    self.kind == other.kind)
+            return (
+                self.fov == other.fov and self.overlap == other.overlap and self.kind == other.kind
+            )
         except AttributeError:
             return False
 
     def __repr__(self):
-        template = ('SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})')
-        return template.format(self.fov['ra'].value, self.fov['dec'].value,
-                               self.overlap['ra'], self.overlap['dec'],
-                               self.kind)
+        template = 'SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})'
+        return template.format(
+            self.fov['ra'].value,
+            self.fov['dec'].value,
+            self.overlap['ra'],
+            self.overlap['dec'],
+            self.kind,
+        )
 
     def copy(self):
         """Return a new instance containing a copy of the sky grid data."""
@@ -558,14 +567,17 @@ class SkyGrid:
         """
         if name.startswith('allsky'):
             try:
-                fov = (float(name.split('-')[1].split('x')[0]),
-                       float(name.split('-')[1].split('x')[1]))
+                fov = (
+                    float(name.split('-')[1].split('x')[0]),
+                    float(name.split('-')[1].split('x')[1]),
+                )
                 overlap = (float(name.split('-')[2]), float(name.split('-')[3]))
                 return cls(fov, overlap)
             except Exception:
                 template = 'allsky-{fov_ra}x{fov_dec}-{overlap_ra}-{overlap_dec}`'
-                raise ValueError(f'Grid name "{name}" not recognised, '
-                                 'Name format should match ', template)
+                raise ValueError(
+                    f'Grid name "{name}" not recognised, Name format should match ', template
+                )
         elif name in NAMED_GRIDS:
             fov = NAMED_GRIDS[name]['fov']
             overlap = NAMED_GRIDS[name]['overlap']
@@ -698,8 +710,9 @@ class SkyGrid:
         for i in range(len(tile_pixels)):
             # Find the tile with the highest probability
             high_tile_prob = max(tile_probs)
-            if ((prob_limit is not None and high_tile_prob < 10**(-1 * prob_limit)) or
-                    high_tile_prob == 0):
+            if (
+                prob_limit is not None and high_tile_prob < 10 ** (-1 * prob_limit)
+            ) or high_tile_prob == 0:
                 # We've reached the probability limit, or we've already blacked out all the pixels
                 # and there's no probability left!
                 # Any remaining tiles will have their contour level set to 1.
@@ -740,7 +753,7 @@ class SkyGrid:
         if nside is None:
             nside = 128
         self._base_nside = nside
-        self._base_skymap = SkyMap(np.zeros(12 * self._base_nside ** 2), order='NESTED')
+        self._base_skymap = SkyMap(np.zeros(12 * self._base_nside**2), order='NESTED')
         self._base_pixels = self._get_tile_pixels(self._base_skymap)
 
     def get_tile(self, coord, overlap=False):
@@ -792,8 +805,9 @@ class SkyGrid:
                 pixel = coord2pix(self._base_nside, c, nest=True)
 
                 # Get the tile indices that contain that pixel and add to list
-                names = [self.tilenames[i] for i in range(self.ntiles)
-                         if pixel in self._base_pixels[i]]
+                names = [
+                    self.tilenames[i] for i in range(self.ntiles) if pixel in self._base_pixels[i]
+                ]
                 tilenames.append(names)
 
         if scalar:
@@ -811,8 +825,9 @@ class SkyGrid:
         #       a bigger requite of some of the internal functions.
         raise NotImplementedError
 
-    def get_visible_tiles(self, locations, time_range=None, alt_limit=30, sun_limit=-15,
-                          any_all='any'):
+    def get_visible_tiles(
+        self, locations, time_range=None, alt_limit=30, sun_limit=-15, any_all='any'
+    ):
         """Get the tiles that are visible from the given location(s).
 
         Parameters
@@ -1067,10 +1082,13 @@ class SkyGrid:
             the contained probability within each tile and the contour level it is within.
         """
         col_names = ['tilename', 'ra', 'dec', 'prob', 'contour']
-        col_data = [self.tilenames, self.coords.ra, self.coords.dec,
-                    self.probs if self.probs is not None else np.zeros(self.ntiles),
-                    self.contours if self.contours is not None else np.zeros(self.ntiles),
-                    ]
+        col_data = [
+            self.tilenames,
+            self.coords.ra,
+            self.coords.dec,
+            self.probs if self.probs is not None else np.zeros(self.ntiles),
+            self.contours if self.contours is not None else np.zeros(self.ntiles),
+        ]
         return QTable(col_data, names=col_names)
 
     def _get_pixel_count(self, nside=128):
@@ -1078,7 +1096,7 @@ class SkyGrid:
         # Create test skymap, if it hasn't already been generated
         self._get_test_map(nside)
 
-        count = np.zeros(12 * self._base_nside ** 2)
+        count = np.zeros(12 * self._base_nside**2)
         for ipix in self._base_pixels:
             count[ipix] += 1
         return count
@@ -1102,11 +1120,13 @@ class SkyGrid:
     def _get_tile_paths(self, meridian_split=False, edge_points=4):
         """Create and cache Matplotlib Patches to use when plotting tiles."""
         # Used cached versions to save time when repeatedly plotting
-        if (not meridian_split and hasattr(self, '_paths') and
-                self._paths_points == edge_points):
+        if not meridian_split and hasattr(self, '_paths') and self._paths_points == edge_points:
             return self._paths
-        elif (meridian_split and hasattr(self, '_paths_split') and
-                self._paths_split_points == edge_points):
+        elif (
+            meridian_split
+            and hasattr(self, '_paths_split')
+            and self._paths_split_points == edge_points
+        ):
             return self._paths_split
 
         # We can't just plot the four corners (already saved under self.vertices) because that will
@@ -1130,11 +1150,17 @@ class SkyGrid:
     def _get_array_paths(self, meridian_split=False, edge_points=1):
         """Create and cache Matplotlib Patches to use when plotting sub-array fields."""
         # Used cached versions to save time when repeatedly plotting
-        if (not meridian_split and hasattr(self, '_array_paths') and
-                self._array_paths_points == edge_points):
+        if (
+            not meridian_split
+            and hasattr(self, '_array_paths')
+            and self._array_paths_points == edge_points
+        ):
             return self._array_paths
-        elif (meridian_split and hasattr(self, '_array_paths_split') and
-                self._array_paths_split_points == edge_points):
+        elif (
+            meridian_split
+            and hasattr(self, '_array_paths_split')
+            and self._array_paths_split_points == edge_points
+        ):
             return self._array_paths_split
 
         if self.array_params is None:
@@ -1183,20 +1209,14 @@ class SkyGrid:
 
         if len(paths) == 1:
             # Add a single patch
-            patch = PathPatch(
-                paths[0],
-                transform=axes.get_transform('world'),
-                *args, **kwargs
-            )
+            patch = PathPatch(paths[0], transform=axes.get_transform('world'), *args, **kwargs)
             axes.add_patch(patch)
             return patch
         else:
             # Add all the patches together as a collection
             patches = [PathPatch(path) for path in paths]
             collection = PatchCollection(
-                patches,
-                transform=axes.get_transform('world'),
-                *args, **kwargs
+                patches, transform=axes.get_transform('world'), *args, **kwargs
             )
             axes.add_collection(collection)
             return collection
@@ -1226,21 +1246,38 @@ class SkyGrid:
         paths = paths.flatten()
         patches = [PathPatch(path) for path in paths]
         collection = PatchCollection(
-            patches,
-            transform=axes.get_transform('world'),
-            *args, **kwargs
+            patches, transform=axes.get_transform('world'), *args, **kwargs
         )
         axes.add_collection(collection)
         return collection
 
-    def plot(self, title=None, filename=None, dpi=90, figsize=(8, 6),
-             plot_type='mollweide', center=(0, 45), radius=10,
-             color=None, linecolor=None, linewidth=None, alpha=0.3,
-             discrete_colorbar=False, discrete_stepsize=1,
-             colorbar_limits=None, colorbar_orientation='v',
-             highlight=None, highlight_color=None, highlight_label=None,
-             coordinates=None, tilenames=None, text=None,
-             plot_skymap=False, plot_contours=False, plot_stats=False):
+    def plot(
+        self,
+        title=None,
+        filename=None,
+        dpi=90,
+        figsize=(8, 6),
+        plot_type='mollweide',
+        center=(0, 45),
+        radius=10,
+        color=None,
+        linecolor=None,
+        linewidth=None,
+        alpha=0.3,
+        discrete_colorbar=False,
+        discrete_stepsize=1,
+        colorbar_limits=None,
+        colorbar_orientation='v',
+        highlight=None,
+        highlight_color=None,
+        highlight_label=None,
+        coordinates=None,
+        tilenames=None,
+        text=None,
+        plot_skymap=False,
+        plot_contours=False,
+        plot_stats=False,
+    ):
         """Plot the grid.
 
         Parameters
@@ -1364,22 +1401,24 @@ class SkyGrid:
         transform = axes.get_transform('world')
 
         # Plot the tiles
-        tile_patches = self.plot_tiles(axes,
-                                       fc='blue',
-                                       ec='none',
-                                       lw=0,
-                                       alpha=alpha,
-                                       zorder=2,
-                                       )
+        tile_patches = self.plot_tiles(
+            axes,
+            fc='blue',
+            ec='none',
+            lw=0,
+            alpha=alpha,
+            zorder=2,
+        )
 
         # Also plot on the lines over the top
-        edge_patches = self.plot_tiles(axes,
-                                       fc='none',
-                                       ec='black',
-                                       lw=0.5,
-                                       alpha=alpha,
-                                       zorder=3,
-                                       )
+        edge_patches = self.plot_tiles(
+            axes,
+            fc='none',
+            ec='black',
+            lw=0.5,
+            alpha=alpha,
+            zorder=3,
+        )
 
         # Plot text
         if tilenames is not None and text is None:
@@ -1393,10 +1432,18 @@ class SkyGrid:
                 except ValueError:
                     continue
                 coord = self.coords[index]
-                plt.text(coord.ra.deg, coord.dec.deg, str(text[name]),
-                         color='k', weight='bold', fontsize=6,
-                         ha='center', va='center', clip_on=True,
-                         transform=transform)
+                plt.text(
+                    coord.ra.deg,
+                    coord.dec.deg,
+                    str(text[name]),
+                    color='k',
+                    weight='bold',
+                    fontsize=6,
+                    ha='center',
+                    va='center',
+                    clip_on=True,
+                    transform=transform,
+                )
 
         # Plot skymap probabilities
         if plot_skymap is True:
@@ -1404,13 +1451,14 @@ class SkyGrid:
                 raise ValueError('SkyGrid does not have a SkyMap applied')
 
             # Set the probability array to the color array
-            skymap_patches = self.plot_tiles(axes,
-                                             array=np.array(self.probs),
-                                             ec='none',
-                                             lw=0,
-                                             alpha=0.5,
-                                             zorder=1,
-                                             )
+            skymap_patches = self.plot_tiles(
+                axes,
+                array=np.array(self.probs),
+                ec='none',
+                lw=0,
+                alpha=0.5,
+                zorder=1,
+            )
 
             # Use the LIGO colormap
             skymap_patches.set_cmap('cylon')
@@ -1426,8 +1474,9 @@ class SkyGrid:
 
             # Plot the 50% and 90% skymap contours
             # Taken from SkyMap.plot()
-            self.skymap.plot_contours(axes, levels=[0.5, 0.9],
-                                      colors='black', linewidths=0.5, zorder=99)
+            self.skymap.plot_contours(
+                axes, levels=[0.5, 0.9], colors='black', linewidths=0.5, zorder=99
+            )
 
         if plot_stats is True:
             # Colour in areas based on the number of tiles they are within
@@ -1449,11 +1498,16 @@ class SkyGrid:
             norm = BoundaryNorm(np.linspace(0, k + 1, k + 2), cmap.N)
 
             # Plot the points
-            points = axes.scatter(coords.ra.deg, coords.dec.deg,
-                                  transform=transform,
-                                  s=1, c=count,
-                                  cmap=cmap, norm=norm,
-                                  zorder=0)
+            points = axes.scatter(
+                coords.ra.deg,
+                coords.dec.deg,
+                transform=transform,
+                s=1,
+                c=count,
+                cmap=cmap,
+                norm=norm,
+                zorder=0,
+            )
 
             # Add the colorbar
             cb = fig.colorbar(points, ax=axes, fraction=0.02, pad=0.05)
@@ -1491,12 +1545,15 @@ class SkyGrid:
                             # See above link in plot_stats
                             cmap = copy(plt.cm.jet_r)
                             if colorbar_limits is None:
-                                colorbar_limits = (int(np.floor(np.min(masked_array))),
-                                                   int(np.ceil(np.max(masked_array))))
-                            boundaries = np.linspace(colorbar_limits[0],
-                                                     colorbar_limits[1] + 1,
-                                                     (colorbar_limits[1] + 1 -
-                                                      colorbar_limits[0] + 1))
+                                colorbar_limits = (
+                                    int(np.floor(np.min(masked_array))),
+                                    int(np.ceil(np.max(masked_array))),
+                                )
+                            boundaries = np.linspace(
+                                colorbar_limits[0],
+                                colorbar_limits[1] + 1,
+                                (colorbar_limits[1] + 1 - colorbar_limits[0] + 1),
+                            )
                             norm = BoundaryNorm(boundaries, cmap.N)
                             tile_patches.set_norm(norm)
                         else:
@@ -1511,15 +1568,23 @@ class SkyGrid:
 
                         # Display the color bar
                         if colorbar_orientation.lower()[0] == 'h':
-                            cb = fig.colorbar(tile_patches, ax=axes,
-                                              fraction=0.03, pad=0.05, aspect=50,
-                                              orientation='horizontal')
+                            cb = fig.colorbar(
+                                tile_patches,
+                                ax=axes,
+                                fraction=0.03,
+                                pad=0.05,
+                                aspect=50,
+                                orientation='horizontal',
+                            )
                         else:
                             cb = fig.colorbar(tile_patches, ax=axes, fraction=0.02, pad=0.05)
                         if discrete_colorbar:
-                            tick_labels = np.arange(colorbar_limits[0],
-                                                    colorbar_limits[1] + 1,
-                                                    discrete_stepsize, dtype=int)
+                            tick_labels = np.arange(
+                                colorbar_limits[0],
+                                colorbar_limits[1] + 1,
+                                discrete_stepsize,
+                                dtype=int,
+                            )
                             tick_location = tick_labels + 0.5
                             cb.set_ticks(tick_location)
                             cb.set_ticklabels(tick_labels)
@@ -1621,21 +1686,23 @@ class SkyGrid:
                         linecolor_array[index] = highlight_color
                         linewidth_array[index] = 1.5
                     # Add patches over normal lines
-                    self.plot_tiles(axes,
-                                    fc='none',
-                                    ec=np.array(linecolor_array),
-                                    lw=np.array(linewidth_array),
-                                    alpha=0.5,
-                                    zorder=9,
-                                    )
+                    self.plot_tiles(
+                        axes,
+                        fc='none',
+                        ec=np.array(linecolor_array),
+                        lw=np.array(linewidth_array),
+                        alpha=0.5,
+                        zorder=9,
+                    )
                     # Add to legend
                     if highlight_label is not None:
                         label = highlight_label + ' ({} tiles)'.format(len(highlight))
-                        patch = Patch(facecolor='none',
-                                      edgecolor=highlight_color,
-                                      linewidth=1.5,
-                                      label=label,
-                                      )
+                        patch = Patch(
+                            facecolor='none',
+                            edgecolor=highlight_color,
+                            linewidth=1.5,
+                            label=label,
+                        )
                         legend_patches.append(patch)
                 except Exception:
                     raise ValueError('Invalid entries in highlight list')
@@ -1657,55 +1724,66 @@ class SkyGrid:
                             linecolor_array[index] = linecolor
                             linewidth_array[index] = 1.5
                         # Add patches over normal lines
-                        self.plot_tiles(axes,
-                                        fc='none',
-                                        ec=np.array(linecolor_array),
-                                        lw=np.array(linewidth_array),
-                                        alpha=0.5,
-                                        zorder=9 + len(highlight) - j,
-                                        )
+                        self.plot_tiles(
+                            axes,
+                            fc='none',
+                            ec=np.array(linecolor_array),
+                            lw=np.array(linewidth_array),
+                            alpha=0.5,
+                            zorder=9 + len(highlight) - j,
+                        )
                         # Add to legend
                         if highlight_label is not None:
                             label = highlight_label[j] + ' ({} tiles)'.format(len(tilelist))
-                            patch = Patch(facecolor='none',
-                                          edgecolor=linecolor,
-                                          linewidth=1.5,
-                                          label=label,
-                                          )
+                            patch = Patch(
+                                facecolor='none',
+                                edgecolor=linecolor,
+                                linewidth=1.5,
+                                label=label,
+                            )
                             legend_patches.append(patch)
                 except Exception:
                     raise ValueError('Invalid entries in highlight list')
 
             # Display legend
             if len(legend_patches) > 0:
-                plt.legend(handles=legend_patches,
-                           loc='center',
-                           bbox_to_anchor=(0.5, -0.1),
-                           ncol=3,
-                           ).set_zorder(999)
+                plt.legend(
+                    handles=legend_patches,
+                    loc='center',
+                    bbox_to_anchor=(0.5, -0.1),
+                    ncol=3,
+                ).set_zorder(999)
 
         # Plot coordinates
         if coordinates:
-            axes.scatter(coordinates.ra.value, coordinates.dec.value,
-                         transform=transform,
-                         s=99, c='blue', marker='*',
-                         zorder=9)
+            axes.scatter(
+                coordinates.ra.value,
+                coordinates.dec.value,
+                transform=transform,
+                s=99,
+                c='blue',
+                marker='*',
+                zorder=9,
+            )
             if coordinates.isscalar:
                 coordinates = SkyCoord([coordinates])
             for coord in coordinates:
-                axes.text(coord.ra.value, coord.dec.value,
-                          coord.to_string('hmsdms').replace(' ', '\n') + '\n',
-                          transform=transform,
-                          ha='center', va='bottom',
-                          size='x-small', zorder=12,
-                          )
+                axes.text(
+                    coord.ra.value,
+                    coord.dec.value,
+                    coord.to_string('hmsdms').replace(' ', '\n') + '\n',
+                    transform=transform,
+                    ha='center',
+                    va='bottom',
+                    size='x-small',
+                    zorder=12,
+                )
 
         # Set title
         if title is None:
-            title = 'All sky grid (fov={}x{}, overlap={},{})'.format(self.fov['ra'],
-                                                                     self.fov['dec'],
-                                                                     self.overlap['ra'],
-                                                                     self.overlap['dec'])
+            title = 'All sky grid (fov={}x{}, overlap={},{})'.format(
+                self.fov['ra'], self.fov['dec'], self.overlap['ra'], self.overlap['dec']
+            )
             if plot_skymap and self.skymap is not None:
                 title += '\n' + 'with skymap'
         axes.set_title(title, y=1.05)

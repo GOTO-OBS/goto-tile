@@ -23,7 +23,7 @@ def gaussian_prob(grid, peak, radius):
 
     # calculate the probability at each point with a 2D gaussian function
     sigma = radius / np.sqrt(2.3)
-    prob = np.exp(-dist ** 2 / (2 * sigma ** 2))
+    prob = np.exp(-(dist**2) / (2 * sigma**2))
 
     if np.sum(prob) == 0:
         # The radius is probably too small, so even in the peak pixel the gaussian prob is tiny.

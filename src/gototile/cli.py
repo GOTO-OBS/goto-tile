@@ -15,12 +15,26 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
-def run(grid, skymap=None,
-        simulate=True, date=None, duration=1, site=None, mounts=1, source=None,
-        max_tiles=200, min_prob=0, contour=0.95, min_alt=30, twilight=-12, exptime=300,
-        airmass_weight=0.1,
-        verbose=False, outfile=None, plot=None,
-        ):
+def run(
+    grid,
+    skymap=None,
+    simulate=True,
+    date=None,
+    duration=1,
+    site=None,
+    mounts=1,
+    source=None,
+    max_tiles=200,
+    min_prob=0,
+    contour=0.95,
+    min_alt=30,
+    twilight=-12,
+    exptime=300,
+    airmass_weight=0.1,
+    verbose=False,
+    outfile=None,
+    plot=None,
+):
     if skymap is None:
         # Just output the coordinates for the grid tiles
         table = grid.get_table()
@@ -64,16 +78,20 @@ def run(grid, skymap=None,
             grid.plot_tiles(axes, fc='none', ec='0.7', lw=0.3, zorder=1.2)
 
             # Add the skymap contours
-            skymap.plot_contours(axes, levels=[0.5, 0.9],
-                                 colors='black', linewidths=0.5, zorder=1.3)
+            skymap.plot_contours(
+                axes, levels=[0.5, 0.9], colors='black', linewidths=0.5, zorder=1.3
+            )
 
             # Add a colorbar
             tiles.set_cmap('cylon')
             fig.colorbar(
-                tiles, ax=axes, fraction=0.02, pad=0.05,
+                tiles,
+                ax=axes,
+                fraction=0.02,
+                pad=0.05,
                 label='Tile contained probability',
-                format=lambda x, _: f'{x:.0%}'
-                )
+                format=lambda x, _: f'{x:.0%}',
+            )
 
             # Save the figure
             plt.savefig(plot)
@@ -165,8 +183,10 @@ def run(grid, skymap=None,
 
     if source:
         source_tiles = grid.get_tile(source, overlap=True)
-        print(f'The source coordinates were located in tile{"s" if len(source_tiles) > 1 else ""}',
-              source_tiles)
+        print(
+            f'The source coordinates were located in tile{"s" if len(source_tiles) > 1 else ""}',
+            source_tiles,
+        )
         source_nobs = sum(obs_dict[tile] if tile in obs_dict else 0 for tile in source_tiles)
         print(f'The source location was observed {source_nobs} times')
     else:
@@ -180,15 +200,22 @@ def run(grid, skymap=None,
     if plot is not None:
         # TODO: REPLACE WITH PROPER PLOT
         print('Saving observation plot to', plot)
-        visible_tiles = grid.get_visible_tiles(site, time_range=(start_date, end_date),
-                                               alt_limit=min_alt, sun_limit=twilight)
+        visible_tiles = grid.get_visible_tiles(
+            site, time_range=(start_date, end_date), alt_limit=min_alt, sun_limit=twilight
+        )
         non_visible_tiles = [t for t in grid.tilenames if t not in visible_tiles]
 
-        grid.plot(filename=plot, title='', dpi=150, plot_contours=True,
-                  color=obs_dict, discrete_colorbar=True,
-                  highlight=[source_tiles, non_visible_tiles], highlight_color=['red', '0.4'],
-                  coordinates=source,
-                  )
+        grid.plot(
+            filename=plot,
+            title='',
+            dpi=150,
+            plot_contours=True,
+            color=obs_dict,
+            discrete_colorbar=True,
+            highlight=[source_tiles, non_visible_tiles],
+            highlight_color=['red', '0.4'],
+            coordinates=source,
+        )
 
 
 def main():
@@ -211,79 +238,153 @@ def main():
             raise argparse.ArgumentTypeError(msg)
         return site
 
-    description = ('This script creates pointings for selected telescopes, '
-                   'with given skymap files.')
+    description = 'This script creates pointings for selected telescopes, with given skymap files.'
     parser = argparse.ArgumentParser(description=description)
 
     # Telescope options
-    group = parser.add_argument_group('grid options',
-                                      'Either chose a pre-defined telescope from the list given '
-                                      'or define a custom grid.')
+    group = parser.add_argument_group(
+        'grid options',
+        'Either chose a pre-defined telescope from the list given or define a custom grid.',
+    )
     mxg = group.add_mutually_exclusive_group(required=True)
-    mxg.add_argument('-t', '--telescope', type=str, choices=SkyGrid.get_named_grids().keys(),
-                     help='Which pre-defined telescope system to simulate.')
-    mxg.add_argument('-g', '--grid', type=float, nargs=4,
-                     metavar=('FOV_RA', 'FOV_DEC', 'OVERLAP_RA', 'OVERLAP_DEC'),
-                     help='Define custom sky grid parameters: field of view (in degrees) and '
-                          'overlap (0-0.9) in RA and Dec axes.')
+    mxg.add_argument(
+        '-t',
+        '--telescope',
+        type=str,
+        choices=SkyGrid.get_named_grids().keys(),
+        help='Which pre-defined telescope system to simulate.',
+    )
+    mxg.add_argument(
+        '-g',
+        '--grid',
+        type=float,
+        nargs=4,
+        metavar=('FOV_RA', 'FOV_DEC', 'OVERLAP_RA', 'OVERLAP_DEC'),
+        help='Define custom sky grid parameters: field of view (in degrees) and '
+        'overlap (0-0.9) in RA and Dec axes.',
+    )
 
     # Skymap options
     group = parser.add_argument_group('skymap options')
     mxg = group.add_mutually_exclusive_group()
-    mxg.add_argument('-s', '--skymap', type=str, metavar='PATH',
-                     help='Path to skymap FITS file',)
-    mxg.add_argument('-G', '--gaussian', type=float, nargs=3, metavar=('RA', 'DEC', 'RADIUS'),
-                     help=('Create a gaussian skymap with the given '
-                           'RA, Dec and 68%% containment radius (in degrees).'))
+    mxg.add_argument(
+        '-s',
+        '--skymap',
+        type=str,
+        metavar='PATH',
+        help='Path to skymap FITS file',
+    )
+    mxg.add_argument(
+        '-G',
+        '--gaussian',
+        type=float,
+        nargs=3,
+        metavar=('RA', 'DEC', 'RADIUS'),
+        help=(
+            'Create a gaussian skymap with the given '
+            'RA, Dec and 68%% containment radius (in degrees).'
+        ),
+    )
 
     # Simulation options
     group = parser.add_argument_group('simulation options')
-    group.add_argument('--simulate', action='store_true',
-                       help='Simulate observations of the given skymap. Note this requires either '
-                            'the --skymap or --gaussian options.')
-    group.add_argument('-d', '--date', type=date_validator, default='now',
-                       help='Date to start observation simulations, in any format that can be '
-                            'parsed by `astropy.time.Time` (default=Time.now())',
-                       )
-    group.add_argument('-D', '--duration', type=float, default=1,
-                       help='Number of 24-hour days to simulate (default=1)'
-                       )
-    group.add_argument('-S', '--site', type=site_validator, default='lapalma',
-                       help=('Site to simulate observing from, any string that can be parsed '
-                             'by `astropy.coordinates.EarthLocation.of_site()` (default=LaPalma)'),
-                       )
-    group.add_argument('-m', '--mounts', type=int, default=1,
-                       help=('Number of independent mounts to simulate observing with '
-                             '(default=1)'),
-                       )
-    group.add_argument('-C', '--source-coords', type=float, nargs=2, metavar=('RA', 'DEC'),
-                       help=('Coordinates of the skymap source, in degrees'),
-                       )
-    group.add_argument('--max-tiles', type=int, default=200,
-                       help='Maximum number of tiles to select for observing (default=0)')
-    group.add_argument('--min-prob', type=float, default=0,
-                       help='Minimum probability to select tiles (default=0)')
-    group.add_argument('-c', '--contour', type=float, default=0.95,
-                       help='Probability contour level to select tiles (default=0.95)')
-    group.add_argument('--min-alt', type=float, default=30,
-                       help='Telescope horizon limit in degrees (default=30)')
-    group.add_argument('--twilight', type=float, default=-12,
-                       help='Maximum hight of the Sun to allow observing, in degrees (default=-12)')
-    group.add_argument('--exptime', type=float, default=300,
-                       help='Time spent by each telescope observing each tile, in seconds. '
-                            'Should include readout time (default=300)')
-    group.add_argument('--airmass-weight', type=float, default=0.1,
-                       help='Realative amount to weight airmass vs tile probability when '
-                            'calculating tile scores (default=0.1).')
+    group.add_argument(
+        '--simulate',
+        action='store_true',
+        help='Simulate observations of the given skymap. Note this requires either '
+        'the --skymap or --gaussian options.',
+    )
+    group.add_argument(
+        '-d',
+        '--date',
+        type=date_validator,
+        default='now',
+        help='Date to start observation simulations, in any format that can be '
+        'parsed by `astropy.time.Time` (default=Time.now())',
+    )
+    group.add_argument(
+        '-D',
+        '--duration',
+        type=float,
+        default=1,
+        help='Number of 24-hour days to simulate (default=1)',
+    )
+    group.add_argument(
+        '-S',
+        '--site',
+        type=site_validator,
+        default='lapalma',
+        help=(
+            'Site to simulate observing from, any string that can be parsed '
+            'by `astropy.coordinates.EarthLocation.of_site()` (default=LaPalma)'
+        ),
+    )
+    group.add_argument(
+        '-m',
+        '--mounts',
+        type=int,
+        default=1,
+        help=('Number of independent mounts to simulate observing with (default=1)'),
+    )
+    group.add_argument(
+        '-C',
+        '--source-coords',
+        type=float,
+        nargs=2,
+        metavar=('RA', 'DEC'),
+        help=('Coordinates of the skymap source, in degrees'),
+    )
+    group.add_argument(
+        '--max-tiles',
+        type=int,
+        default=200,
+        help='Maximum number of tiles to select for observing (default=0)',
+    )
+    group.add_argument(
+        '--min-prob', type=float, default=0, help='Minimum probability to select tiles (default=0)'
+    )
+    group.add_argument(
+        '-c',
+        '--contour',
+        type=float,
+        default=0.95,
+        help='Probability contour level to select tiles (default=0.95)',
+    )
+    group.add_argument(
+        '--min-alt', type=float, default=30, help='Telescope horizon limit in degrees (default=30)'
+    )
+    group.add_argument(
+        '--twilight',
+        type=float,
+        default=-12,
+        help='Maximum hight of the Sun to allow observing, in degrees (default=-12)',
+    )
+    group.add_argument(
+        '--exptime',
+        type=float,
+        default=300,
+        help='Time spent by each telescope observing each tile, in seconds. '
+        'Should include readout time (default=300)',
+    )
+    group.add_argument(
+        '--airmass-weight',
+        type=float,
+        default=0.1,
+        help='Realative amount to weight airmass vs tile probability when '
+        'calculating tile scores (default=0.1).',
+    )
 
     # Output options
     group = parser.add_argument_group('output options')
-    group.add_argument('-v', '--verbose', action='store_true',
-                       help='Print additional logging infomation.')
-    group.add_argument('-o', '--outfile', metavar=('FILENAME'),
-                       help='Save tile table to the given filename.')
-    group.add_argument('-p', '--plot', metavar=('FILENAME'),
-                       help='Save a sky plot to the given filename')
+    group.add_argument(
+        '-v', '--verbose', action='store_true', help='Print additional logging infomation.'
+    )
+    group.add_argument(
+        '-o', '--outfile', metavar=('FILENAME'), help='Save tile table to the given filename.'
+    )
+    group.add_argument(
+        '-p', '--plot', metavar=('FILENAME'), help='Save a sky plot to the given filename'
+    )
 
     # Parse args
     args = parser.parse_args()
@@ -321,7 +422,9 @@ def main():
     else:
         source = None
 
-    run(grid, skymap,
+    run(
+        grid,
+        skymap,
         simulate=args.simulate,
         date=args.date,
         duration=args.duration,
@@ -338,4 +441,4 @@ def main():
         verbose=args.verbose,
         outfile=args.outfile,
         plot=args.plot,
-        )
+    )

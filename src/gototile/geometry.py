@@ -165,8 +165,9 @@ def interpolate_points(coords, n_points=5):
             steps = np.array([np.arange(0, s.deg, s.deg / (n_points + 1)) * u.deg for s in sep])
             # Then we have to offset each individually
             # TODO: There might be a faster way to do this?
-            new_points = SkyCoord([coords_a.directional_offset_by(ang, s[:, np.newaxis])
-                                   for s in steps])
+            new_points = SkyCoord(
+                [coords_a.directional_offset_by(ang, s[:, np.newaxis]) for s in steps]
+            )
         offset_points.append(new_points)
 
     # Combine into a single array, and transpose to match input
