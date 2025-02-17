@@ -59,6 +59,7 @@ repository = "http://github.com/GOTO-OBS/goto-tile"
 
 [tool.hatch.version]
 source = "vcs"
+tag-pattern =  "(v\\d+\\.\\d+\\.\\d+)"  # e.g. v1.2.3
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/gototile/_version.py"
