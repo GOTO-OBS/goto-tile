@@ -16,8 +16,9 @@ from . import skymaptools
 from .skymap import SkyMap
 
 
-class download:
-    @staticmethod
+def download_glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cutoff_dist=10000):
+    """Download the GLADE galaxy catalog and convert it to CSV format."""
+
     def reporthook(count, block_size, total_size):
         global start_time
         if count == 0:
@@ -33,51 +34,49 @@ class download:
         )
         sys.stdout.flush()
 
-    @staticmethod
-    def glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cutoff_dist=10000):
-        print('Downloading GLADE galaxy catalog ...')
-        if local_path is None:
-            local_path = pkg_resources.resource_filename('gototile', 'data')
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
+    print('Downloading GLADE galaxy catalog ...')
+    if local_path is None:
+        local_path = pkg_resources.resource_filename('gototile', 'data')
+        if not os.path.exists(local_path):
+            os.makedirs(local_path)
 
-        out_txt = os.path.join(local_path, 'GLADE.txt')
-        urlretrieve(url, out_txt, download.reporthook)
+    out_txt = os.path.join(local_path, 'GLADE.txt')
+    urlretrieve(url, out_txt, reporthook)
 
-        print('\nCoverting .txt to .csv ...')
-        col = [
-            'PGC',
-            'GWGC name',
-            'HyperLEDA name',
-            '2MASS name',
-            'SDSS-DR12 name',
-            'flag1',
-            'ra',
-            'dec',
-            'Dist',
-            'Dist_err',
-            'z',
-            'B',
-            'B_err',
-            'B_Abs',
-            'J',
-            'J_err',
-            'H',
-            'H_err',
-            'K',
-            'K_err',
-            'flag2',
-            'flag3',
-        ]
+    print('\nConverting .txt to .csv ...')
+    col = [
+        'PGC',
+        'GWGC name',
+        'HyperLEDA name',
+        '2MASS name',
+        'SDSS-DR12 name',
+        'flag1',
+        'ra',
+        'dec',
+        'Dist',
+        'Dist_err',
+        'z',
+        'B',
+        'B_err',
+        'B_Abs',
+        'J',
+        'J_err',
+        'H',
+        'H_err',
+        'K',
+        'K_err',
+        'flag2',
+        'flag3',
+    ]
 
-        df = pd.read_csv(out_txt, sep=' ', header=None)
-        df.columns = col
-        df = df[(df.Dist < cutoff_dist) & (df.flag1 == 'G')]
+    df = pd.read_csv(out_txt, sep=' ', header=None)
+    df.columns = col
+    df = df[(df.Dist < cutoff_dist) & (df.flag1 == 'G')]
 
-        outfile = os.path.join(local_path, 'GLADE.csv')
-        df.to_csv(outfile, index=False)
+    outfile = os.path.join(local_path, 'GLADE.csv')
+    df.to_csv(outfile, index=False)
 
-        os.remove(out_txt)
+    os.remove(out_txt)
 
 
 def create_catalog_skymap(
@@ -149,7 +148,7 @@ def create_catalog_skymap(
     else:
         if name == 'GLADE':
             # Can download the GLADE catalog if it doesn't exist
-            download.glade()
+            download_glade()
             filepath = os.path.join(data_path, filename)
         else:
             raise ValueError('Catalog name not recognized')
