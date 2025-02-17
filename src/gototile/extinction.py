@@ -1,7 +1,7 @@
 import os
-import pkg_resources
 
 import numpy as np
+import pkg_resources
 
 from .skymap import SkyMap
 

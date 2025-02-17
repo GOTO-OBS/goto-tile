@@ -1,15 +1,16 @@
 from __future__ import absolute_import, division
 
 import os.path
-import numpy as np
-import astropy.units as u
-from astropy.coordinates import SkyCoord, Angle
 import sys
-from urllib.request import urlretrieve
-import pkg_resources
 import time
-import pandas as pd
+from urllib.request import urlretrieve
+
+import astropy.units as u
 import healpy as hp
+import numpy as np
+import pandas as pd
+import pkg_resources
+from astropy.coordinates import Angle, SkyCoord
 
 from . import skymaptools
 from .skymap import SkyMap

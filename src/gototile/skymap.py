@@ -1,28 +1,19 @@
 """Module containing the SkyMap class."""
 
-from gzip import GzipFile
-from io import BytesIO
-import os
 import warnings
 from copy import deepcopy
+from gzip import GzipFile
+from io import BytesIO
 
+import healpy as hp
+import ligo.skymap.plot  # noqa: F401  (for extra projections)
+import mhealpy as mhp
+import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import QTable
-
-import healpy as hp
-
-import ligo.skymap.plot  # noqa: F401  (for extra projections)
-
 from matplotlib import pyplot as plt
-
-if 'DISPLAY' not in os.environ:
-    plt.switch_backend('agg')
-
-import mhealpy as mhp
-
-import numpy as np
 
 from .gaussian import create_gaussian_map
 from .skymaptools import coord2pix, get_data_contours, pix2coord

@@ -74,8 +74,10 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle
     "F",  # flake8
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "I", # isort
 ]
 ignore = []
 

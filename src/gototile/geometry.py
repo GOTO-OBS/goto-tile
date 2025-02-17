@@ -1,11 +1,9 @@
 """Module containing utility functions for spherical geometry."""
 
+import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-
 from matplotlib.path import Path
-
-import numpy as np
 
 
 def onsky_offset(coords, offsets):

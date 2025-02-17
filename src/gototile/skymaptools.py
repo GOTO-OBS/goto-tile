@@ -2,12 +2,10 @@
 
 from functools import lru_cache
 
+import healpy as hp
+import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-
-import healpy as hp
-
-import numpy as np
 
 
 def get_data_contours(data, min_zero=True):

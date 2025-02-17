@@ -2,32 +2,23 @@
 
 import itertools
 import math
-import os
 from collections import Counter
 from copy import copy, deepcopy
 
+import ligo.skymap.plot  # noqa: F401  (for extra projections)
+import numpy as np
 from astroplan import AltitudeConstraint, AtNightConstraint, Observer, is_observable
-
 from astropy import units as u
 from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.table import QTable
-
-import ligo.skymap.plot  # noqa: F401  (for extra projections)
-
 from matplotlib import pyplot as plt
-
-if 'DISPLAY' not in os.environ:
-    plt.switch_backend('agg')
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import BoundaryNorm
 from matplotlib.patches import Patch, PathPatch
 
-import numpy as np
-
 from .geometry import coords_to_path, interpolate_points, onsky_offset
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
-
 
 NAMED_GRIDS = {
     'GOTO4': {

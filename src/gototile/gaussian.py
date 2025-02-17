@@ -1,6 +1,5 @@
-import numpy as np
-
 import healpy as hp
+import numpy as np
 
 from .skymaptools import pix2coord
 

@@ -3,16 +3,14 @@
 
 import argparse
 
+import numpy as np
 from astropy import units as u
-from astropy.coordinates import AltAz, EarthLocation, get_sun, SkyCoord
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_sun
 from astropy.time import Time, TimeDelta
-
-from gototile.grid import SkyGrid
-from gototile.skymap import SkyMap
-
 from matplotlib import pyplot as plt
 
-import numpy as np
+from .grid import SkyGrid
+from .skymap import SkyMap
 
 
 def run(
