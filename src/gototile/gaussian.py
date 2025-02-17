@@ -1,3 +1,5 @@
+"""Functions to create a HEALPix map with a Gaussian peak at a given location."""
+
 import healpy as hp
 import numpy as np
 
@@ -5,7 +7,7 @@ from .skymaptools import pix2coord
 
 
 def gaussian_prob(grid, peak, radius):
-    """Calculate the probability of points gaussian dist.)
+    """Calculate the probability of points gaussian dist.
 
     Parameters
     ----------
@@ -15,6 +17,7 @@ def gaussian_prob(grid, peak, radius):
         central peak of the distribution
     radius : float
         68% containment radius, in degrees
+
     """
     # for each point on the grid calculate the angular distance to the peak
     dist = peak.separation(grid)
@@ -57,6 +60,7 @@ def create_gaussian_map(peak, radius, nside=64, nest=True):
     -------
     prob_array : `numpy.array`
         the probability data
+
     """
     # Get the celestial coordinates of each pixel
     npix = hp.nside2npix(nside)

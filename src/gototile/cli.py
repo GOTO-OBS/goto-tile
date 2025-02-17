@@ -1,4 +1,3 @@
-#! /usr/bin/env python3
 """Core command-line script for the gototile package."""
 
 import argparse
@@ -33,6 +32,7 @@ def run(
     outfile=None,
     plot=None,
 ):
+    """Run the GOTO-tile simulation."""
     if skymap is None:
         # Just output the coordinates for the grid tiles
         table = grid.get_table()
@@ -216,26 +216,31 @@ def run(
         )
 
 
+def date_validator(date):
+    """Validate the date argument and return an astropy.time.Time instance."""
+    try:
+        if date == 'now':
+            date = Time.now()
+        else:
+            date = Time(date)
+    except ValueError:
+        msg = "invalid date: '{}' not a recognised format".format(date)
+        raise argparse.ArgumentTypeError(msg)
+    return date
+
+
+def site_validator(site):
+    """Validate the site argument and return an astropy.coordinates.EarthLocation instance."""
+    try:
+        site = EarthLocation.of_site(site)
+    except ValueError:
+        msg = "unrecognised site: '{}', check EarthLocation.get_site_names().".format(site)
+        raise argparse.ArgumentTypeError(msg)
+    return site
+
+
 def main():
-    def date_validator(date):
-        try:
-            if date == 'now':
-                date = Time.now()
-            else:
-                date = Time(date)
-        except ValueError:
-            msg = "invalid date: '{}' not a recognised format".format(date)
-            raise argparse.ArgumentTypeError(msg)
-        return date
-
-    def site_validator(site):
-        try:
-            site = EarthLocation.of_site(site)
-        except ValueError:
-            msg = "unrecognised site: '{}', check EarthLocation.get_site_names().".format(site)
-            raise argparse.ArgumentTypeError(msg)
-        return site
-
+    """Command-line interface for the gototile package."""
     description = 'This script creates pointings for selected telescopes, with given skymap files.'
     parser = argparse.ArgumentParser(description=description)
 

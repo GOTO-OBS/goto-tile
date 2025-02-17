@@ -185,44 +185,58 @@ class SkyMap:
 
     @property
     def data(self):
+        """Return the skymap data."""
         return self.healpix.data
 
     @property
     def skymap(self):
-        # backwards-compatible equivalent of SkyMap.data
+        """Return the skymap data.
+
+        This is a backwards-compatible equivalent of SkyMap.data.
+        """
         return self.healpix.data
 
     @property
     def nside(self):
+        """Return the HEALPix nside parameter."""
         return self.healpix.nside
 
     @property
     def npix(self):
+        """Return the number of pixels in the skymap."""
         return self.healpix.npix
 
     @property
     def uniq(self):
+        """Return the UNIQ pixel indices for each pixel in the skymap."""
         return self.healpix.uniq
 
     @property
     def order(self):
+        """Return the HEALPix ordering for the skymap."""
         return self.healpix.scheme
 
     @property
     def is_nested(self):
+        """Return True if the skymap is in nested HEALPix ordering."""
         return self.healpix.is_nested
 
     @property
     def isnested(self):
-        # backwards-compatible equivalent of SkyMap.is_nested
+        """Return True if the skymap is in nested HEALPix ordering.
+
+        This is a backwards-compatible equivalent of SkyMap.is_nested.
+        """
         return self.healpix.is_nested
 
     @property
     def is_moc(self):
+        """Return True if the skymap is a Multi-Order Coverage map."""
         return self.healpix.is_moc
 
     @property
     def density(self):
+        """Return True if the skymap is a density map (per steradian)."""
         return self.healpix.density()
 
     @density.setter

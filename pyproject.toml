@@ -79,8 +79,23 @@ select = [
     "W",  # pycodestyle warnings
     "I", # isort
     "N", # pep8-naming
+    "D", # pydocstyle
 ]
-ignore = []
+ignore = [
+    # Numpy docstring format for pydocstyle
+    # (see https://www.pydocstyle.org/en/stable/error_codes.html#default-conventions)
+    "D107",  # undocumented-public-init
+    "D203",  # incorrect-blank-line-before-class
+    "D212",  # multi-line-summary-first-line
+    "D213",  # multi-line-summary-second-line
+    "D402",  # signature-in-docstring
+    "D413",  # missing-blank-line-after-last-section
+    "D415",  # missing-terminal-punctuation
+    "D416",  # missing-section-name-colon
+    "D417",  # undocumented-param
+    # This one isn't part of the Numpy format, but it's just annoying and often disabled
+    "D105",  # undocumented-magic-method
+]
 
 [tool.ruff.format]
 quote-style = "single"

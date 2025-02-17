@@ -1,3 +1,5 @@
+"""Module to create a skymap of weighted galactic extinction."""
+
 import os
 
 import numpy as np
@@ -10,7 +12,7 @@ def create_extinction_skymap(min_weight=0, exp_k=5):
     """Create a skymap of weighted galactic extinction.
 
     Parameters
-    ------------
+    ----------
     min_weight : float, optional
         minimum weight to scale the skymap
         default is 0

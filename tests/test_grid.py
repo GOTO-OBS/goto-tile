@@ -1,3 +1,5 @@
+"""Test the grid module."""
+
 import numpy as np
 from astropy import units as u
 
@@ -5,6 +7,7 @@ from gototile.grid import SkyGrid
 
 
 def test_gridding():
+    """Test the SkyGrid class."""
     fov = {'ra': 4 * u.deg, 'dec': 2 * u.deg}
 
     # 512 requires more memory, but has higher precision. Some
