@@ -151,7 +151,7 @@ def run(
                 # Airmass is weighted relative to the contained probability by a factor of X
                 # (default X=0.1), and the total score is always between 0 and 1 - lower is better.
                 tile_obs = tile_times_observed[horizon_mask]
-                tile_probs = 1 - masked_table['prob'][horizon_mask]
+                tile_probs = 1 - selected_tiles['prob'][horizon_mask]
                 tile_airmass = tile_altaz.secz[horizon_mask]
                 tile_tiebreaker = tile_probs + airmass_weight * (2 - tile_airmass)
                 tile_ranks = tile_obs + tile_tiebreaker / (1 + airmass_weight)

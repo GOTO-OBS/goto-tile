@@ -71,6 +71,13 @@ include = [
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle
+    "F",  # flake8
+]
+ignore = []
+
 [tool.ruff.format]
 quote-style = "single"
 indent-style = "space"

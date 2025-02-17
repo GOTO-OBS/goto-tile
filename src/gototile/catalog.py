@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division
 
 import os.path
-from collections import defaultdict
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord, Angle
@@ -36,7 +35,7 @@ class download:
     @staticmethod
     def glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cutoff_dist=10000):
         print('Downloading GLADE galaxy catalog ...')
-        if local_path == None:
+        if local_path is None:
             local_path = pkg_resources.resource_filename('gototile', 'data')
             if not os.path.exists(local_path):
                 os.makedirs(local_path)
