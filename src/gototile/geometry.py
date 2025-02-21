@@ -164,7 +164,7 @@ def interpolate_points(coords, n_points=5):
             # Then we have to offset each individually
             # TODO: There might be a faster way to do this?
             new_points = SkyCoord(
-                [coords_a.directional_offset_by(ang, s[:, np.newaxis]) for s in steps]
+                [coords_a.directional_offset_by(ang, s[:, np.newaxis]) for s in steps],
             )
         offset_points.append(new_points)
 
@@ -205,27 +205,21 @@ def coords_to_path(coords, meridian_split=False):
     dec = coords.dec.deg
 
     # Check if the region passes over the RA=0 line
-    overlaps_meridian = any(ra < 90) and any(ra > 270)
-    if not overlaps_meridian or not meridian_split:
-        # If not then just make a normal closed path
-        return Path(np.array((ra, dec)).T, closed=True)
-
     # If it does then we need to do some extra work
-    if any(np.logical_and(ra > 90, ra < 270)):
-        # This region includes one of the poles
-        # To get it to fill we need to add extra points at the pole itself
-        # First sort by RA
-        ra, dec = zip(*sorted(zip(ra, dec), key=lambda radec: radec[0]))
+    if meridian_split and any(ra < 90) and any(ra > 270):
+        # If the region includes either of the poles we need to add extra points at the pole itself
+        if any(np.logical_and(ra > 90, ra < 270)):
+            # First sort by RA
+            ra, dec = zip(*sorted(zip(ra, dec), key=lambda radec: radec[0]))
 
-        # Now add extra points
-        pole = 90 if np.all(np.array(dec) > 0) else -90
-        ra = np.array([0] + list(ra) + [360, 360])
-        dec = np.array([pole] + list(dec) + [dec[0], pole])
+            # Now add extra points
+            pole = 90 if np.all(np.array(dec) > 0) else -90
+            ra = np.array([0, *list(ra), 360, 360])
+            dec = np.array([pole, *list(dec), dec[0], pole])
 
-        # Return the path with the extra points
-        return Path(np.array((ra, dec)).T, closed=True)
+            # Return the path with the extra points
+            return Path(np.array((ra, dec)).T, closed=True)
 
-    else:
         # Tiles that pass over the edges of the plot (at RA=0) won't fill properly,
         # they need to be split into two sections on either side.
         # First create masks, with a little leeway on each side
@@ -243,12 +237,15 @@ def coords_to_path(coords, meridian_split=False):
         ra_r[(ra_r < 1) | (ra_r > 359)] = 360
 
         # Add the first point on again to close
-        ra_l = list(ra_l) + [ra_l[0]]
-        dec_l = list(dec_l) + [dec_l[0]]
-        ra_r = list(ra_r) + [ra_r[0]]
-        dec_r = list(dec_r) + [dec_r[0]]
+        ra_l = [*list(ra_l), ra_l[0]]
+        dec_l = [*list(dec_l), dec_l[0]]
+        ra_r = [*list(ra_r), ra_r[0]]
+        dec_r = [*list(dec_r), dec_r[0]]
 
         # Create the paths, then combine them and return a single Path object
         path_l = Path(np.array((ra_l, dec_l)).T, closed=True)
         path_r = Path(np.array((ra_r, dec_r)).T, closed=True)
         return Path.make_compound_path(path_l, path_r)
+
+    # For any other position just make a normal closed path
+    return Path(np.array((ra, dec)).T, closed=True)

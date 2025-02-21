@@ -12,7 +12,7 @@ from .grid import SkyGrid
 from .skymap import SkyMap
 
 
-def run(
+def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
     grid,
     skymap=None,
     simulate=True,
@@ -77,7 +77,11 @@ def run(
 
             # Add the skymap contours
             skymap.plot_contours(
-                axes, levels=[0.5, 0.9], colors='black', linewidths=0.5, zorder=1.3
+                axes,
+                levels=[0.5, 0.9],
+                colors='black',
+                linewidths=0.5,
+                zorder=1.3,
             )
 
             # Add a colorbar
@@ -169,7 +173,7 @@ def run(
     print()
     print(f'Made {sum(tile_times_observed)} observations of {sum(tile_times_observed > 0)} tiles')
     obs_dict = {all_tiles[i]: tile_times_observed[i] for i in range(len(all_tiles))}
-    all_obs = [obs_dict[t] if t in obs_dict else 0 for t in grid.tilenames]
+    all_obs = [obs_dict.get(t, 0) for t in grid.tilenames]
     table = grid.get_table()
     table['selected'] = [t in all_tiles for t in grid.tilenames]
     table['nobs'] = all_obs
@@ -185,7 +189,7 @@ def run(
             f'The source coordinates were located in tile{"s" if len(source_tiles) > 1 else ""}',
             source_tiles,
         )
-        source_nobs = sum(obs_dict[tile] if tile in obs_dict else 0 for tile in source_tiles)
+        source_nobs = sum(obs_dict.get(t, 0) for t in source_tiles)
         print(f'The source location was observed {source_nobs} times')
     else:
         source_tiles = []
@@ -199,7 +203,10 @@ def run(
         # TODO: REPLACE WITH PROPER PLOT
         print('Saving observation plot to', plot)
         visible_tiles = grid.get_visible_tiles(
-            site, time_range=(start_date, end_date), alt_limit=min_alt, sun_limit=twilight
+            site,
+            time_range=(start_date, end_date),
+            alt_limit=min_alt,
+            sun_limit=twilight,
         )
         non_visible_tiles = [t for t in grid.tilenames if t not in visible_tiles]
 
@@ -219,13 +226,10 @@ def run(
 def date_validator(date):
     """Validate the date argument and return an astropy.time.Time instance."""
     try:
-        if date == 'now':
-            date = Time.now()
-        else:
-            date = Time(date)
-    except ValueError:
-        msg = "invalid date: '{}' not a recognised format".format(date)
-        raise argparse.ArgumentTypeError(msg)
+        date = Time.now() if date == 'now' else Time(date)
+    except ValueError as err:
+        msg = f"invalid date: '{date}' not a recognised format"
+        raise argparse.ArgumentTypeError(msg) from err
     return date
 
 
@@ -233,13 +237,13 @@ def site_validator(site):
     """Validate the site argument and return an astropy.coordinates.EarthLocation instance."""
     try:
         site = EarthLocation.of_site(site)
-    except ValueError:
-        msg = "unrecognised site: '{}', check EarthLocation.get_site_names().".format(site)
-        raise argparse.ArgumentTypeError(msg)
+    except ValueError as err:
+        msg = f"unrecognised site: '{site}', check EarthLocation.get_site_names()."
+        raise argparse.ArgumentTypeError(msg) from err
     return site
 
 
-def main():
+def main():  # noqa: PLR0915
     """Command-line interface for the gototile package."""
     description = 'This script creates pointings for selected telescopes, with given skymap files.'
     parser = argparse.ArgumentParser(description=description)
@@ -344,7 +348,10 @@ def main():
         help='Maximum number of tiles to select for observing (default=0)',
     )
     group.add_argument(
-        '--min-prob', type=float, default=0, help='Minimum probability to select tiles (default=0)'
+        '--min-prob',
+        type=float,
+        default=0,
+        help='Minimum probability to select tiles (default=0)',
     )
     group.add_argument(
         '-c',
@@ -354,7 +361,10 @@ def main():
         help='Probability contour level to select tiles (default=0.95)',
     )
     group.add_argument(
-        '--min-alt', type=float, default=30, help='Telescope horizon limit in degrees (default=30)'
+        '--min-alt',
+        type=float,
+        default=30,
+        help='Telescope horizon limit in degrees (default=30)',
     )
     group.add_argument(
         '--twilight',
@@ -380,13 +390,22 @@ def main():
     # Output options
     group = parser.add_argument_group('output options')
     group.add_argument(
-        '-v', '--verbose', action='store_true', help='Print additional logging infomation.'
+        '-v',
+        '--verbose',
+        action='store_true',
+        help='Print additional logging infomation.',
     )
     group.add_argument(
-        '-o', '--outfile', metavar=('FILENAME'), help='Save tile table to the given filename.'
+        '-o',
+        '--outfile',
+        metavar=('FILENAME'),
+        help='Save tile table to the given filename.',
     )
     group.add_argument(
-        '-p', '--plot', metavar=('FILENAME'), help='Save a sky plot to the given filename'
+        '-p',
+        '--plot',
+        metavar=('FILENAME'),
+        help='Save a sky plot to the given filename',
     )
 
     # Parse args

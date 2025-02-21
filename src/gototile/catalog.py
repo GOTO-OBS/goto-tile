@@ -1,10 +1,8 @@
 """Catalog functions for gototile."""
 
-from __future__ import absolute_import, division
-
-import os.path
 import sys
 import time
+from pathlib import Path
 from urllib.request import urlretrieve
 
 import astropy.units as u
@@ -22,7 +20,7 @@ def download_glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cu
     """Download the GLADE galaxy catalog and convert it to CSV format."""
 
     def reporthook(count, block_size, total_size):
-        global start_time
+        global start_time  # noqa: PLW0603
         if count == 0:
             start_time = time.time()
             return
@@ -31,19 +29,22 @@ def download_glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cu
         speed = int(progress_size / (1024 * duration))
         percent = int(count * block_size * 100 / total_size)
         sys.stdout.write(
-            '\r...%d%%, %d MB, %d KB/s, %d seconds passed'
-            % (percent, progress_size / (1024 * 1024), speed, duration)
+            f'\r...{percent}%, {progress_size / (1024 * 1024):.2f} MB, '
+            f'{speed} KB/s, {duration:.2f} seconds passed'
+            % (percent, progress_size / (1024 * 1024), speed, duration),
         )
         sys.stdout.flush()
 
     print('Downloading GLADE galaxy catalog ...')
     if local_path is None:
-        local_path = pkg_resources.resource_filename('gototile', 'data')
-        if not os.path.exists(local_path):
-            os.makedirs(local_path)
+        local_path = Path(pkg_resources.resource_filename('gototile', 'data'))
+        if not local_path.exists():
+            local_path.mkdir(parents=True)
 
-    out_txt = os.path.join(local_path, 'GLADE.txt')
-    urlretrieve(url, out_txt, reporthook)
+    out_txt = local_path / 'GLADE.txt'
+    if not url.startswith(('http:', 'https:')):
+        raise ValueError("URL must start with 'http:' or 'https:'")
+    urlretrieve(url, out_txt, reporthook)  # noqa: S310
 
     print('\nConverting .txt to .csv ...')
     col = [
@@ -71,17 +72,17 @@ def download_glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cu
         'flag3',
     ]
 
-    df = pd.read_csv(out_txt, sep=' ', header=None)
-    df.columns = col
-    df = df[(df.Dist < cutoff_dist) & (df.flag1 == 'G')]
+    catalog_df = pd.read_csv(out_txt, sep=' ', header=None)
+    catalog_df.columns = col
+    catalog_df = catalog_df[(catalog_df.Dist < cutoff_dist) & (catalog_df.flag1 == 'G')]
 
-    outfile = os.path.join(local_path, 'GLADE.csv')
-    df.to_csv(outfile, index=False)
+    outfile = local_path / 'GLADE.csv'
+    catalog_df.to_csv(outfile, index=False)
 
-    os.remove(out_txt)
+    out_txt.unlink()
 
 
-def create_catalog_skymap(
+def create_catalog_skymap(  # noqa: PLR0913
     name,
     dist_mean=None,
     dist_err=None,
@@ -142,18 +143,15 @@ def create_catalog_skymap(
 
     """
     # Find the catalog path
-    data_path = pkg_resources.resource_filename('gototile', 'data')
+    data_path = Path(pkg_resources.resource_filename('gototile', 'data'))
     filename = name + '.csv'
-    if os.path.isfile(os.path.join(data_path, filename)):
-        # The catalog already exists
-        filepath = os.path.join(data_path, filename)
-    else:
+    filepath = data_path / filename
+    if not filepath.is_file():
         if name == 'GLADE':
             # Can download the GLADE catalog if it doesn't exist
             download_glade()
-            filepath = os.path.join(data_path, filename)
         else:
-            raise ValueError('Catalog name not recognized')
+            raise ValueError(f'Catalog name {name} not recognized')
 
     # Read the catalog
     table = pd.read_csv(filepath)
@@ -164,7 +162,7 @@ def create_catalog_skymap(
         key = 'weighted_distance'
 
     # Get ra,dec coords of the entries in the table
-    ra, dec = table['ra'].values, table['dec'].values
+    ra, dec = table['ra'].to_numpy(), table['dec'].to_numpy()
     coord = SkyCoord(ra, dec, unit='deg', frame='fk5')
 
     # Convert coordinates into HEALPix pixels

@@ -2,6 +2,7 @@
 
 import itertools
 import math
+import re
 from collections import Counter
 from copy import copy, deepcopy
 
@@ -97,19 +98,18 @@ def create_grid(fov, overlap, kind='minverlap'):
 
     if kind == 'cosine':
         return create_grid_cosine(fov, overlap)
-    elif kind == 'cosine_symmetric':
+    if kind == 'cosine_symmetric':
         return create_grid_cosine_symmetric(fov, overlap)
-    elif kind == 'product':
+    if kind == 'product':
         return create_grid_product(fov, overlap)
-    elif kind == 'minverlap':
+    if kind == 'minverlap':
         return create_grid_minverlap(fov, overlap)
-    elif kind == 'enhanced':
+    if kind == 'enhanced':
         return create_grid_enhanced(fov, overlap)
-    elif kind.startswith('enhanced'):
-        params = [i == '1' for i in kind.strip('enhanced')]
+    if kind.startswith('enhanced'):
+        params = [i == '1' for i in kind.replace('enhanced', '')]
         return create_grid_enhanced(fov, overlap, *params)
-    else:
-        raise ValueError('Unknown grid tiling method: "{}"'.format(kind))
+    raise ValueError(f'Unknown grid tiling method: "{kind}"')
 
 
 def create_grid_product(fov, overlap):
@@ -219,8 +219,13 @@ def create_grid_minverlap(fov, overlap):
     return allras, alldecs
 
 
-def create_grid_enhanced(
-    fov, overlap, integer_fit=True, force_equator=False, polar_edge=False, corner_align=True
+def create_grid_enhanced(  # noqa: PLR0912, PLR0913
+    fov,
+    overlap,
+    integer_fit=True,
+    force_equator=False,
+    polar_edge=False,
+    corner_align=True,
 ):
     """Create a pointing grid to cover the whole sky.
 
@@ -263,7 +268,7 @@ def create_grid_enhanced(
     else:
         # Place the highest band exactly on the pole
         pole = 90
-    if force_equator:
+    if force_equator:  # noqa: SIM108
         # Fit between 0 and the pole
         dec_range = pole
     else:
@@ -314,8 +319,7 @@ def create_grid_enhanced(
                 max_fov_ra = corner_se.ra.value * 2
                 # This is the maximum spacing, so only override the default if it is larger than
                 # the maximum (usually closest to the poles).
-                if band_fov_ra > max_fov_ra:
-                    band_fov_ra = max_fov_ra
+                band_fov_ra = min(band_fov_ra, max_fov_ra)
             if integer_fit:
                 # Calculate the number of steps to best fit into the given range
                 n_ra = math.ceil(360 / band_fov_ra)
@@ -382,11 +386,11 @@ def create_array(fov=(2.21, 2.95), shape=(4, 2), overlap=0.2):
     centres = []
     for j in range(shape[1])[::-1]:
         for i in range(shape[0])[::-1]:
-            centres.append(
+            centres.append(  # noqa: PERF401
                 (
                     (i - (shape[0] - 1) / 2) * (fov[0] - overlap[0]),
                     (j - (shape[1] - 1) / 2) * (fov[1] - overlap[1]),
-                )
+                ),
             )
 
     # Now simply offset half the fov in each direction from the centres to find the four corners.
@@ -465,7 +469,10 @@ class SkyGrid:
 
         # Give the grid a unique name
         self.name = 'allsky-{}x{}-{}-{}'.format(
-            self.fov['ra'].value, self.fov['dec'].value, self.overlap['ra'], self.overlap['dec']
+            self.fov['ra'].value,
+            self.fov['dec'].value,
+            self.overlap['ra'],
+            self.overlap['dec'],
         )
 
         # Create the grid
@@ -557,19 +564,16 @@ class SkyGrid:
 
         """
         if name.startswith('allsky'):
-            try:
-                fov = (
-                    float(name.split('-')[1].split('x')[0]),
-                    float(name.split('-')[1].split('x')[1]),
-                )
-                overlap = (float(name.split('-')[2]), float(name.split('-')[3]))
-                return cls(fov, overlap)
-            except Exception:
-                template = 'allsky-{fov_ra}x{fov_dec}-{overlap_ra}-{overlap_dec}`'
-                raise ValueError(
-                    f'Grid name "{name}" not recognised, Name format should match ', template
-                )
-        elif name in NAMED_GRIDS:
+            pattern = r'allsky-(\d+(\.\d+)?)x(\d+(\.\d+)?)-(\d+(\.\d+)?)'
+            match = re.match(pattern, name)
+            if not match:
+                template = 'allsky-{fov_ra}x{fov_dec}-{overlap_ra}-{overlap_dec}'
+                msg = f'Grid name "{name}" not recognised, name format should match "{template}".'
+                raise ValueError(msg)
+            fov = (float(match.group(1)), float(match.group(3)))
+            overlap = (float(match.group(5)), float(match.group(7)))
+            return cls(fov, overlap)
+        if name in NAMED_GRIDS:
             fov = NAMED_GRIDS[name]['fov']
             overlap = NAMED_GRIDS[name]['overlap']
             kind = NAMED_GRIDS[name]['kind']
@@ -721,7 +725,7 @@ class SkyGrid:
             # Recalculate the probability within any changed tiles
             changed_tiles = np.unique(np.concatenate(pixel_tiles[high_tile_pixels]))
             tile_probs[changed_tiles] = np.array(
-                [np.sum(pixel_probs[pixels]) for pixels in tile_pixels[changed_tiles]]
+                [np.sum(pixel_probs[pixels]) for pixels in tile_pixels[changed_tiles]],
             )
 
         # Start from a contour level of 1, only replace those with the calculated values
@@ -803,8 +807,7 @@ class SkyGrid:
 
         if scalar:
             return tilenames[0]
-        else:
-            return tilenames
+        return tilenames
 
     def get_field(self):
         """Find which field(s) the given coordinates fall within."""
@@ -817,7 +820,12 @@ class SkyGrid:
         raise NotImplementedError
 
     def get_visible_tiles(
-        self, locations, time_range=None, alt_limit=30, sun_limit=-15, any_all='any'
+        self,
+        locations,
+        time_range=None,
+        alt_limit=30,
+        sun_limit=-15,
+        any_all='any',
     ):
         """Get the tiles that are visible from the given location(s).
 
@@ -850,11 +858,11 @@ class SkyGrid:
             locations = [locations]
 
         if any_all == 'any':
-            mask = np.full(self.ntiles, False)
+            mask = np.full(self.ntiles, fill_value=False)
         elif any_all == 'all':
-            mask = np.full(self.ntiles, True)
+            mask = np.full(self.ntiles, fill_value=True)
         else:
-            raise ValueError('Invalid value for any_all: "{}"'.format(any_all))
+            raise ValueError(f'Invalid value for any_all: "{any_all}"')
 
         for location in locations:
             if time_range is None:
@@ -888,8 +896,7 @@ class SkyGrid:
         """Return the indices of the given tile(s)."""
         if isinstance(tilenames, str):
             return self.tilenames.index(tilenames)
-        else:
-            return [self.tilenames.index(tile) for tile in tilenames]
+        return [self.tilenames.index(tile) for tile in tilenames]
 
     def get_coordinates(self, tilenames=None):
         """Return the central coordinates of the given tile(s).
@@ -978,7 +985,7 @@ class SkyGrid:
         if self.pixels is None:
             raise ValueError('SkyGrid does not have a SkyMap applied')
         if tilenames is None:
-            return sorted(set([ipix for tile_pix in self.pixels for ipix in tile_pix]))
+            return sorted({ipix for tile_pix in self.pixels for ipix in tile_pix})
 
         indices = self._get_tilename_indices(tilenames)
         if isinstance(indices, int):
@@ -1026,7 +1033,7 @@ class SkyGrid:
         """
         self._get_test_map()
         if tilenames is None:
-            pixels = sorted(set([ipix for tile_pix in self._base_pixels for ipix in tile_pix]))
+            pixels = sorted({ipix for tile_pix in self._base_pixels for ipix in tile_pix})
             return self._base_skymap.get_pixel_area(pixels)
 
         indices = self._get_tilename_indices(tilenames)
@@ -1063,8 +1070,7 @@ class SkyGrid:
 
         if isinstance(tilenames, str):
             return self.get_area(tilenames)
-        else:
-            return [self.get_area(tile) for tile in tilenames]
+        return [self.get_area(tile) for tile in tilenames]
 
     def get_table(self):
         """Return an astropy QTable containing the name and coordinates of each tile in the grid.
@@ -1105,15 +1111,14 @@ class SkyGrid:
 
         table = QTable(col_data, names=col_names)
         table['freq'].format = '.2%'
-        table = table.group_by('in_tiles')
-        return table
+        return table.group_by('in_tiles')
 
     def _get_tile_paths(self, meridian_split=False, edge_points=4):
         """Create and cache Matplotlib Patches to use when plotting tiles."""
         # Used cached versions to save time when repeatedly plotting
         if not meridian_split and hasattr(self, '_paths') and self._paths_points == edge_points:
             return self._paths
-        elif (
+        if (
             meridian_split
             and hasattr(self, '_paths_split')
             and self._paths_split_points == edge_points
@@ -1147,7 +1152,7 @@ class SkyGrid:
             and self._array_paths_points == edge_points
         ):
             return self._array_paths
-        elif (
+        if (
             meridian_split
             and hasattr(self, '_array_paths_split')
             and self._array_paths_split_points == edge_points
@@ -1198,19 +1203,21 @@ class SkyGrid:
             indexes = [self.tilenames.index(tilename) for tilename in tilenames]
             paths = np.array(paths)[indexes]
 
-        if len(paths) == 1:
-            # Add a single patch
-            patch = PathPatch(paths[0], transform=axes.get_transform('world'), *args, **kwargs)
-            axes.add_patch(patch)
-            return patch
-        else:
-            # Add all the patches together as a collection
+        if len(paths) > 1:
+            # Fomr multiple tiles add all the patches together as a collection
             patches = [PathPatch(path) for path in paths]
             collection = PatchCollection(
-                patches, transform=axes.get_transform('world'), *args, **kwargs
+                patches,
+                *args,
+                transform=axes.get_transform('world'),
+                **kwargs,
             )
             axes.add_collection(collection)
             return collection
+        # For a single tile we can just return a single patch
+        patch = PathPatch(paths[0], *args, transform=axes.get_transform('world'), **kwargs)
+        axes.add_patch(patch)
+        return patch
 
     def plot_array(self, axes, tilenames=None, edge_points=1, *args, **kwargs):
         """Plot a sub-array of fields aligned to the grid onto the given axes."""
@@ -1237,12 +1244,15 @@ class SkyGrid:
         paths = paths.flatten()
         patches = [PathPatch(path) for path in paths]
         collection = PatchCollection(
-            patches, transform=axes.get_transform('world'), *args, **kwargs
+            patches,
+            *args,
+            transform=axes.get_transform('world'),
+            **kwargs,
         )
         axes.add_collection(collection)
         return collection
 
-    def plot(
+    def plot(  # noqa: C901, PLR0912, PLR0913, PLR0915
         self,
         title=None,
         filename=None,
@@ -1466,7 +1476,11 @@ class SkyGrid:
             # Plot the 50% and 90% skymap contours
             # Taken from SkyMap.plot()
             self.skymap.plot_contours(
-                axes, levels=[0.5, 0.9], colors='black', linewidths=0.5, zorder=99
+                axes,
+                levels=[0.5, 0.9],
+                colors='black',
+                linewidths=0.5,
+                zorder=99,
             )
 
         if plot_stats is True:
@@ -1515,15 +1529,15 @@ class SkyGrid:
                 # Should be a dict with keys as tile names
                 try:
                     color_array = np.array(['none'] * self.ntiles, dtype=object)
-                    for name in color.keys():
+                    for name in color:
                         index = self.tilenames.index(name)
                         color_array[index] = color[name]
                     tile_patches.set_facecolor(np.array(color_array))
-                except Exception:
+                except Exception:  # noqa: BLE001
                     try:
                         # Create the color array
                         color_array = np.array([np.nan] * self.ntiles)
-                        for name in color.keys():
+                        for name in color:
                             index = self.tilenames.index(name)
                             color_array[index] = color[name]
                         color_array = np.array(color_array)
@@ -1580,8 +1594,8 @@ class SkyGrid:
                             cb.set_ticks(tick_location)
                             cb.set_ticklabels(tick_labels)
 
-                    except Exception:
-                        raise ValueError('Invalid entries in color array')
+                    except Exception:  # noqa: BLE001
+                        raise ValueError('Invalid entries in color array') from None
 
             elif isinstance(color, (list, tuple, np.ndarray)):
                 # A list-like of colors, should be same length as number of tiles
@@ -1591,12 +1605,12 @@ class SkyGrid:
                 # Could be a list of weights or a list of colors
                 try:
                     tile_patches.set_facecolor(np.array(color))
-                except Exception:
+                except Exception:  # noqa: BLE001
                     try:
                         tile_patches.set_array(np.array(color))
                         fig.colorbar(tile_patches, ax=axes, fraction=0.02, pad=0.05)
-                    except Exception:
-                        raise ValueError('Invalid entries in color array')
+                    except Exception:  # noqa: BLE001
+                        raise ValueError('Invalid entries in color array') from None
 
             else:
                 # Might just be a string color name
@@ -1608,12 +1622,12 @@ class SkyGrid:
                 # Should be a dict with keys as tile names
                 try:
                     linecolor_array = np.array(['black'] * self.ntiles, dtype=object)
-                    for name in linecolor.keys():
+                    for name in linecolor:
                         index = self.tilenames.index(name)
                         linecolor_array[index] = linecolor[name]
                     edge_patches.set_edgecolor(np.array(linecolor_array))
-                except Exception:
-                    raise ValueError('Invalid entries in linecolor array')
+                except Exception:  # noqa: BLE001
+                    raise ValueError('Invalid entries in linecolor array') from None
 
             elif isinstance(linecolor, (list, tuple, np.ndarray)):
                 # A list-like of colors, should be same length as number of tiles
@@ -1623,8 +1637,8 @@ class SkyGrid:
                 # Should be a list of color string
                 try:
                     edge_patches.set_edgecolor(np.array(linecolor))
-                except Exception:
-                    raise ValueError('Invalid entries in linecolor array')
+                except Exception:  # noqa: BLE001
+                    raise ValueError('Invalid entries in linecolor array') from None
 
             else:
                 # Might just be a string color name
@@ -1636,12 +1650,12 @@ class SkyGrid:
                 # Should be a dict with keys as tile names
                 try:
                     linewidth_array = np.array([0.5] * self.ntiles)
-                    for name in linewidth.keys():
+                    for name in linewidth:
                         index = self.tilenames.index(name)
                         linewidth_array[index] = linewidth[name]
                     edge_patches.set_linewidth(np.array(linewidth_array))
-                except Exception:
-                    raise ValueError('Invalid entries in linewidth array')
+                except Exception:  # noqa: BLE001
+                    raise ValueError('Invalid entries in linewidth array') from None
 
             elif isinstance(linewidth, (list, tuple, np.ndarray)):
                 # A list-like of floats, should be same length as number of tiles
@@ -1651,8 +1665,8 @@ class SkyGrid:
                 # Should be a list of floats
                 try:
                     edge_patches.set_linewidth(np.array(linewidth))
-                except Exception:
-                    raise ValueError('Invalid entries in linewidth array')
+                except Exception:  # noqa: BLE001
+                    raise ValueError('Invalid entries in linewidth array') from None
 
             else:
                 # Might just be a float
@@ -1687,7 +1701,7 @@ class SkyGrid:
                     )
                     # Add to legend
                     if highlight_label is not None:
-                        label = highlight_label + ' ({} tiles)'.format(len(highlight))
+                        label = highlight_label + f' ({len(highlight)} tiles)'
                         patch = Patch(
                             facecolor='none',
                             edgecolor=highlight_color,
@@ -1695,8 +1709,8 @@ class SkyGrid:
                             label=label,
                         )
                         legend_patches.append(patch)
-                except Exception:
-                    raise ValueError('Invalid entries in highlight list')
+                except Exception:  # noqa: BLE001
+                    raise ValueError('Invalid entries in highlight list') from None
             else:
                 # Should be a list of lists
                 try:
@@ -1725,7 +1739,7 @@ class SkyGrid:
                         )
                         # Add to legend
                         if highlight_label is not None:
-                            label = highlight_label[j] + ' ({} tiles)'.format(len(tilelist))
+                            label = highlight_label[j] + f' ({len(tilelist)} tiles)'
                             patch = Patch(
                                 facecolor='none',
                                 edgecolor=linecolor,
@@ -1733,8 +1747,8 @@ class SkyGrid:
                                 label=label,
                             )
                             legend_patches.append(patch)
-                except Exception:
-                    raise ValueError('Invalid entries in highlight list')
+                except Exception:  # noqa: BLE001
+                    raise ValueError('Invalid entries in highlight list') from None
 
             # Display legend
             if len(legend_patches) > 0:
@@ -1773,7 +1787,10 @@ class SkyGrid:
         # Set title
         if title is None:
             title = 'All sky grid (fov={}x{}, overlap={},{})'.format(
-                self.fov['ra'], self.fov['dec'], self.overlap['ra'], self.overlap['dec']
+                self.fov['ra'],
+                self.fov['dec'],
+                self.overlap['ra'],
+                self.overlap['dec'],
             )
             if plot_skymap and self.skymap is not None:
                 title += '\n' + 'with skymap'

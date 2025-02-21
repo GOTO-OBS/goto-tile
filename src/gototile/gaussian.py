@@ -34,9 +34,7 @@ def gaussian_prob(grid, peak, radius):
         prob[dist == np.min(dist)] = 1
 
     # normalise the probability
-    prob = prob / np.sum(prob)
-
-    return prob
+    return prob / np.sum(prob)
 
 
 def create_gaussian_map(peak, radius, nside=64, nest=True):
@@ -68,6 +66,4 @@ def create_gaussian_map(peak, radius, nside=64, nest=True):
     grid = pix2coord(nside, ipix, nest=nest)
 
     # Calculate the probability at each pixel
-    prob = gaussian_prob(grid, peak, radius)
-
-    return prob
+    return gaussian_prob(grid, peak, radius)

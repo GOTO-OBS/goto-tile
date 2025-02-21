@@ -4,6 +4,7 @@ import warnings
 from copy import deepcopy
 from gzip import GzipFile
 from io import BytesIO
+from pathlib import Path
 
 import healpy as hp
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
@@ -70,7 +71,7 @@ class SkyMap:
 
     def __mul__(self, other):
         if not isinstance(other, self.__class__):
-            raise ValueError('SkyMaps can only be multiplied by other SkyMaps')
+            raise TypeError('SkyMaps can only be multiplied by other SkyMaps')
 
         result = self.copy()
         other_copy = other.copy()
@@ -106,17 +107,15 @@ class SkyMap:
         """Convert HEALpy pixel indexes to SkyCoords."""
         if not self.is_moc:
             return pix2coord(self.nside, ipix, nest=self.is_nested)
-        else:
-            nside, nested_ipix = mhp.uniq2nest(self.uniq[ipix])
-            return pix2coord(nside, nested_ipix, nest=True)
+        nside, nested_ipix = mhp.uniq2nest(self.uniq[ipix])
+        return pix2coord(nside, nested_ipix, nest=True)
 
     def _coord2pix(self, coord):
         """Convert SkyCoords to HEALpy pixel indexes."""
         if not self.is_moc:
             return coord2pix(self.nside, coord, nest=self.is_nested)
-        else:
-            nested_ipix = coord2pix(self.nside, coord, nest=True)
-            return self.healpix.nest2pix(nested_ipix)
+        nested_ipix = coord2pix(self.nside, coord, nest=True)
+        return self.healpix.nest2pix(nested_ipix)
 
     def _save_data(self, data, order=None, coordsys=None, uniq=None, density=False):
         """Save the skymap data and add attributes."""
@@ -252,13 +251,20 @@ class SkyMap:
             self._save_data(data, self.order, self.coordsys, self.uniq, density=False)
 
     @classmethod
-    def from_fits(cls, fits_file, coordsys='C', hdu=1, data_field=None, density=None):
+    def from_fits(  # noqa: C901, PLR0912
+        cls,
+        fits_file,
+        coordsys='C',
+        hdu=1,
+        data_field=None,
+        density=None,
+    ):
         """Initialize a `~gototile.skymap.SkyMap` object from a FITS file.
 
         Parameters
         ----------
-        fits_file : str, `astropy.io.fits.HDU` or `astropy.io.fits.HDUList`
-            Path to the FITS file (if str) or FITS HDU, passed to `astropy.io.fits.open`.
+        fits_file : str, pathlib.Path, `astropy.io.fits.HDU` or `astropy.io.fits.HDUList`
+            Path to the FITS file (if str or Path) or FITS HDU, passed to `astropy.io.fits.open`.
 
         coordsys : str, default='C'
             The coordinate system the data uses.
@@ -284,7 +290,7 @@ class SkyMap:
 
         """
         file_open = False
-        if isinstance(fits_file, str):
+        if isinstance(fits_file, (str, Path)):
             # If a string has been given then open the file (could be a path or URL)
             hdu_list = fits.open(fits_file)
             hdu = hdu_list[hdu]
@@ -320,10 +326,7 @@ class SkyMap:
         # Load the skymap data
         if data_field is not None:
             data = hdu.data.field(data_field).ravel()
-            if 'UNIQ' in hdu.data.columns:
-                uniq = hdu.data['UNIQ']
-            else:
-                uniq = None
+            uniq = hdu.data['UNIQ'] if 'UNIQ' in hdu.data.columns else None
         elif hdu.data.columns[0].name == 'UNIQ':
             data_field = 1
             data = hdu.data.field(data_field).ravel()
@@ -339,11 +342,12 @@ class SkyMap:
 
         # Attempt to determine if the data is in density units
         if density is None:
-            if 'DENSITY' in hdu.data.columns[data_field].name:
-                density = True
-            elif hdu.data.columns[data_field].unit is not None and (
-                '/sr' in hdu.data.columns[data_field].unit
-                or 'sr-1' in hdu.data.columns[data_field].unit
+            if 'DENSITY' in hdu.data.columns[data_field].name or (
+                hdu.data.columns[data_field].unit is not None
+                and (
+                    '/sr' in hdu.data.columns[data_field].unit
+                    or 'sr-1' in hdu.data.columns[data_field].unit
+                )
             ):
                 density = True
             else:
@@ -454,12 +458,11 @@ class SkyMap:
             header = [
                 (k.upper(), self.header[k])
                 for k in self.header
-                if not isinstance(self.header[k], fits.header._HeaderCommentaryCards)
+                if not isinstance(self.header[k], fits.header._HeaderCommentaryCards)  # noqa: SLF001
             ]
             for k in self.header:
-                if isinstance(self.header[k], fits.header._HeaderCommentaryCards):
-                    for v in self.header[k]:
-                        header.append((k.upper(), v))
+                if isinstance(self.header[k], fits.header._HeaderCommentaryCards):  # noqa: SLF001
+                    header.extend((k.upper(), v) for v in self.header[k])
         else:
             header = None
         self.healpix.write_map(
@@ -515,7 +518,10 @@ class SkyMap:
         # If this skymap is NESTED we need to regrade before and after
         if self.order == 'NESTED':
             in_data = hp.ud_grade(
-                self.data, nside_out=self.nside, order_in='NESTED', order_out='RING'
+                self.data,
+                nside_out=self.nside,
+                order_in='NESTED',
+                order_out='RING',
             )
         else:
             in_data = self.data.copy()
@@ -526,7 +532,10 @@ class SkyMap:
         # Convert back to NESTED if needed
         if self.order == 'NESTED':
             out_data = hp.ud_grade(
-                out_data, nside_out=self.nside, order_in='RING', order_out='NESTED'
+                out_data,
+                nside_out=self.nside,
+                order_in='RING',
+                order_out='NESTED',
             )
 
         # Save the new data
@@ -557,10 +566,9 @@ class SkyMap:
             # Just get the radius of the nearest pixel (not very useful)
             ipix = np.where(sep == (min(sep)))[0][0]
             return self.data[ipix]
-        else:
-            # Find all the pixels within the radius and sum them (more useful)
-            ipix = np.where(sep < radius)[0]
-            return self.data[ipix].sum()
+        # Find all the pixels within the radius and sum them (more useful)
+        ipix = np.where(sep < radius)[0]
+        return self.data[ipix].sum()
 
     def get_contour(self, coord):
         """Return the lowest contour level the given sky coordinate is within.
@@ -596,8 +604,7 @@ class SkyMap:
         """Return the area of each pixel (only valid for non-NUNIQ skymaps) in square degrees."""
         if self.order != 'NUNIQ':
             return 4 * np.pi / (12 * np.array(self.nside) ** 2) * ((180 / np.pi) ** 2)
-        else:
-            raise ValueError('NUNIQ maps have variable pixel areas.')
+        raise ValueError('NUNIQ maps have variable pixel areas.')
 
     def get_pixel_areas(self, ipix):
         """Return the areas covered by each of the given skymap pixels in square degrees.
@@ -644,8 +651,7 @@ class SkyMap:
         areas = self.get_pixel_areas(ipix)
         if isinstance(areas, int):
             return areas
-        else:
-            return sum(areas)
+        return sum(areas)
 
     def get_contour_area(self, contour_level):
         """Return the area of a given contour region, in square degrees.
@@ -715,12 +721,11 @@ class SkyMap:
             uniq_pix_array = np.array(list(uniq_pix))
             query_pix = np.searchsorted(self.uniq, uniq_pix_array)
             return np.sort(query_pix)
-        else:
-            # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
-            ipix = hp.query_polygon(self.nside, vertices, inclusive, fact, nest=True)
-            if self.order == 'RING':
-                ipix = np.array(sorted(hp.nest2ring(self.nside, ipix)))
-            return ipix
+        # Note nest is always True, see https://github.com/GOTO-OBS/goto-tile/issues/65
+        ipix = hp.query_polygon(self.nside, vertices, inclusive, fact, nest=True)
+        if self.order == 'RING':
+            ipix = np.array(sorted(hp.nest2ring(self.nside, ipix)))
+        return ipix
 
     def get_table(self):
         """Return an astropy QTable containing information on the skymap pixels."""
@@ -763,28 +768,27 @@ class SkyMap:
         if not self.is_moc:
             return axes.contour_hpx(
                 self.contours / max(self.contours),
+                *args,
                 nested=self.is_nested,
                 levels=levels,
-                *args,
                 **kwargs,
             )
-        else:
-            # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
-            # this convoluted method creates a flat skymap based on the actual contour levels,
-            # so it should approximate the moc contour levels
-            # It's not ideal, but it will do for most plots
-            mask = np.zeros(len(self.contours))
-            for level in levels:
-                mask += np.array(self.contours / max(self.contours) > level, dtype=int)
-            healpix = mhp.HealpixMap(mask, self.uniq, scheme='NUNIQ', density=True)
-            contour_data = healpix.rasterize(128, 'NESTED').data
-            return axes.contour_hpx(
-                contour_data,
-                nested=True,
-                levels=[i + 0.5 for i in range(len(levels))],
-                *args,
-                **kwargs,
-            )
+        # mhealpy can't plot contours, and contour_hpx only takes flat skymaps
+        # this convoluted method creates a flat skymap based on the actual contour levels,
+        # so it should approximate the moc contour levels
+        # It's not ideal, but it will do for most plots
+        mask = np.zeros(len(self.contours))
+        for level in levels:
+            mask += np.array(self.contours / max(self.contours) > level, dtype=int)
+        healpix = mhp.HealpixMap(mask, self.uniq, scheme='NUNIQ', density=True)
+        contour_data = healpix.rasterize(128, 'NESTED').data
+        return axes.contour_hpx(
+            contour_data,
+            *args,
+            nested=True,
+            levels=[i + 0.5 for i in range(len(levels))],
+            **kwargs,
+        )
 
     def plot_pixels(self, axes, *args, **kwargs):
         """Plot the skymap data onto the given axes."""
@@ -794,7 +798,7 @@ class SkyMap:
 
         return self.healpix.plot_grid(axes, *args, **kwargs)
 
-    def plot(
+    def plot(  # noqa: C901, PLR0912, PLR0913
         self,
         title=None,
         filename=None,

@@ -79,8 +79,7 @@ def get_data_contours(data, min_zero=True):
         sorted_contours[0] = 0
 
     # "Un-sort" the contour array back to the normal pixel order
-    contours = sorted_contours[np.argsort(sorted_ipix)]
-    return contours
+    return sorted_contours[np.argsort(sorted_ipix)]
 
 
 def coord2pix(nside, coord, nest=False):
@@ -109,11 +108,8 @@ def coord2pix(nside, coord, nest=False):
     theta = 0.5 * np.pi - coord.dec.rad
     phi = coord.ra.rad
 
-    # Get pixel numbers from healpy
-    ipix = hp.ang2pix(nside, theta, phi, nest)
-
-    # Return pixels
-    return ipix
+    # Get and return pixel numbers from healpy
+    return hp.ang2pix(nside, theta, phi, nest)
 
 
 def pix2coord(nside, ipix, nest=False):

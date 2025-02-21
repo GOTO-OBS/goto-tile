@@ -73,15 +73,9 @@ include = [
 line-length = 100
 
 [tool.ruff.lint]
-select = [
-    "F",  # flake8
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "I", # isort
-    "N", # pep8-naming
-    "D", # pydocstyle
-]
+select = ["ALL"]
 ignore = [
+    ## pydocstyle
     # Numpy docstring format for pydocstyle
     # (see https://www.pydocstyle.org/en/stable/error_codes.html#default-conventions)
     "D107",  # undocumented-public-init
@@ -95,9 +89,35 @@ ignore = [
     "D417",  # undocumented-param
     # This one isn't part of the Numpy format, but it's just annoying and often disabled
     "D105",  # undocumented-magic-method
+
+    ## Pylint
+    # Disable complaining about magic values, annoying with coordinates (dec=90 etc)
+    "PLR2004",  # magic-value-comparison
+
+    ## Tryceratops
+    # Disable complaining about error messages
+    "TRY003",  # raise-vanilla-args
+
+    ## flake8-boolean-trap
+    # Disable complaining about boolean default values, many come from other apis (nested=True etc)
+    "FBT002",  # boolean-default-value-positional-argument
+
+    ## flake8-commas
+    # Disable complaining about trailing commas, since hte linter handles it
+    "COM812",  # missing-comma
+
+    ## Any other addons to fully ignore
+    "ANN",  # flake8-annotations (TODO)
+    "T20",  # flake8-print
+    "EM",  # flake8-errmsg
+    "FIX",  # flake8-fixme
+    "TD",  # flake8-todos
 ]
 
 [tool.ruff.format]
 quote-style = "single"
 indent-style = "space"
 docstring-code-format = true
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
