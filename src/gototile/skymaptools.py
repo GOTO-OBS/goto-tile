@@ -1,16 +1,16 @@
 """Module containing utility functions for the SkyGrid class."""
 
+from __future__ import annotations
+
 from functools import lru_cache
 
+import healpy as hp
+import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 
-import healpy as hp
 
-import numpy as np
-
-
-def get_data_contours(data, min_zero=True):
+def get_data_contours(data: np.ndarray, min_zero: bool = True) -> np.ndarray:
     """Calculate the minimum contour level of each pixel in a given skymap data array.
 
     This is done using the cumulative sum method, (vaguely) based on code from
@@ -81,11 +81,10 @@ def get_data_contours(data, min_zero=True):
         sorted_contours[0] = 0
 
     # "Un-sort" the contour array back to the normal pixel order
-    contours = sorted_contours[np.argsort(sorted_ipix)]
-    return contours
+    return sorted_contours[np.argsort(sorted_ipix)]
 
 
-def coord2pix(nside, coord, nest=False):
+def coord2pix(nside: int | list[int], coord: SkyCoord, nest: bool = False) -> int | np.ndarray:
     """Convert sky coordinates to pixel indices.
 
     Parameters
@@ -111,14 +110,11 @@ def coord2pix(nside, coord, nest=False):
     theta = 0.5 * np.pi - coord.dec.rad
     phi = coord.ra.rad
 
-    # Get pixel numbers from healpy
-    ipix = hp.ang2pix(nside, theta, phi, nest)
-
-    # Return pixels
-    return ipix
+    # Get and return pixel numbers from healpy
+    return hp.ang2pix(nside, theta, phi, nest)
 
 
-def pix2coord(nside, ipix, nest=False):
+def pix2coord(nside: int, ipix: int | np.ndarray, nest: bool = False) -> SkyCoord:
     """Convert pixel index or indices to sky coordinates.
 
     Parameters
@@ -152,7 +148,7 @@ def pix2coord(nside, ipix, nest=False):
 
 
 @lru_cache(maxsize=128)
-def _pix2coord_cached(nside, ipix, nest=False):
+def _pix2coord_cached(nside: int, ipix: int | np.ndarray, nest: bool = False) -> SkyCoord:
     """Convert pixel index or indices to sky coordinates, and cache the results.
 
     This is the same as pix2coord, but uses the `functools.lru_cache` decorator.

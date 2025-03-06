@@ -1,16 +1,18 @@
-import os
-import pkg_resources
+"""Module to create a skymap of weighted galactic extinction."""
+
+from pathlib import Path
 
 import numpy as np
+import pkg_resources
 
 from .skymap import SkyMap
 
 
-def create_extinction_skymap(min_weight=0, exp_k=5):
+def create_extinction_skymap(min_weight: float = 0, exp_k: int = 5) -> SkyMap:
     """Create a skymap of weighted galactic extinction.
 
     Parameters
-    ------------
+    ----------
     min_weight : float, optional
         minimum weight to scale the skymap
         default is 0
@@ -25,11 +27,12 @@ def create_extinction_skymap(min_weight=0, exp_k=5):
 
     """
     # Find the extinction file path
-    data_path = pkg_resources.resource_filename('gototile', 'data')
+    data_path = Path(pkg_resources.resource_filename('gototile', 'data'))
     filename = 'extinction.fits'
+    filepath = data_path / filename
 
     # Create the SkyMap
-    skymap = SkyMap.from_fits(os.path.join(data_path, filename))
+    skymap = SkyMap.from_fits(filepath)
 
     # Scale skymap data between `min_weight` and 1
     data = skymap.data
@@ -42,6 +45,6 @@ def create_extinction_skymap(min_weight=0, exp_k=5):
     weighted_data = (1 - min_weight) * weighted_data + min_weight
 
     # Update the SkyMap class
-    skymap._save_data(weighted_data, skymap.order, skymap.coordsys)
+    skymap._save_data(weighted_data, skymap.order, skymap.coordsys)  # noqa: SLF001
 
     return skymap

@@ -14,4 +14,4 @@ __pycache__/
 src/gototile/_version.py
 
 # Don't upload large catalogs
-src/gototile/data/GLADE.csv
+src/gototile/data/GLADE.*
