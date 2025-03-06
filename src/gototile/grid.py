@@ -1,10 +1,13 @@
 """Module containing the SkyGrid class."""
 
+from __future__ import annotations
+
 import itertools
 import math
 import re
 from collections import Counter
 from copy import copy, deepcopy
+from typing import TYPE_CHECKING
 
 import ligo.skymap.plot  # noqa: F401  (for extra projections)
 import numpy as np
@@ -20,6 +23,10 @@ from matplotlib.patches import Patch, PathPatch
 from .geometry import coords_to_path, interpolate_points, onsky_offset
 from .skymap import SkyMap
 from .skymaptools import coord2pix, pix2coord
+
+if TYPE_CHECKING:
+    from astropy.time import Time
+    from matplotlib.path import Path
 
 NAMED_GRIDS = {
     'GOTO4': {
@@ -48,7 +55,11 @@ NAMED_GRIDS['GOTO-8'] = NAMED_GRIDS['GOTO8']
 NAMED_GRIDS['GOTO'] = NAMED_GRIDS['GOTO8']
 
 
-def create_grid(fov, overlap, kind='minverlap'):
+def create_grid(
+    fov: dict[str, int | float | u.Quantity],
+    overlap: dict[str, int | float | u.Quantity],
+    kind: str = 'minverlap',
+) -> tuple[np.ndarray, np.ndarray]:
     """Create grid coordinates.
 
     Calculate strips along RA and stacked in declination to cover the full sky.
@@ -85,6 +96,13 @@ def create_grid(fov, overlap, kind='minverlap'):
                 This method creates lots of overlap between tiles at high decs,
                 which makes it impractical for survey purposes.
 
+    Returns
+    -------
+    ras : `numpy.ndarray`
+        The Right Ascension coordinates of the grid points, in degrees.
+    decs : `numpy.ndarray`
+        The Declination coordinates of the grid points, in degrees.
+
     """
     fov = fov.copy()
     overlap = overlap.copy()
@@ -112,7 +130,10 @@ def create_grid(fov, overlap, kind='minverlap'):
     raise ValueError(f'Unknown grid tiling method: "{kind}"')
 
 
-def create_grid_product(fov, overlap):
+def create_grid_product(
+    fov: dict[str, int | float | u.Quantity],
+    overlap: dict[str, int | float | u.Quantity],
+) -> tuple[np.ndarray, np.ndarray]:
     """Create a pointing grid to cover the whole sky.
 
     This method uses the product of RA and Dec to get the RA spacings.
@@ -133,7 +154,10 @@ def create_grid_product(fov, overlap):
     return allras, alldecs
 
 
-def create_grid_cosine(fov, overlap):
+def create_grid_cosine(
+    fov: dict[str, int | float | u.Quantity],
+    overlap: dict[str, int | float | u.Quantity],
+) -> tuple[np.ndarray, np.ndarray]:
     """Create a pointing grid to cover the whole sky.
 
     This method adjusts the RA spacings based on the cos of the declination.
@@ -159,7 +183,10 @@ def create_grid_cosine(fov, overlap):
     return allras, alldecs
 
 
-def create_grid_cosine_symmetric(fov, overlap):
+def create_grid_cosine_symmetric(
+    fov: dict[str, int | float | u.Quantity],
+    overlap: dict[str, int | float | u.Quantity],
+) -> tuple[np.ndarray, np.ndarray]:
     """Create a pointing grid to cover the whole sky.
 
     This method adjusts the RA spacings based on the cos of the declination.
@@ -189,7 +216,10 @@ def create_grid_cosine_symmetric(fov, overlap):
     return allras, alldecs
 
 
-def create_grid_minverlap(fov, overlap):
+def create_grid_minverlap(
+    fov: dict[str, int | float | u.Quantity],
+    overlap: dict[str, int | float | u.Quantity],
+) -> tuple[np.ndarray, np.ndarray]:
     """Create a pointing grid to cover the whole sky.
 
     This method takes the overlaps given as the minimum rather than fixed,
@@ -220,13 +250,13 @@ def create_grid_minverlap(fov, overlap):
 
 
 def create_grid_enhanced(  # noqa: PLR0912, PLR0913
-    fov,
-    overlap,
-    integer_fit=True,
-    force_equator=False,
-    polar_edge=False,
-    corner_align=True,
-):
+    fov: dict[str, int | float | u.Quantity],
+    overlap: dict[str, int | float | u.Quantity],
+    integer_fit: bool = True,
+    force_equator: bool = False,
+    polar_edge: bool = False,
+    corner_align: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
     """Create a pointing grid to cover the whole sky.
 
     Parameters
@@ -339,7 +369,11 @@ def create_grid_enhanced(  # noqa: PLR0912, PLR0913
     return allras, alldecs
 
 
-def create_array(fov=(2.21, 2.95), shape=(4, 2), overlap=0.2):
+def create_array(
+    fov: tuple[float, float] = (2.21, 2.95),
+    shape: tuple[float, float] = (4, 2),
+    overlap: float | tuple[float, float] = 0.2,
+) -> tuple[np.ndarray, np.ndarray]:
     """Define the relative on-sky offsets for an array of rectangular FoVs.
 
     The default is the GOTO array of 8 UTs, arranged in 2 rows of 4, with 0.2 deg overlap.
@@ -438,7 +472,20 @@ class SkyGrid:
 
     """
 
-    def __init__(self, fov, overlap=None, kind='minverlap', array_params=None):
+    def __init__(
+        self,
+        fov: tuple[int | float | u.Quantity, int | float | u.Quantity]
+        | list[int | float | u.Quantity, int | float | u.Quantity]
+        | dict[str, int | float | u.Quantity],
+        overlap: tuple[int | float | u.Quantity, int | float | u.Quantity]
+        | list[int | float | u.Quantity, int | float | u.Quantity]
+        | dict[str, int | float | u.Quantity]
+        | None = None,
+        kind: str = 'minverlap',
+        array_params: tuple[tuple[float, float], tuple[float, float], float | tuple[float, float]]
+        | dict[str, tuple[float, float] | float]
+        | None = None,
+    ) -> None:
         # Parse fov
         if isinstance(fov, (list, tuple)):
             fov = {'ra': fov[0], 'dec': fov[1]}
@@ -524,7 +571,7 @@ class SkyGrid:
         self.probs = None
         self.contours = None
 
-    def __eq__(self, other):
+    def __eq__(self, other: SkyGrid) -> bool:
         try:
             return (
                 self.fov == other.fov and self.overlap == other.overlap and self.kind == other.kind
@@ -532,7 +579,7 @@ class SkyGrid:
         except AttributeError:
             return False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         template = 'SkyGrid(fov=({}, {}), overlap=({}, {}), kind={})'
         return template.format(
             self.fov['ra'].value,
@@ -542,12 +589,12 @@ class SkyGrid:
             self.kind,
         )
 
-    def copy(self):
+    def copy(self) -> SkyGrid:
         """Return a new instance containing a copy of the sky grid data."""
         return deepcopy(self)
 
     @classmethod
-    def from_name(cls, name):
+    def from_name(cls, name: str) -> SkyGrid:
         """Initialize a `~gototile.grid.SkyGrid` object from a name string.
 
         Parameters
@@ -583,11 +630,11 @@ class SkyGrid:
         raise ValueError(f'Name "{name}" not recognised, check `SkyGrid.get_named_grids()`.')
 
     @staticmethod
-    def get_named_grids():
+    def get_named_grids() -> dict:
         """Get a dictionary of pre-defined grid parameters for use with `SkyGrid.from_name()`."""
         return NAMED_GRIDS
 
-    def apply_skymap(self, skymap):
+    def apply_skymap(self, skymap: SkyMap) -> np.ndarray:
         """Apply a SkyMap to the grid, calculating the contained probability within each tile.
 
         The tile probabilities are stored in self.probs, and the contour levels in self.contours.
@@ -618,7 +665,7 @@ class SkyGrid:
 
         return self.probs
 
-    def _get_tile_pixels(self, skymap):
+    def _get_tile_pixels(self, skymap: SkyMap) -> np.ndarray:
         """Calculate the skymap pixel indices within each tile."""
         # Need to provide tile vertices in cartesian coordinates
         tile_vertices = self.vertices.cartesian.get_xyz(xyz_axis=2).value
@@ -632,7 +679,7 @@ class SkyGrid:
         # (skymap.query_polygon already returns numpy arrays)
         return np.array(tile_pixels, dtype=object)
 
-    def _get_pixel_tiles(self, skymap):
+    def _get_pixel_tiles(self, skymap: SkyMap) -> np.ndarray:
         """Calculate which tiles each skymap pixel is within."""
         if skymap == self.skymap and self.pixels is not None:
             # Use cached pixels if available
@@ -657,7 +704,7 @@ class SkyGrid:
             pixel_tiles[key] = indices
         return np.array([np.array(tiles) for tiles in pixel_tiles], dtype=object)
 
-    def _get_tile_probs(self, skymap):
+    def _get_tile_probs(self, skymap: SkyMap) -> np.ndarray:
         """Calculate the contained probabilities within each tile."""
         if skymap == self.skymap and self.pixels is not None:
             # Use cached pixels if available
@@ -668,7 +715,7 @@ class SkyGrid:
 
         return np.array([np.sum(pixel_probs[pixels]) for pixels in tile_pixels])
 
-    def _get_tile_contours(self, skymap, prob_limit=5):
+    def _get_tile_contours(self, skymap: SkyMap, prob_limit: int = 5) -> np.ndarray:
         """Calculate the minimum contour level of each pixel.
 
         Unlike for SkyMaps (see `gototile.skymaptools.get_data_contours()`), the calculation for
@@ -738,7 +785,7 @@ class SkyGrid:
 
         return contours
 
-    def _get_test_map(self, nside=None):
+    def _get_test_map(self, nside: int | None = None) -> None:
         """Create a basic empty skymap, useful for statistical calculations.
 
         We could do this in __init__, but why not save time and only do if if we need it?
@@ -751,7 +798,7 @@ class SkyGrid:
         self._base_skymap = SkyMap(np.zeros(12 * self._base_nside**2), order='NESTED')
         self._base_pixels = self._get_tile_pixels(self._base_skymap)
 
-    def get_tile(self, coord, overlap=False):
+    def get_tile(self, coord: SkyCoord, overlap: bool = False) -> str | list[str]:
         """Find which tile(s) the given coordinates fall within.
 
         Parameters
@@ -809,7 +856,7 @@ class SkyGrid:
             return tilenames[0]
         return tilenames
 
-    def get_field(self):
+    def get_field(self) -> None:
         """Find which field(s) the given coordinates fall within."""
         # TODO: With the array system we should be able to find the exact tile and field within
         #       that tile's array the coordinates are in.
@@ -821,12 +868,12 @@ class SkyGrid:
 
     def get_visible_tiles(
         self,
-        locations,
-        time_range=None,
-        alt_limit=30,
-        sun_limit=-15,
-        any_all='any',
-    ):
+        locations: EarthLocation | list[EarthLocation],
+        time_range: tuple[Time, Time] | None = None,
+        alt_limit: float = 30,
+        sun_limit: float = -15,
+        any_all: str = 'any',
+    ) -> list[str]:
         """Get the tiles that are visible from the given location(s).
 
         Parameters
@@ -892,13 +939,13 @@ class SkyGrid:
 
         return list(np.array(self.tilenames)[mask])
 
-    def _get_tilename_indices(self, tilenames):
+    def _get_tilename_indices(self, tilenames: str | list[str]) -> int | list[int]:
         """Return the indices of the given tile(s)."""
         if isinstance(tilenames, str):
             return self.tilenames.index(tilenames)
         return [self.tilenames.index(tile) for tile in tilenames]
 
-    def get_coordinates(self, tilenames=None):
+    def get_coordinates(self, tilenames: str | list[str] | None = None) -> SkyCoord:
         """Return the central coordinates of the given tile(s).
 
         Parameters
@@ -919,7 +966,7 @@ class SkyGrid:
         indices = self._get_tilename_indices(tilenames)
         return self.coords[indices]
 
-    def get_vertices(self, tilenames=None):
+    def get_vertices(self, tilenames: str | list[str] | None = None) -> SkyCoord:
         """Return coordinates of the four corners of the given tile(s).
 
         Parameters
@@ -941,7 +988,7 @@ class SkyGrid:
         indices = self._get_tilename_indices(tilenames)
         return self.vertices[indices]
 
-    def get_edges(self, tilenames=None, edge_points=4):
+    def get_edges(self, tilenames: str | list[str] | None = None, edge_points: int = 4) -> SkyCoord:
         """Return coordinates along the edges of the given tile(s).
 
         Parameters
@@ -967,7 +1014,7 @@ class SkyGrid:
         indices = self._get_tilename_indices(tilenames)
         return interpolate_points(self.vertices[indices], edge_points)
 
-    def get_pixels(self, tilenames=None):
+    def get_pixels(self, tilenames: str | list[str] | None = None) -> list[int]:
         """Get the skymap pixels contained within the given tile(s).
 
         Parameters
@@ -994,7 +1041,7 @@ class SkyGrid:
             pixels = [ipix for tile_pix in self.pixels[indices] for ipix in tile_pix]
         return sorted(set(pixels))
 
-    def get_probability(self, tilenames=None):
+    def get_probability(self, tilenames: str | list[str] | None = None) -> float:
         """Return the contained probability within the given tile(s).
 
         If multiple tiles are given, the probability only be included once in any overlaps.
@@ -1007,14 +1054,14 @@ class SkyGrid:
 
         Returns
         -------
-        probability : int
+        probability : float
             The total skymap value within the area covered by the given tile(s).
 
         """
         pixels = self.get_pixels(tilenames)
         return self.skymap.data[pixels].sum()
 
-    def get_area(self, tilenames=None):
+    def get_area(self, tilenames: str | list[str] | None = None) -> float:
         """Return the sky area contained within the given tile(s) in square degrees.
 
         If multiple tiles are given, the area only be included once in any overlaps.
@@ -1027,7 +1074,7 @@ class SkyGrid:
 
         Returns
         -------
-        area : int
+        area : float
             The total sky area covered by the given tile(s), in square degrees.
 
         """
@@ -1044,7 +1091,7 @@ class SkyGrid:
         pixels = sorted(set(pixels))
         return self._base_skymap.get_pixel_area(pixels)
 
-    def get_areas(self, tilenames=None):
+    def get_areas(self, tilenames: str | list[str] | None = None) -> float | list[float]:
         """Return the areas contained within each of the given tile(s) in square degrees.
 
         Note although every tile should have the same area (equal to fov_ra * fov_dec) there will
@@ -1061,7 +1108,7 @@ class SkyGrid:
 
         Returns
         -------
-        area : int or list of int
+        area : float or list of float
             The areas covered by the given tile(s), in square degrees.
 
         """
@@ -1072,7 +1119,7 @@ class SkyGrid:
             return self.get_area(tilenames)
         return [self.get_area(tile) for tile in tilenames]
 
-    def get_table(self):
+    def get_table(self) -> QTable:
         """Return an astropy QTable containing the name and coordinates of each tile in the grid.
 
         If a sky map has been applied to the grid the table will include columns with
@@ -1088,7 +1135,7 @@ class SkyGrid:
         ]
         return QTable(col_data, names=col_names)
 
-    def _get_pixel_count(self, nside=128):
+    def _get_pixel_count(self, nside: int = 128) -> np.ndarray:
         """For each pixel in the base skymap, count of the number of tiles it falls within."""
         # Create test skymap, if it hasn't already been generated
         self._get_test_map(nside)
@@ -1098,7 +1145,7 @@ class SkyGrid:
             count[ipix] += 1
         return count
 
-    def get_stats(self, nside=128):
+    def get_stats(self, nside: int = 128) -> QTable:
         """Return a table containing grid statistics."""
         count = self._get_pixel_count(nside)
         counter = Counter(count)
@@ -1113,7 +1160,7 @@ class SkyGrid:
         table['freq'].format = '.2%'
         return table.group_by('in_tiles')
 
-    def _get_tile_paths(self, meridian_split=False, edge_points=4):
+    def _get_tile_paths(self, meridian_split: bool = False, edge_points: int = 4) -> list[Path]:
         """Create and cache Matplotlib Patches to use when plotting tiles."""
         # Used cached versions to save time when repeatedly plotting
         if not meridian_split and hasattr(self, '_paths') and self._paths_points == edge_points:
@@ -1143,7 +1190,7 @@ class SkyGrid:
 
         return paths
 
-    def _get_array_paths(self, meridian_split=False, edge_points=1):
+    def _get_array_paths(self, meridian_split: bool = False, edge_points: int = 1) -> np.ndarray:
         """Create and cache Matplotlib Patches to use when plotting sub-array fields."""
         # Used cached versions to save time when repeatedly plotting
         if (
@@ -1182,11 +1229,24 @@ class SkyGrid:
 
         return all_paths
 
-    def plot_tile(self, axes, tilename, *args, **kwargs):
+    def plot_tile(
+        self,
+        axes: plt.Axes,
+        tilename: str,
+        *args,  # noqa: ANN002
+        **kwargs,  # noqa: ANN003
+    ) -> Patch:
         """Plot a Patch for a single tile onto the given axes."""
         return self.plot_tiles(axes, [tilename], *args, **kwargs)
 
-    def plot_tiles(self, axes, tilenames=None, edge_points=4, *args, **kwargs):
+    def plot_tiles(
+        self,
+        axes: plt.Axes,
+        tilenames: list[str] | None = None,
+        edge_points: int = 4,
+        *args,  # noqa: ANN002
+        **kwargs,  # noqa: ANN003
+    ) -> Patch | PatchCollection:
         """Plot a PatchCollection for the grid tiles onto the given axes."""
         # Add default arguments
         if 'fc' not in kwargs and 'facecolor' not in kwargs:
@@ -1204,7 +1264,7 @@ class SkyGrid:
             paths = np.array(paths)[indexes]
 
         if len(paths) > 1:
-            # Fomr multiple tiles add all the patches together as a collection
+            # For multiple tiles add all the patches together as a collection
             patches = [PathPatch(path) for path in paths]
             collection = PatchCollection(
                 patches,
@@ -1219,7 +1279,14 @@ class SkyGrid:
         axes.add_patch(patch)
         return patch
 
-    def plot_array(self, axes, tilenames=None, edge_points=1, *args, **kwargs):
+    def plot_array(
+        self,
+        axes: plt.Axes,
+        tilenames: list[str] | None = None,
+        edge_points: int = 1,
+        *args,  # noqa: ANN002
+        **kwargs,  # noqa: ANN003
+    ) -> PatchCollection:
         """Plot a sub-array of fields aligned to the grid onto the given axes."""
         if self.array_params is None:
             raise ValueError('SkyGrid does not have an array defined')
@@ -1254,31 +1321,31 @@ class SkyGrid:
 
     def plot(  # noqa: C901, PLR0912, PLR0913, PLR0915
         self,
-        title=None,
-        filename=None,
-        dpi=90,
-        figsize=(8, 6),
-        plot_type='mollweide',
-        center=(0, 45),
-        radius=10,
-        color=None,
-        linecolor=None,
-        linewidth=None,
-        alpha=0.3,
-        discrete_colorbar=False,
-        discrete_stepsize=1,
-        colorbar_limits=None,
-        colorbar_orientation='v',
-        highlight=None,
-        highlight_color=None,
-        highlight_label=None,
-        coordinates=None,
-        tilenames=None,
-        text=None,
-        plot_skymap=False,
-        plot_contours=False,
-        plot_stats=False,
-    ):
+        title: str | None = None,
+        filename: str | None = None,
+        dpi: float = 90,
+        figsize: tuple[float, float] = (8, 6),
+        plot_type: str = 'mollweide',
+        center: tuple[float, float] = (0, 45),
+        radius: float = 10,
+        color: str | list[str] | None = None,
+        linecolor: str | list[str] | dict[str, str] | None = None,
+        linewidth: float | list[float] | dict[str, float] | None = None,
+        alpha: float = 0.3,
+        discrete_colorbar: bool = False,
+        discrete_stepsize: int = 1,
+        colorbar_limits: tuple[float, float] | None = None,
+        colorbar_orientation: str = 'v',
+        highlight: str | list[str] | list[list[str]] | None = None,
+        highlight_color: str | list[str] | None = None,
+        highlight_label: str | list[str] | None = None,
+        coordinates: SkyCoord | None = None,
+        tilenames: list[str] | None = None,
+        text: dict[str, str] | None = None,
+        plot_skymap: bool = False,
+        plot_contours: bool = False,
+        plot_stats: bool = False,
+    ) -> None:
         """Plot the grid.
 
         Parameters

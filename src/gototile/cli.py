@@ -1,5 +1,7 @@
 """Core command-line script for the gototile package."""
 
+from __future__ import annotations
+
 import argparse
 
 import numpy as np
@@ -13,25 +15,25 @@ from .skymap import SkyMap
 
 
 def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
-    grid,
-    skymap=None,
-    simulate=True,
-    date=None,
-    duration=1,
-    site=None,
-    mounts=1,
-    source=None,
-    max_tiles=200,
-    min_prob=0,
-    contour=0.95,
-    min_alt=30,
-    twilight=-12,
-    exptime=300,
-    airmass_weight=0.1,
-    verbose=False,
-    outfile=None,
-    plot=None,
-):
+    grid: SkyGrid,
+    skymap: SkyMap | None = None,
+    simulate: bool = True,
+    date: Time | None = None,
+    duration: float = 1,
+    site: str | EarthLocation | None = None,
+    mounts: int = 1,
+    source: SkyCoord | None = None,
+    max_tiles: int = 200,
+    min_prob: float = 0,
+    contour: float = 0.95,
+    min_alt: float = 30,
+    twilight: float = -12,
+    exptime: float = 300,
+    airmass_weight: float = 0.1,
+    verbose: bool = False,
+    outfile: str | None = None,
+    plot: str | None = None,
+) -> None:
     """Run the GOTO-tile simulation."""
     if skymap is None:
         # Just output the coordinates for the grid tiles
@@ -223,7 +225,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
         )
 
 
-def date_validator(date):
+def date_validator(date: str) -> Time:
     """Validate the date argument and return an astropy.time.Time instance."""
     try:
         date = Time.now() if date == 'now' else Time(date)
@@ -233,7 +235,7 @@ def date_validator(date):
     return date
 
 
-def site_validator(site):
+def site_validator(site: str) -> EarthLocation:
     """Validate the site argument and return an astropy.coordinates.EarthLocation instance."""
     try:
         site = EarthLocation.of_site(site)
@@ -243,7 +245,7 @@ def site_validator(site):
     return site
 
 
-def main():  # noqa: PLR0915
+def main() -> None:  # noqa: PLR0915
     """Command-line interface for the gototile package."""
     description = 'This script creates pointings for selected telescopes, with given skymap files.'
     parser = argparse.ArgumentParser(description=description)

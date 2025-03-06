@@ -100,6 +100,7 @@ ignore = [
 
     ## flake8-boolean-trap
     # Disable complaining about boolean default values, many come from other apis (nested=True etc)
+    "FBT001",  # boolean-type-hint-positional-argument
     "FBT002",  # boolean-default-value-positional-argument
 
     ## flake8-commas
@@ -107,7 +108,6 @@ ignore = [
     "COM812",  # missing-comma
 
     ## Any other addons to fully ignore
-    "ANN",  # flake8-annotations (TODO)
     "T20",  # flake8-print
     "EM",  # flake8-errmsg
     "FIX",  # flake8-fixme

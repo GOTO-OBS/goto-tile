@@ -8,7 +8,7 @@ import pkg_resources
 from .skymap import SkyMap
 
 
-def create_extinction_skymap(min_weight=0, exp_k=5):
+def create_extinction_skymap(min_weight: float = 0, exp_k: int = 5) -> SkyMap:
     """Create a skymap of weighted galactic extinction.
 
     Parameters

@@ -3,8 +3,10 @@
 Based on <https://github.com/maresb/hatch-vcs-footgun-example>.
 """
 
+from __future__ import annotations
 
-def _get_hatch_version():
+
+def _get_hatch_version() -> str | None:
     """Compute the most up-to-date version number in a development environment.
 
     Returns `None` if Hatchling is not installed, e.g. in a production environment.
@@ -31,7 +33,7 @@ def _get_hatch_version():
     return metadata.core.version or metadata.hatch.version.cached
 
 
-def _get_importlib_metadata_version():
+def _get_importlib_metadata_version() -> str:
     """Compute the version number using importlib.metadata.
 
     This is the official Pythonic way to get the version number of an installed

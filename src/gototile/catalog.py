@@ -1,5 +1,7 @@
 """Catalog functions for gototile."""
 
+from __future__ import annotations
+
 import sys
 import time
 from pathlib import Path
@@ -16,10 +18,15 @@ from . import skymaptools
 from .skymap import SkyMap
 
 
-def download_glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cutoff_dist=10000):
+def download_glade(
+    url: str = 'http://glade.elte.hu/GLADE_2.3.txt',
+    local_path: str | Path | None = None,
+    cutoff_dist: int = 10000,
+) -> None:
     """Download the GLADE galaxy catalog and convert it to CSV format."""
 
-    def reporthook(count, block_size, total_size):
+    def reporthook(count: int, block_size: int, total_size: int) -> None:
+        """Report download progress."""
         global start_time  # noqa: PLW0603
         if count == 0:
             start_time = time.time()
@@ -83,16 +90,16 @@ def download_glade(url='http://glade.elte.hu/GLADE_2.3.txt', local_path=None, cu
 
 
 def create_catalog_skymap(  # noqa: PLR0913
-    name,
-    dist_mean=None,
-    dist_err=None,
-    key='weight',
-    nside=64,
-    nest=True,
-    smooth=True,
-    sigma=15,
-    min_weight=0,
-):
+    name: str,
+    dist_mean: float | None = None,
+    dist_err: float | None = None,
+    key: str = 'weight',
+    nside: int = 64,
+    nest: bool = True,
+    smooth: bool = True,
+    sigma: float = 15,
+    min_weight: int = 0,
+) -> SkyMap:
     """Create a skymap of weighted galaxy positions from a given catalog.
 
     Parameters

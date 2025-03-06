@@ -1,12 +1,17 @@
 """Module containing utility functions for spherical geometry."""
 
+from __future__ import annotations
+
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from matplotlib.path import Path
 
 
-def onsky_offset(coords, offsets):
+def onsky_offset(
+    coords: SkyCoord | list[SkyCoord],
+    offsets: tuple[u.Quantity, u.Quantity] | list[tuple[u.Quantity, u.Quantity]],
+) -> SkyCoord:
     """Find coordinates of points offset from the target coordinates by the given on-sky distances.
 
     This function is used when considering points offset off of the celestial sphere, e.g.
@@ -101,7 +106,7 @@ def onsky_offset(coords, offsets):
     return offset_coords
 
 
-def interpolate_points(coords, n_points=5):
+def interpolate_points(coords: SkyCoord, n_points: int = 5) -> SkyCoord:
     """Interpolate a number of on-sky positions between the given coordinates.
 
     Parameters
@@ -177,7 +182,7 @@ def interpolate_points(coords, n_points=5):
     return points
 
 
-def coords_to_path(coords, meridian_split=False):
+def coords_to_path(coords: SkyCoord, meridian_split: bool = False) -> Path:
     """Create a Matplotlib Path for a region defined by the given edge coordinates.
 
     The main benefit of this function is that it can handle shapes that pass over the RA=0 meridian,

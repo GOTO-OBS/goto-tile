@@ -6,7 +6,7 @@ from astropy import units as u
 from gototile.grid import SkyGrid
 
 
-def test_gridding():
+def test_gridding() -> None:
     """Test the SkyGrid class."""
     fov = {'ra': 4 * u.deg, 'dec': 2 * u.deg}
 
